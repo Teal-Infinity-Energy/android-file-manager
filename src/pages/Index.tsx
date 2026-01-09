@@ -63,7 +63,7 @@ const Index = () => {
               <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
                 <Plus className="h-5 w-5 text-primary-foreground" />
               </div>
-              <h1 className="text-xl font-semibold text-foreground">QuickLaunch</h1>
+              <h1 className="text-xl font-semibold text-foreground">OneTap</h1>
             </div>
             <p className="text-muted-foreground mt-2">
               Create shortcuts to your files and links
