@@ -1,26 +1,52 @@
-# QuickLaunch - Native Android Setup
+# OneTap - Native Android Setup
 
-This document explains how to set up the native Android code for full functionality.
+This document explains how to set up and test the OneTap app on your Android device.
 
 ## Prerequisites
 
-1. Export this project to GitHub
-2. Clone the repository locally
-3. Run `npm install`
-4. Run `npx cap add android`
-5. Run `npm run build`
-6. Run `npx cap sync`
+- **Node.js** (v18 or later)
+- **Android Studio** (with Android SDK)
+- **An Android phone** (Android 12+) with Developer Mode enabled
+- **USB cable** to connect your phone
 
-## Native Android Files to Add
+## Step-by-Step Testing Instructions
 
-After running `npx cap sync`, you need to add the following native Android code:
+### Step 1: Export to GitHub
 
-### 1. ShortcutPlugin.kt
+1. In Lovable, click the **GitHub** button (top right)
+2. Click **"Export to GitHub"** and create a new repository
+3. Wait for the export to complete
 
-Create file: `android/app/src/main/java/app/lovable/.../plugins/ShortcutPlugin.kt`
+### Step 2: Clone and Setup Locally
+
+```bash
+# Clone your repository
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+cd YOUR_REPO_NAME
+
+# Install dependencies
+npm install
+
+# Add Android platform
+npx cap add android
+
+# Build the web app
+npm run build
+
+# Sync to Android
+npx cap sync android
+```
+
+### Step 3: Add Native Android Code
+
+After running `npx cap sync`, you need to add native code for shortcut functionality:
+
+#### 3a. Create ShortcutPlugin.kt
+
+Create file: `android/app/src/main/java/app/onetap/shortcuts/plugins/ShortcutPlugin.kt`
 
 ```kotlin
-package app.lovable.quicklaunch.plugins
+package app.onetap.shortcuts.plugins
 
 import android.content.Intent
 import android.content.pm.ShortcutInfo
@@ -67,14 +93,12 @@ class ShortcutPlugin : Plugin() {
         val intentData = call.getString("intentData") ?: return
         val intentType = call.getString("intentType")
         
-        // Create the intent that opens content directly
         val intent = Intent(intentAction).apply {
             data = Uri.parse(intentData)
             intentType?.let { type = it }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         
-        // Create icon
         val icon = createIcon(call)
         
         val shortcutInfo = ShortcutInfo.Builder(context, id)
@@ -93,17 +117,14 @@ class ShortcutPlugin : Plugin() {
     private fun createIcon(call: PluginCall): Icon {
         val context = context!!
         
-        // Try emoji icon
         call.getString("iconEmoji")?.let { emoji ->
             return createEmojiIcon(emoji)
         }
         
-        // Try text icon
         call.getString("iconText")?.let { text ->
             return createTextIcon(text)
         }
         
-        // Default icon
         return Icon.createWithResource(context, android.R.drawable.ic_menu_add)
     }
     
@@ -113,14 +134,12 @@ class ShortcutPlugin : Plugin() {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         
-        // Draw background
         val bgPaint = Paint().apply {
             color = Color.parseColor("#2563EB")
             style = Paint.Style.FILL
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
         
-        // Draw emoji
         val textPaint = Paint().apply {
             textSize = size * 0.5f
             textAlign = Paint.Align.CENTER
@@ -137,14 +156,12 @@ class ShortcutPlugin : Plugin() {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         
-        // Draw background
         val bgPaint = Paint().apply {
             color = Color.parseColor("#2563EB")
             style = Paint.Style.FILL
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
         
-        // Draw text
         val textPaint = Paint().apply {
             color = Color.WHITE
             textSize = size * 0.4f
@@ -208,12 +225,16 @@ class ShortcutPlugin : Plugin() {
 }
 ```
 
-### 2. Register the Plugin
+#### 3b. Update MainActivity.kt
 
-In `android/app/src/main/java/.../MainActivity.kt`, add:
+Edit `android/app/src/main/java/app/onetap/shortcuts/MainActivity.kt`:
 
 ```kotlin
-import app.lovable.quicklaunch.plugins.ShortcutPlugin
+package app.onetap.shortcuts
+
+import android.os.Bundle
+import com.getcapacitor.BridgeActivity
+import app.onetap.shortcuts.plugins.ShortcutPlugin
 
 class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -223,15 +244,15 @@ class MainActivity : BridgeActivity() {
 }
 ```
 
-### 3. AndroidManifest.xml Updates
+#### 3c. Update AndroidManifest.xml
 
-Add to `android/app/src/main/AndroidManifest.xml`:
+Edit `android/app/src/main/AndroidManifest.xml` and add:
 
 ```xml
-<!-- Inside <manifest> -->
+<!-- Inside <manifest> tag -->
 <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
 
-<!-- Inside <activity> for Share Sheet support -->
+<!-- Inside <activity> tag for Share Sheet support -->
 <intent-filter>
     <action android:name="android.intent.action.SEND" />
     <category android:name="android.intent.category.DEFAULT" />
@@ -244,13 +265,48 @@ Add to `android/app/src/main/AndroidManifest.xml`:
 </intent-filter>
 ```
 
-## Running the App
+### Step 4: Enable Developer Mode on Your Phone
 
-1. Connect an Android device or start an emulator
-2. Run `npx cap run android`
+1. Go to **Settings → About Phone**
+2. Tap **Build Number** 7 times
+3. Go back to **Settings → Developer Options**
+4. Enable **USB Debugging**
 
-## Building for Release
+### Step 5: Connect and Run
 
-1. In Android Studio, go to Build → Generate Signed Bundle/APK
-2. Create or use a keystore
-3. Build a signed APK for distribution
+```bash
+# Connect your phone via USB
+# Accept the "Allow USB debugging" prompt on your phone
+
+# Run the app
+npx cap run android
+```
+
+This will build and install the app directly on your phone!
+
+### Alternative: Use Android Studio
+
+```bash
+# Open in Android Studio
+npx cap open android
+```
+
+Then click the **Run** button (green play icon) in Android Studio.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Device not detected | Check USB cable, enable USB debugging |
+| Build fails | Run `npx cap sync android` again |
+| App crashes | Check Logcat in Android Studio for errors |
+| Shortcuts not working | Ensure Android 8.0+ and launcher supports pinned shortcuts |
+
+## Building a Release APK
+
+1. Open in Android Studio: `npx cap open android`
+2. Go to **Build → Generate Signed Bundle/APK**
+3. Select **APK**
+4. Create a new keystore or use existing
+5. Build the signed APK
+6. Find APK in `android/app/release/`
