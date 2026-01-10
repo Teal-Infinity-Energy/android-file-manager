@@ -115,16 +115,39 @@ public class VideoProxyActivity extends Activity {
     
     private void openInternalPlayer(Uri videoUri, String mimeType) {
         try {
+            // If this is our own FileProvider URI, convert it to a direct file:// URI for maximum reliability.
+            // Some launchers/providers can behave oddly with transient grants on cold-start.
+            Uri dataToSend = videoUri;
+            try {
+                String expectedAuthority = getPackageName() + ".fileprovider";
+                if (expectedAuthority.equals(videoUri.getAuthority())) {
+                    String path = videoUri.getPath();
+                    if (path != null && path.contains("/shortcuts/")) {
+                        String fileName = path.substring(path.lastIndexOf("/") + 1);
+                        java.io.File shortcutsDir = new java.io.File(getFilesDir(), "shortcuts");
+                        java.io.File localFile = new java.io.File(shortcutsDir, fileName);
+                        if (localFile.exists() && localFile.length() > 0) {
+                            dataToSend = Uri.fromFile(localFile);
+                            Log.d(TAG, "Converted FileProvider URI to file:// for internal player: " + dataToSend);
+                        } else {
+                            Log.w(TAG, "Local shortcut file missing/empty, keeping content URI: " + localFile.getAbsolutePath());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to convert to file:// URI, keeping original content URI: " + e.getMessage());
+            }
+
             // Launch OneTap with internal video player action
             Intent fallbackIntent = new Intent(this, MainActivity.class);
             fallbackIntent.setAction("app.onetap.PLAY_VIDEO");
-            fallbackIntent.setDataAndType(videoUri, mimeType);
+            fallbackIntent.setDataAndType(dataToSend, mimeType);
             fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             fallbackIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            
+
             startActivity(fallbackIntent);
             Log.d(TAG, "Internal video player launched");
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Error launching internal player: " + e.getMessage());
         }

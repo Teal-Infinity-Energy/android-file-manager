@@ -933,11 +933,37 @@ public class ShortcutPlugin extends Plugin {
                 return;
             }
 
+            // IMPORTANT: If we receive our own FileProvider URI, convert it to a stable absolute file path.
+            // This avoids edge cases where a launcher/provider doesn't preserve transient grants across cold start.
+            String dataString = uri.toString();
+            try {
+                Context context = getContext();
+                if (context != null) {
+                    String authority = uri.getAuthority();
+                    if (authority != null && authority.equals(context.getPackageName() + ".fileprovider")) {
+                        String path = uri.getPath();
+                        if (path != null && path.contains("/shortcuts/")) {
+                            String fileName = path.substring(path.lastIndexOf("/") + 1);
+                            File shortcutsDir = new File(context.getFilesDir(), "shortcuts");
+                            File localFile = new File(shortcutsDir, fileName);
+                            if (localFile.exists() && localFile.length() > 0) {
+                                dataString = "file://" + localFile.getAbsolutePath();
+                                android.util.Log.d("ShortcutPlugin", "PLAY_VIDEO: converted FileProvider URI to file path: " + dataString);
+                            } else {
+                                android.util.Log.w("ShortcutPlugin", "PLAY_VIDEO: local shortcut file missing/empty: " + localFile.getAbsolutePath());
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.w("ShortcutPlugin", "PLAY_VIDEO: failed to convert to file path, keeping original URI: " + e);
+            }
+
             JSObject result = new JSObject();
             result.put("action", action);
             result.put("type", type != null ? type : "video/*");
-            result.put("data", uri.toString());
-            android.util.Log.d("ShortcutPlugin", "PLAY_VIDEO data URI: " + uri.toString());
+            result.put("data", dataString);
+            android.util.Log.d("ShortcutPlugin", "PLAY_VIDEO data: " + dataString);
             call.resolve(result);
         } else {
             android.util.Log.d("ShortcutPlugin", "No shared content found");
