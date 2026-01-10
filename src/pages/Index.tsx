@@ -41,8 +41,13 @@ const Index = () => {
         // Add nonce to force fresh navigation/player initialization on repeated taps
         const nonce = Date.now();
         console.log('[Index] Video open detected, navigating to player:', { action: sharedAction, uri: sharedContent.uri, type: sharedContent.mimeType, nonce });
-        clearSharedContent();
+
+        // Navigate first (preserve any one-time URI grants during cold start), then clear.
         navigate(`/player?uri=${uri}&type=${type}&t=${nonce}`);
+        // Clear the shared intent shortly after navigation to avoid re-processing loops.
+        setTimeout(() => {
+          clearSharedContent();
+        }, 0);
         return;
       }
 
