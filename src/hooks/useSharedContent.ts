@@ -7,6 +7,7 @@ import type { ContentSource } from '@/types/shortcut';
 // Supports both initial launch and app resume (when app is already open)
 export function useSharedContent() {
   const [sharedContent, setSharedContent] = useState<ContentSource | null>(null);
+  const [sharedAction, setSharedAction] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const lastProcessedRef = useRef<string | null>(null);
 
@@ -17,13 +18,16 @@ export function useSharedContent() {
       console.log('[useSharedContent] Shared content result:', shared);
       
       if (shared) {
-        // Handle both text (URLs) and data (file URIs)
+        const action = shared.action || null;
+        setSharedAction(action);
+
+        // Handle both text (URLs, etc.) and data (file URIs)
         const text = shared.text || '';
         const data = shared.data || '';
-        
+
         // Create a unique identifier for this share to prevent duplicates
-        const shareId = `${text}-${data}-${shared.type}`;
-        
+        const shareId = `${action}-${text}-${data}-${shared.type}`;
+
         // Check if we already processed this exact share
         if (lastProcessedRef.current === shareId) {
           console.log('[useSharedContent] Already processed this share, skipping');
@@ -68,6 +72,8 @@ export function useSharedContent() {
             console.log('[useSharedContent] Text is not a valid URL, ignoring');
           }
         }
+      } else {
+        setSharedAction(null);
       }
     } catch (error) {
       console.error('[useSharedContent] Error checking shared content:', error);
@@ -120,6 +126,7 @@ export function useSharedContent() {
   const clearSharedContent = useCallback(async () => {
     console.log('[useSharedContent] Clearing shared content');
     setSharedContent(null);
+    setSharedAction(null);
     
     // Clear the native intent to prevent re-processing
     try {
@@ -139,7 +146,7 @@ export function useSharedContent() {
     checkSharedContent();
   }, [checkSharedContent]);
 
-  return { sharedContent, isLoading, clearSharedContent, recheckSharedContent };
+  return { sharedContent, sharedAction, isLoading, clearSharedContent, recheckSharedContent };
 }
 
 // Extract a readable name from URL

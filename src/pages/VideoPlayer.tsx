@@ -1,22 +1,56 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 
 const VideoPlayer = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [playbackSrc, setPlaybackSrc] = useState<string | null>(null);
   
   const videoUri = searchParams.get('uri');
   const mimeType = searchParams.get('type') || 'video/mp4';
 
   useEffect(() => {
     console.log('[VideoPlayer] Mounted with URI:', videoUri, 'Type:', mimeType);
-    
+
     if (!videoUri) {
       setError('No video URI provided');
+      return;
     }
+
+    // Try to resolve content:// URIs to a file path for better WebView compatibility.
+    const resolve = async () => {
+      try {
+        // Default: use the raw URI
+        let src = videoUri;
+
+        if (videoUri.startsWith('content://')) {
+          const resolved = await ShortcutPlugin.resolveContentUri({ contentUri: videoUri });
+          console.log('[VideoPlayer] resolveContentUri result:', resolved);
+
+          if (resolved?.success && resolved.filePath) {
+            const fileUri = resolved.filePath.startsWith('file://')
+              ? resolved.filePath
+              : `file://${resolved.filePath}`;
+            src = Capacitor.convertFileSrc(fileUri);
+          }
+        } else if (videoUri.startsWith('file://') || videoUri.startsWith('/')) {
+          const fileUri = videoUri.startsWith('file://') ? videoUri : `file://${videoUri}`;
+          src = Capacitor.convertFileSrc(fileUri);
+        }
+
+        setPlaybackSrc(src);
+      } catch (e) {
+        console.warn('[VideoPlayer] Failed to resolve video URI, using raw URI', e);
+        setPlaybackSrc(videoUri);
+      }
+    };
+
+    resolve();
   }, [videoUri, mimeType]);
 
   const handleBack = () => {
@@ -28,7 +62,7 @@ const VideoPlayer = () => {
     setError('Unable to play this video. The file may be corrupted or in an unsupported format.');
   };
 
-  if (error || !videoUri) {
+  if (error || !videoUri || !playbackSrc) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
         <div className="text-center">
@@ -65,14 +99,14 @@ const VideoPlayer = () => {
       {/* Video player */}
       <div className="flex-1 flex items-center justify-center">
         <video
-          src={videoUri}
+          src={playbackSrc}
           className="max-w-full max-h-full w-full h-full object-contain"
           controls
           autoPlay
           playsInline
           onError={handleVideoError}
         >
-          <source src={videoUri} type={mimeType} />
+          <source src={playbackSrc} type={mimeType} />
           Your browser does not support the video tag.
         </video>
       </div>

@@ -924,6 +924,21 @@ public class ShortcutPlugin extends Plugin {
             }
 
             call.resolve(result);
+        } else if ("app.onetap.PLAY_VIDEO".equals(action)) {
+            // Internal video player fallback from VideoProxyActivity
+            Uri uri = intent.getData();
+            if (uri == null) {
+                android.util.Log.e("ShortcutPlugin", "PLAY_VIDEO intent missing data URI");
+                call.resolve(null);
+                return;
+            }
+
+            JSObject result = new JSObject();
+            result.put("action", action);
+            result.put("type", type != null ? type : "video/*");
+            result.put("data", uri.toString());
+            android.util.Log.d("ShortcutPlugin", "PLAY_VIDEO data URI: " + uri.toString());
+            call.resolve(result);
         } else {
             android.util.Log.d("ShortcutPlugin", "No shared content found");
             call.resolve(null);
