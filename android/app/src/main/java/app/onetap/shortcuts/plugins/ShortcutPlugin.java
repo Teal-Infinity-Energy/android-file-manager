@@ -978,7 +978,7 @@ public class ShortcutPlugin extends Plugin {
     @PluginMethod
     public void resolveContentUri(PluginCall call) {
         android.util.Log.d("ShortcutPlugin", "resolveContentUri called");
-        
+
         String contentUri = call.getString("contentUri");
         if (contentUri == null) {
             JSObject result = new JSObject();
@@ -987,19 +987,60 @@ public class ShortcutPlugin extends Plugin {
             call.resolve(result);
             return;
         }
-        
+
+        Context context = getContext();
         Uri uri = Uri.parse(contentUri);
-        String realPath = getRealPathFromUri(getContext(), uri);
-        
+
+        // First attempt: resolve to a real filesystem path (works for some MediaStore URIs)
+        String realPath = getRealPathFromUri(context, uri);
+
         JSObject result = new JSObject();
         if (realPath != null) {
             result.put("success", true);
             result.put("filePath", realPath);
-        } else {
+            call.resolve(result);
+            return;
+        }
+
+        // Fallback: copy the content URI into app cache and return an absolute file path.
+        // This is required for many SAF/document URIs where _data is not available.
+        try {
+            String detectedMime = detectMimeType(context, uri);
+            String extension = getExtensionFromMimeType(detectedMime);
+            if (extension == null) extension = "";
+
+            File cacheDir = new File(context.getCacheDir(), "onetap_resolved");
+            if (!cacheDir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                cacheDir.mkdirs();
+            }
+
+            File outFile = new File(cacheDir, "resolved_" + System.currentTimeMillis() + extension);
+
+            ContentResolver resolver = context.getContentResolver();
+            InputStream in = resolver.openInputStream(uri);
+            if (in == null) {
+                throw new Exception("ContentResolver.openInputStream returned null");
+            }
+
+            try (InputStream input = in; OutputStream output = new FileOutputStream(outFile)) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                }
+            }
+
+            android.util.Log.d("ShortcutPlugin", "resolveContentUri: copied to cache path=" + outFile.getAbsolutePath());
+            result.put("success", true);
+            result.put("filePath", outFile.getAbsolutePath());
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "resolveContentUri fallback copy failed: " + e.getMessage());
             result.put("success", false);
             result.put("error", "Could not resolve URI to file path");
+            call.resolve(result);
         }
-        call.resolve(result);
     }
     
     @PluginMethod

@@ -29,11 +29,18 @@ const Index = () => {
   // ALWAYS override current state when new share arrives (even on success screen)
   useEffect(() => {
     if (!isLoadingShared && sharedContent) {
-      // Internal video fallback: jump straight to the player
-      if (sharedAction === 'app.onetap.PLAY_VIDEO' && sharedContent.type === 'file') {
+      const isVideoFile =
+        sharedContent.type === 'file' && !!sharedContent.mimeType && sharedContent.mimeType.startsWith('video/');
+
+      // Internal video fallback: jump straight to the player.
+      // Some OEMs/launchers/providers may not preserve the action reliably; in that case sharedAction can be null.
+      // We only auto-play when action is PLAY_VIDEO OR when action is missing but the payload is a video file.
+      const shouldAutoPlayVideo = sharedAction === 'app.onetap.PLAY_VIDEO' || (sharedAction == null && isVideoFile);
+
+      if (shouldAutoPlayVideo && sharedContent.type === 'file') {
         const uri = encodeURIComponent(sharedContent.uri);
         const type = encodeURIComponent(sharedContent.mimeType || 'video/*');
-        console.log('[Index] PLAY_VIDEO detected, navigating to internal player:', sharedContent.uri);
+        console.log('[Index] Video open detected, navigating to player:', { action: sharedAction, uri: sharedContent.uri, type: sharedContent.mimeType });
         clearSharedContent();
         navigate(`/player?uri=${uri}&type=${type}`);
         return;
