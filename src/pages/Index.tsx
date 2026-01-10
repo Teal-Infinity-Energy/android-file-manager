@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { ContentSourcePicker } from '@/components/ContentSourcePicker';
 import { UrlInput } from '@/components/UrlInput';
@@ -21,31 +21,42 @@ const Index = () => {
   const [searchParams] = useSearchParams();
   const lastSharedIdRef = useRef<string | null>(null);
   
+  const navigate = useNavigate();
   const { createShortcut } = useShortcuts();
-  const { sharedContent, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
+  const { sharedContent, sharedAction, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
 
-  // Handle shared content from Android Share Sheet
+  // Handle shared content from Android Share Sheet AND internal video fallback
   // ALWAYS override current state when new share arrives (even on success screen)
   useEffect(() => {
     if (!isLoadingShared && sharedContent) {
+      // Internal video fallback: jump straight to the player
+      if (sharedAction === 'app.onetap.PLAY_VIDEO' && sharedContent.type === 'file') {
+        const uri = encodeURIComponent(sharedContent.uri);
+        const type = encodeURIComponent(sharedContent.mimeType || 'video/*');
+        console.log('[Index] PLAY_VIDEO detected, navigating to internal player:', sharedContent.uri);
+        clearSharedContent();
+        navigate(`/player?uri=${uri}&type=${type}`);
+        return;
+      }
+
       // Create unique ID for this share
       const shareId = `${sharedContent.uri}-${sharedContent.type}`;
-      
+
       // Check if we already processed this exact share
       if (lastSharedIdRef.current === shareId) {
         console.log('[Index] Already processed this share, skipping');
         return;
       }
-      
+
       console.log('[Index] Processing shared content (override mode):', sharedContent);
       lastSharedIdRef.current = shareId;
-      
+
       // Reset state and process new share
       setContentSource(sharedContent);
       setStep('customize');
       clearSharedContent();
     }
-  }, [sharedContent, isLoadingShared, clearSharedContent]);
+  }, [sharedContent, sharedAction, isLoadingShared, clearSharedContent, navigate]);
 
   // Handle Android back button
   useBackButton({
