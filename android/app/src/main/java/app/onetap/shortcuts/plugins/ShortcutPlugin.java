@@ -250,13 +250,21 @@ public class ShortcutPlugin extends Plugin {
     private Intent createCompatibleIntent(Context context, String action, Uri dataUri, String mimeType) {
         Intent intent = new Intent(action);
         
+        // CRITICAL: Detect MIME type if not provided or if it's generic
+        String resolvedMimeType = mimeType;
+        if (resolvedMimeType == null || resolvedMimeType.isEmpty() || "*/*".equals(resolvedMimeType)) {
+            // Try to detect from URI
+            resolvedMimeType = detectMimeType(context, dataUri);
+            android.util.Log.d("ShortcutPlugin", "Detected MIME type: " + resolvedMimeType);
+        }
+        
         // CRITICAL: Use setDataAndType() when both are present
-        if (mimeType != null && !mimeType.isEmpty()) {
-            intent.setDataAndType(dataUri, mimeType);
-            android.util.Log.d("ShortcutPlugin", "Set data AND type: " + dataUri + " / " + mimeType);
+        if (resolvedMimeType != null && !resolvedMimeType.isEmpty() && !"*/*".equals(resolvedMimeType)) {
+            intent.setDataAndType(dataUri, resolvedMimeType);
+            android.util.Log.d("ShortcutPlugin", "Set data AND type: " + dataUri + " / " + resolvedMimeType);
         } else {
             intent.setData(dataUri);
-            android.util.Log.d("ShortcutPlugin", "Set data only: " + dataUri);
+            android.util.Log.d("ShortcutPlugin", "Set data only (no MIME): " + dataUri);
         }
         
         // Add flags for proper file access and new task
@@ -354,14 +362,17 @@ public class ShortcutPlugin extends Plugin {
         String result = null;
         
         try {
-            // Try MediaStore for images/videos
+            // Try MediaStore for images/videos - use _data column which works for both
             if (uri.getAuthority() != null && uri.getAuthority().contains("media")) {
-                String[] projection = { MediaStore.Images.Media.DATA };
+                // Use "_data" directly as it works for all media types (images, video, audio)
+                String[] projection = { "_data" };
                 Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null);
                 if (cursor != null) {
-                    int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
                     if (cursor.moveToFirst()) {
-                        result = cursor.getString(columnIndex);
+                        int columnIndex = cursor.getColumnIndex("_data");
+                        if (columnIndex >= 0) {
+                            result = cursor.getString(columnIndex);
+                        }
                     }
                     cursor.close();
                 }
@@ -376,10 +387,20 @@ public class ShortcutPlugin extends Plugin {
                     if (displayNameIndex >= 0) {
                         String displayName = cursor.getString(displayNameIndex);
                         // Check common locations
-                        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                        File possibleFile = new File(downloads, displayName);
-                        if (possibleFile.exists()) {
-                            result = possibleFile.getAbsolutePath();
+                        File[] possibleLocations = {
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                            new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera")
+                        };
+                        
+                        for (File location : possibleLocations) {
+                            File possibleFile = new File(location, displayName);
+                            if (possibleFile.exists()) {
+                                result = possibleFile.getAbsolutePath();
+                                break;
+                            }
                         }
                     }
                     cursor.close();
@@ -391,6 +412,122 @@ public class ShortcutPlugin extends Plugin {
         
         android.util.Log.d("ShortcutPlugin", "Real path for " + uri + ": " + result);
         return result;
+    }
+    
+    // Detect MIME type from URI using various methods
+    private String detectMimeType(Context context, Uri uri) {
+        String mimeType = null;
+        
+        // Method 1: Try ContentResolver
+        try {
+            mimeType = context.getContentResolver().getType(uri);
+            if (mimeType != null && !mimeType.isEmpty() && !"*/*".equals(mimeType)) {
+                android.util.Log.d("ShortcutPlugin", "MIME from ContentResolver: " + mimeType);
+                return mimeType;
+            }
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error getting MIME from ContentResolver: " + e.getMessage());
+        }
+        
+        // Method 2: Try file extension from URI path
+        String path = uri.getPath();
+        if (path != null) {
+            String extension = MimeTypeMap.getFileExtensionFromUrl(path);
+            if (extension != null && !extension.isEmpty()) {
+                mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.toLowerCase());
+                if (mimeType != null) {
+                    android.util.Log.d("ShortcutPlugin", "MIME from extension '" + extension + "': " + mimeType);
+                    return mimeType;
+                }
+            }
+            
+            // Try manual extraction if URL parser fails
+            int dotIndex = path.lastIndexOf('.');
+            if (dotIndex >= 0) {
+                extension = path.substring(dotIndex + 1).toLowerCase();
+                mimeType = getMimeTypeFromExtension(extension);
+                if (mimeType != null) {
+                    android.util.Log.d("ShortcutPlugin", "MIME from manual extension '" + extension + "': " + mimeType);
+                    return mimeType;
+                }
+            }
+        }
+        
+        // Method 3: Try to get real file path and check its extension
+        String realPath = getRealPathFromUri(context, uri);
+        if (realPath != null) {
+            int dotIndex = realPath.lastIndexOf('.');
+            if (dotIndex >= 0) {
+                String extension = realPath.substring(dotIndex + 1).toLowerCase();
+                mimeType = getMimeTypeFromExtension(extension);
+                if (mimeType != null) {
+                    android.util.Log.d("ShortcutPlugin", "MIME from real path extension '" + extension + "': " + mimeType);
+                    return mimeType;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    // Get MIME type from file extension
+    private String getMimeTypeFromExtension(String extension) {
+        if (extension == null) return null;
+        
+        switch (extension.toLowerCase()) {
+            // Images
+            case "jpg":
+            case "jpeg":
+                return "image/jpeg";
+            case "png":
+                return "image/png";
+            case "gif":
+                return "image/gif";
+            case "webp":
+                return "image/webp";
+            case "bmp":
+                return "image/bmp";
+            case "heic":
+                return "image/heic";
+            case "heif":
+                return "image/heif";
+            // Videos
+            case "mp4":
+                return "video/mp4";
+            case "webm":
+                return "video/webm";
+            case "mov":
+                return "video/quicktime";
+            case "avi":
+                return "video/x-msvideo";
+            case "mkv":
+                return "video/x-matroska";
+            case "3gp":
+                return "video/3gpp";
+            // Documents
+            case "pdf":
+                return "application/pdf";
+            case "doc":
+                return "application/msword";
+            case "docx":
+                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case "txt":
+                return "text/plain";
+            case "rtf":
+                return "application/rtf";
+            case "xls":
+                return "application/vnd.ms-excel";
+            case "xlsx":
+                return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            case "ppt":
+                return "application/vnd.ms-powerpoint";
+            case "pptx":
+                return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            default:
+                // Try system MimeTypeMap
+                String systemMime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+                return systemMime;
+        }
     }
     
     private Uri copyToAppStorage(Context context, Uri sourceUri, String id, String mimeType) {

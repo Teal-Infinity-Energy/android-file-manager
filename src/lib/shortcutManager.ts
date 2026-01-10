@@ -131,8 +131,13 @@ export async function createHomeScreenShortcut(
       console.log('[ShortcutManager] Passing file data to native, size:', fileSize);
       fileOptions.fileData = contentSource.fileData;
       fileOptions.fileName = shortcut.name;
-      fileOptions.fileMimeType = shortcut.mimeType || intent.type;
+      // Use the mimeType from shortcut first, then content source, then detect from intent
+      fileOptions.fileMimeType = shortcut.mimeType || (contentSource as any)?.mimeType || intent.type;
       fileOptions.fileSize = fileSize;
+      console.log('[ShortcutManager] File MIME type:', fileOptions.fileMimeType);
+    } else if (shortcut.type === 'file') {
+      // Even without base64 data, pass the mimeType for proper detection
+      console.log('[ShortcutManager] File shortcut without base64, mimeType:', shortcut.mimeType);
     }
     
     const params = {
