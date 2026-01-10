@@ -23,6 +23,10 @@ export function useShortcuts() {
     name: string,
     icon: ShortcutIcon
   ): ShortcutData => {
+    // Determine file type from content source
+    const isFile = source.type === 'file';
+    const fileType = isFile ? detectFileTypeFromMime(source.mimeType, source.name) : undefined;
+    
     const shortcut: ShortcutData = {
       id: crypto.randomUUID(),
       name,
@@ -31,12 +35,34 @@ export function useShortcuts() {
       icon,
       createdAt: Date.now(),
       usageCount: 0,
+      // Preserve file metadata for native side
+      mimeType: source.mimeType,
+      fileType: fileType,
+      fileSize: source.fileSize,
     };
 
     const updated = [...shortcuts, shortcut];
     saveShortcuts(updated);
     return shortcut;
   }, [shortcuts, saveShortcuts]);
+  
+  // Helper to detect file type from MIME type
+  function detectFileTypeFromMime(mimeType?: string, filename?: string): 'image' | 'video' | 'pdf' | 'document' | undefined {
+    if (mimeType) {
+      if (mimeType.startsWith('image/')) return 'image';
+      if (mimeType.startsWith('video/')) return 'video';
+      if (mimeType === 'application/pdf') return 'pdf';
+    }
+    
+    if (filename) {
+      const ext = filename.split('.').pop()?.toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'].includes(ext || '')) return 'image';
+      if (['mp4', 'webm', 'mov', 'avi', 'mkv', '3gp'].includes(ext || '')) return 'video';
+      if (ext === 'pdf') return 'pdf';
+    }
+    
+    return 'document';
+  }
 
   const deleteShortcut = useCallback((id: string) => {
     const updated = shortcuts.filter(s => s.id !== id);
