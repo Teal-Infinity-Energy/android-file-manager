@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Plus, Bug } from 'lucide-react';
 import { ContentSourcePicker } from '@/components/ContentSourcePicker';
 import { UrlInput } from '@/components/UrlInput';
@@ -13,6 +13,7 @@ import { useSharedContent } from '@/hooks/useSharedContent';
 import { pickFile } from '@/lib/contentResolver';
 import { createHomeScreenShortcut } from '@/lib/shortcutManager';
 import type { ContentSource, ShortcutIcon } from '@/types/shortcut';
+import { VIDEO_CACHE_THRESHOLD } from '@/types/shortcut';
 
 type Step = 'source' | 'url' | 'customize' | 'success';
 
@@ -22,8 +23,42 @@ const Index = () => {
   const [lastCreatedName, setLastCreatedName] = useState('');
   const lastSharedIdRef = useRef<string | null>(null);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { createShortcut } = useShortcuts();
   const { sharedContent, sharedAction, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
+
+  // Handle file selected from FileBrowser
+  useEffect(() => {
+    const fromBrowser = searchParams.get('fromBrowser');
+    const filePath = searchParams.get('path');
+    const fileName = searchParams.get('name');
+    const fileSize = searchParams.get('size');
+    const mimeType = searchParams.get('mimeType');
+
+    if (fromBrowser === 'true' && filePath) {
+      console.log('[Index] File from browser:', { filePath, fileName, fileSize, mimeType });
+
+      const size = fileSize ? parseInt(fileSize, 10) : 0;
+      const isLargeFile = size > VIDEO_CACHE_THRESHOLD;
+
+      // Create ContentSource from file path
+      // Use file:// URI for native file access
+      const source: ContentSource = {
+        type: 'file',
+        uri: `file://${filePath}`,
+        name: fileName || filePath.split('/').pop() || 'Unknown',
+        mimeType: mimeType || undefined,
+        fileSize: size,
+        isLargeFile,
+      };
+
+      setContentSource(source);
+      setStep('customize');
+
+      // Clear search params to avoid re-triggering
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   // Handle shared content from Android Share Sheet AND internal video fallback
   // ALWAYS override current state when new share arrives (even on success screen)
@@ -138,6 +173,10 @@ const Index = () => {
     setStep('url');
   };
 
+  const handleBrowseFiles = () => {
+    navigate('/browse');
+  };
+
   const handleUrlSubmit = (url: string) => {
     setContentSource({
       type: 'url',
@@ -203,6 +242,7 @@ const Index = () => {
           <ContentSourcePicker
             onSelectFile={handleSelectFile}
             onSelectUrl={handleSelectUrl}
+            onBrowseFiles={handleBrowseFiles}
           />
         </>
       )}
