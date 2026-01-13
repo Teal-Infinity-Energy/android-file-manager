@@ -19,39 +19,52 @@ export interface ShortcutPluginInterface {
     // Flag to use video proxy activity
     useVideoProxy?: boolean;
   }): Promise<{ success: boolean; error?: string }>;
-  
+
   checkShortcutSupport(): Promise<{ supported: boolean; canPin: boolean }>;
-  
-  getSharedContent(): Promise<{ 
+
+  getSharedContent(): Promise<{
     action?: string;
     type?: string;
     data?: string;
     text?: string;
   } | null>;
-  
+
+  // Native file picker (Android): returns a persistent content:// URI.
+  // On web this returns success=false.
+  pickFile(options?: {
+    mimeTypes?: string[];
+  }): Promise<{
+    success: boolean;
+    uri?: string;
+    name?: string;
+    mimeType?: string;
+    size?: number;
+    error?: string;
+  }>;
+
   // Clear the shared intent after processing to prevent re-processing
   clearSharedIntent(): Promise<void>;
-  
+
   // Save file from base64 and return persistent path
   saveFileFromBase64(options: {
     base64Data: string;
     fileName: string;
     mimeType: string;
   }): Promise<{ success: boolean; filePath?: string; error?: string }>;
-  
+
   // Resolve content:// URI to file:// path
   resolveContentUri(options: {
     contentUri: string;
   }): Promise<{ success: boolean; filePath?: string; error?: string }>;
-  
+
   // Request storage permissions
   requestStoragePermission(): Promise<{ granted: boolean }>;
-  
+
   // List files in a directory
   listDirectory(options: {
     path: string;
-  }): Promise<{ 
-    success: boolean; 
+  }): Promise<{
+    success: boolean;
     files?: Array<{
       name: string;
       path: string;
@@ -61,7 +74,7 @@ export interface ShortcutPluginInterface {
     }>;
     error?: string;
   }>;
-  
+
   // Get file info
   getFileInfo(options: {
     path: string;
