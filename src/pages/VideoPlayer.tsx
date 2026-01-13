@@ -122,19 +122,24 @@ const VideoPlayer = () => {
       }
     }
 
-    // Probe to avoid showing false "corrupted/unsupported" when the file server is still warming up
-    const probe = await probeUrl(resolved.src);
-    console.log('[VideoPlayer] probe:', probe);
-    if (!probe.ok) {
-      setDebugInfo(`probe failed: ${probe.hint || 'unknown'} status=${probe.status ?? '?'} ct=${probe.contentType ?? '?'}`);
-      if (retriesRef.current < 3) {
-        retriesRef.current += 1;
-        setTimeout(() => attemptRef.current(), 700);
+    // On native platforms, skip fetch-based probe (CORS issues with file:// URLs).
+    // The getFileInfo check above is sufficient. On web, probe can help detect server issues.
+    if (!Capacitor.isNativePlatform()) {
+      const probe = await probeUrl(resolved.src);
+      console.log('[VideoPlayer] probe:', probe);
+      if (!probe.ok) {
+        setDebugInfo(`probe failed: ${probe.hint || 'unknown'} status=${probe.status ?? '?'} ct=${probe.contentType ?? '?'}`);
+        if (retriesRef.current < 3) {
+          retriesRef.current += 1;
+          setTimeout(() => attemptRef.current(), 700);
+          return;
+        }
+        setError('Unable to load video stream.');
+        setIsLoading(false);
         return;
       }
-      setError('Unable to load video stream.');
-      setIsLoading(false);
-      return;
+    } else {
+      console.log('[VideoPlayer] Skipping probe on native platform, using file directly');
     }
 
     setPlaybackSrc(resolved.src);
