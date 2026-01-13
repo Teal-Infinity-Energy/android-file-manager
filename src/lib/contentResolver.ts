@@ -1,4 +1,6 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
+import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 import type { FileType, ContentSource } from '@/types/shortcut';
 import { VIDEO_CACHE_THRESHOLD } from '@/types/shortcut';
 
@@ -145,25 +147,55 @@ async function generateImageThumbnail(file: File, maxSize: number = 512): Promis
   });
 }
 
-// Request file from system picker (web fallback)
-// Handles large files by skipping base64 encoding
+// Request file from system picker
+// - On native Android: uses a native document picker to obtain a persistent content:// URI (no base64 → avoids crashes).
+// - On web: falls back to <input type="file"> and (for small files) base64 encoding.
 export async function pickFile(): Promise<ContentSource | null> {
+  // Native path (Android): get a persistent content:// URI.
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const picked = await ShortcutPlugin.pickFile({
+        // Keep broad support: videos/images/pdfs/docs.
+        mimeTypes: ['video/*', 'image/*', 'application/pdf', 'text/plain', '*/*'],
+      });
+
+      if (!picked?.success || !picked.uri) {
+        // user cancelled or picker failed
+        return null;
+      }
+
+      return {
+        type: 'file',
+        uri: picked.uri,
+        mimeType: picked.mimeType,
+        name: picked.name,
+        fileSize: picked.size,
+        // Mark large videos so native can decide internal vs external player.
+        isLargeFile: typeof picked.size === 'number' ? picked.size > VIDEO_CACHE_THRESHOLD : undefined,
+      };
+    } catch (e) {
+      console.warn('[ContentResolver] Native pickFile failed, falling back to web picker:', e);
+      // Continue to web fallback below.
+    }
+  }
+
+  // Web fallback
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,video/*,application/pdf,.doc,.docx,.txt';
-    
+
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         console.log('[ContentResolver] File picked:', file.name, 'size:', file.size, 'type:', file.type);
-        
+
         const isVideo = file.type.startsWith('video/');
         const isLargeFile = file.size > MAX_BASE64_SIZE;
         const isImage = file.type.startsWith('image/');
 
         // For large videos/files, skip base64 encoding to prevent OOM.
-        // For small/medium videos (<= ~14MB), we DO base64 so native can cache into app storage.
+        // For small/medium videos (<= MAX_BASE64_SIZE), we DO base64 so native can cache into app storage.
         if (isLargeFile) {
           console.log('[ContentResolver] Large file - skipping base64 encoding');
 
@@ -188,12 +220,12 @@ export async function pickFile(): Promise<ContentSource | null> {
           });
           return;
         }
-        
+
         try {
           // Read file as base64 for native handling (small files only)
           const base64Data = await fileToBase64(file);
           console.log('[ContentResolver] File converted to base64, length:', base64Data.length);
-          
+
           // Generate thumbnail for images
           let thumbnailData: string | undefined;
           if (isImage) {
@@ -202,7 +234,7 @@ export async function pickFile(): Promise<ContentSource | null> {
               thumbnailData = thumbnail.split(',')[1];
             }
           }
-          
+
           resolve({
             type: 'file',
             uri: URL.createObjectURL(file), // Still useful for preview
@@ -228,7 +260,7 @@ export async function pickFile(): Promise<ContentSource | null> {
         resolve(null);
       }
     };
-    
+
     input.oncancel = () => resolve(null);
     input.click();
   });

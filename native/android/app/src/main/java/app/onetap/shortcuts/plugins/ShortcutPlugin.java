@@ -1,6 +1,7 @@
 package app.onetap.shortcuts.plugins;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -24,6 +25,7 @@ import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.webkit.MimeTypeMap;
 
+import androidx.activity.result.ActivityResult;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -33,6 +35,7 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
@@ -255,6 +258,119 @@ public class ShortcutPlugin extends Plugin {
         call.resolve(result);
     }
     
+
+    @PluginMethod
+    public void pickFile(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "pickFile called");
+
+        if (getActivity() == null) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", "Activity is null");
+            call.resolve(result);
+            return;
+        }
+
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
+
+        // Default to all files, but allow caller to restrict by MIME types
+        intent.setType("*/*");
+        try {
+            JSArray mimeTypesArr = call.getArray("mimeTypes");
+            if (mimeTypesArr != null && mimeTypesArr.length() > 0) {
+                String[] mimeTypes = new String[mimeTypesArr.length()];
+                for (int i = 0; i < mimeTypesArr.length(); i++) {
+                    mimeTypes[i] = mimeTypesArr.getString(i);
+                }
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("ShortcutPlugin", "Invalid mimeTypes provided: " + e.getMessage());
+        }
+
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+
+        startActivityForResult(call, intent, "pickFileResult");
+    }
+
+    @ActivityCallback
+    private void pickFileResult(PluginCall call, ActivityResult result) {
+        android.util.Log.d("ShortcutPlugin", "pickFileResult called");
+
+        JSObject ret = new JSObject();
+
+        if (call == null) {
+            android.util.Log.w("ShortcutPlugin", "pickFileResult: PluginCall is null");
+            return;
+        }
+
+        if (result == null || result.getResultCode() != Activity.RESULT_OK) {
+            ret.put("success", false);
+            ret.put("error", "cancelled");
+            call.resolve(ret);
+            return;
+        }
+
+        Intent data = result.getData();
+        if (data == null || data.getData() == null) {
+            ret.put("success", false);
+            ret.put("error", "No file selected");
+            call.resolve(ret);
+            return;
+        }
+
+        Uri uri = data.getData();
+
+        // Persist permission where possible
+        try {
+            Context context = getContext();
+            if (context != null) {
+                int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                context.getContentResolver().takePersistableUriPermission(uri, takeFlags);
+                android.util.Log.d("ShortcutPlugin", "Persisted URI permission: " + uri);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("ShortcutPlugin", "Could not persist URI permission: " + e.getMessage());
+        }
+
+        String mimeType = null;
+        String name = null;
+        long size = 0;
+
+        try {
+            Context context = getContext();
+            if (context != null) {
+                ContentResolver resolver = context.getContentResolver();
+                mimeType = resolver.getType(uri);
+
+                Cursor cursor = resolver.query(uri, null, null, null, null);
+                if (cursor != null) {
+                    if (cursor.moveToFirst()) {
+                        int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                        if (nameIndex >= 0) name = cursor.getString(nameIndex);
+
+                        int sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE);
+                        if (sizeIndex >= 0) size = cursor.getLong(sizeIndex);
+                    }
+                    cursor.close();
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.w("ShortcutPlugin", "Failed to query file metadata: " + e.getMessage());
+        }
+
+        ret.put("success", true);
+        ret.put("uri", uri.toString());
+        if (mimeType != null) ret.put("mimeType", mimeType);
+        if (name != null) ret.put("name", name);
+        ret.put("size", size);
+
+        call.resolve(ret);
+    }
+
     @PluginMethod
     public void clearSharedIntent(PluginCall call) {
         android.util.Log.d("ShortcutPlugin", "clearSharedIntent called");
