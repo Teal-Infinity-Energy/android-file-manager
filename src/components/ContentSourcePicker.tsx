@@ -1,13 +1,12 @@
-import { FileText, Link, Share2, FolderOpen } from 'lucide-react';
+import { FileText, Link, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ContentSourcePickerProps {
   onSelectFile: () => void;
   onSelectUrl: () => void;
-  onBrowseFiles: () => void;
 }
 
-export function ContentSourcePicker({ onSelectFile, onSelectUrl, onBrowseFiles }: ContentSourcePickerProps) {
+export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSourcePickerProps) {
   return (
     <div className="flex flex-col gap-3 p-4">
       <SourceOption
@@ -15,12 +14,6 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl, onBrowseFiles }
         label="Local File"
         description="Image, video, PDF, document"
         onClick={onSelectFile}
-      />
-      <SourceOption
-        icon={<FolderOpen className="h-6 w-6" />}
-        label="Browse Files"
-        description="File manager for large videos"
-        onClick={onBrowseFiles}
       />
       <SourceOption
         icon={<Link className="h-6 w-6" />}
