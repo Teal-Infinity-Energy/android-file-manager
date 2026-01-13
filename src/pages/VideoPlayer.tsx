@@ -85,7 +85,9 @@ const VideoPlayer = () => {
   const videoUri = searchParams.get('uri');
   const nonce = searchParams.get('t');
 
-  const attempt = useCallback(async () => {
+  const attemptRef = useRef<() => void>(() => {});
+
+  attemptRef.current = async () => {
     if (!videoUri) {
       setError('No video URI provided');
       setIsLoading(false);
@@ -120,14 +122,14 @@ const VideoPlayer = () => {
       }
     }
 
-    // Probe to avoid showing false “corrupted/unsupported” when the file server is still warming up
+    // Probe to avoid showing false "corrupted/unsupported" when the file server is still warming up
     const probe = await probeUrl(resolved.src);
     console.log('[VideoPlayer] probe:', probe);
     if (!probe.ok) {
       setDebugInfo(`probe failed: ${probe.hint || 'unknown'} status=${probe.status ?? '?'} ct=${probe.contentType ?? '?'}`);
       if (retriesRef.current < 3) {
         retriesRef.current += 1;
-        setTimeout(() => attempt(), 700);
+        setTimeout(() => attemptRef.current(), 700);
         return;
       }
       setError('Unable to load video stream.');
@@ -139,16 +141,15 @@ const VideoPlayer = () => {
     setIsLoading(false);
 
     // Clear shared intent ONLY after we have a confirmed playable src.
-    if (Capacitor.isNativePlatform() && !hasClearedIntent) {
+    if (Capacitor.isNativePlatform()) {
       try {
         await ShortcutPlugin.clearSharedIntent();
-        setHasClearedIntent(true);
         console.log('[VideoPlayer] Cleared shared intent (post-resolve)');
       } catch (e) {
         console.log('[VideoPlayer] clearSharedIntent failed (non-fatal):', e);
       }
     }
-  }, [videoUri, nonce, hasClearedIntent]);
+  };
 
   // Reset on new navigation (nonce changes for repeated shortcut taps)
   useEffect(() => {
@@ -157,10 +158,9 @@ const VideoPlayer = () => {
     setError(null);
     setDebugInfo(null);
     setPlaybackSrc(null);
-    setHasClearedIntent(false);
 
-    attempt();
-  }, [attempt, videoUri, nonce]);
+    attemptRef.current();
+  }, [videoUri, nonce]);
 
   // Drive the HTMLVideoElement explicitly; avoid <source type=...> because wrong types cause false “unsupported”.
   useEffect(() => {
@@ -223,13 +223,13 @@ const VideoPlayer = () => {
     if (retriesRef.current < 3) {
       retriesRef.current += 1;
       setIsLoading(true);
-      setTimeout(() => attempt(), 700);
+      setTimeout(() => attemptRef.current(), 700);
       return;
     }
 
     setIsLoading(false);
     setError('Unable to play this video. The file may be corrupted or in an unsupported format.');
-  }, [attempt, playbackSrc]);
+  }, [playbackSrc]);
 
   if (isLoading) {
     return (
