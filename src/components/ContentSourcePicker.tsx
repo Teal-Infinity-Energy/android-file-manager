@@ -1,11 +1,8 @@
 import { useState } from 'react';
-import { Image, Video, FileText, Link, Music, FolderOpen, Clipboard, Star } from 'lucide-react';
-import { Clipboard as CapClipboard } from '@capacitor/clipboard';
+import { Image, Video, FileText, Link, Music, FolderOpen, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isValidUrl } from '@/lib/contentResolver';
 import type { FileTypeFilter } from '@/lib/contentResolver';
 import { SavedLinksSheet } from './SavedLinksSheet';
-import { toast } from 'sonner';
 
 interface ContentSourcePickerProps {
   onSelectFile: (filter: FileTypeFilter) => void;
@@ -14,44 +11,6 @@ interface ContentSourcePickerProps {
 
 export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSourcePickerProps) {
   const [savedLinksOpen, setSavedLinksOpen] = useState(false);
-
-  const handlePasteFromClipboard = async () => {
-    try {
-      const { value } = await CapClipboard.read();
-      if (value && isValidUrl(value)) {
-        onSelectUrl(value);
-      } else if (value) {
-        // Try adding https prefix
-        const withProtocol = value.startsWith('http') ? value : `https://${value}`;
-        if (isValidUrl(withProtocol)) {
-          onSelectUrl(withProtocol);
-        } else {
-          toast.error('No valid URL found in clipboard');
-        }
-      } else {
-        toast.error('Clipboard is empty');
-      }
-    } catch (error) {
-      // Fallback for web
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text && isValidUrl(text)) {
-          onSelectUrl(text);
-        } else if (text) {
-          const withProtocol = text.startsWith('http') ? text : `https://${text}`;
-          if (isValidUrl(withProtocol)) {
-            onSelectUrl(withProtocol);
-          } else {
-            toast.error('No valid URL found in clipboard');
-          }
-        } else {
-          toast.error('Clipboard is empty');
-        }
-      } catch {
-        toast.error('Unable to access clipboard');
-      }
-    }
-  };
 
   const handleSelectSavedLink = (url: string) => {
     onSelectUrl(url);
@@ -123,31 +82,18 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSource
           <span className="font-medium text-foreground">Enter URL</span>
         </button>
 
-        {/* Quick actions row */}
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <button
-            onClick={handlePasteFromClipboard}
-            className={cn(
-              "flex items-center gap-2 rounded-xl bg-muted/30 p-3",
-              "active:scale-[0.98] transition-all duration-150",
-              "focus:outline-none focus:ring-2 focus:ring-ring"
-            )}
-          >
-            <Clipboard className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Paste URL</span>
-          </button>
-          <button
-            onClick={() => setSavedLinksOpen(true)}
-            className={cn(
-              "flex items-center gap-2 rounded-xl bg-muted/30 p-3",
-              "active:scale-[0.98] transition-all duration-150",
-              "focus:outline-none focus:ring-2 focus:ring-ring"
-            )}
-          >
-            <Star className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Saved Links</span>
-          </button>
-        </div>
+        {/* Saved links button */}
+        <button
+          onClick={() => setSavedLinksOpen(true)}
+          className={cn(
+            "w-full flex items-center gap-3 rounded-xl bg-muted/30 p-3 mt-3",
+            "active:scale-[0.98] transition-all duration-150",
+            "focus:outline-none focus:ring-2 focus:ring-ring"
+          )}
+        >
+          <Star className="h-5 w-5 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">Saved Links</span>
+        </button>
       </div>
     </div>
 
