@@ -162,11 +162,11 @@ const Index = () => {
     setStep('customize');
   };
 
-  const handleConfirm = async (name: string, icon: ShortcutIcon) => {
+  const handleConfirm = async (name: string, icon: ShortcutIcon, resumeEnabled?: boolean) => {
     if (!contentSource) return;
     
-    // Create shortcut with file metadata
-    const shortcut = createShortcut(contentSource, name, icon);
+    // Create shortcut with file metadata (including resumeEnabled for PDFs)
+    const shortcut = createShortcut(contentSource, name, icon, resumeEnabled);
     
     try {
       // Pass the file data to native for proper handling

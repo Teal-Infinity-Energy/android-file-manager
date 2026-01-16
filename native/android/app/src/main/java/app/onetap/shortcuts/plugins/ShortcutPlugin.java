@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import app.onetap.shortcuts.NativeVideoPlayerActivity;
+import app.onetap.shortcuts.PDFProxyActivity;
 import app.onetap.shortcuts.VideoProxyActivity;
 
 @CapacitorPlugin(

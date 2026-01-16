@@ -19,9 +19,11 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [resumeEnabled, setResumeEnabled] = useState(false);
   
-  // Check if this is a PDF file
+  // Check if this is a PDF file (robust detection)
   const isPdf = source.mimeType === 'application/pdf' || 
-                source.name?.toLowerCase().endsWith('.pdf');
+                source.mimeType?.includes('pdf') ||
+                source.name?.toLowerCase().endsWith('.pdf') ||
+                source.uri?.toLowerCase().split('?')[0].endsWith('.pdf');
   
   // Get initial emoji based on source type - smart defaults
   const getInitialIcon = (): ShortcutIcon => {
