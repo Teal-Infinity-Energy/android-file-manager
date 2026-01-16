@@ -51,12 +51,13 @@ export function useShortcuts() {
     return shortcut;
   }, [shortcuts, saveShortcuts]);
   
-  // Helper to detect file type from MIME type
+  // Helper to detect file type from MIME type (robust detection)
   function detectFileTypeFromMime(mimeType?: string, filename?: string): 'image' | 'video' | 'pdf' | 'document' | undefined {
     if (mimeType) {
       if (mimeType.startsWith('image/')) return 'image';
       if (mimeType.startsWith('video/')) return 'video';
-      if (mimeType === 'application/pdf') return 'pdf';
+      // Robust PDF detection: exact match or includes 'pdf'
+      if (mimeType === 'application/pdf' || mimeType.includes('pdf')) return 'pdf';
     }
     
     if (filename) {

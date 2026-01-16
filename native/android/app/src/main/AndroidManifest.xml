@@ -106,14 +106,20 @@
             android:noHistory="true"
             android:excludeFromRecents="true">
             
-            <!-- Intent filter to appear in app picker when opening PDFs -->
+            <!-- Intent filter for content:// PDFs (e.g. from Files app, Drive) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="content" />
-                <data android:scheme="file" />
-                <data android:mimeType="application/pdf" />
+                <data android:scheme="content" android:mimeType="application/pdf" />
+            </intent-filter>
+            
+            <!-- Intent filter for file:// PDFs -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" android:mimeType="application/pdf" />
             </intent-filter>
             
         </activity>
