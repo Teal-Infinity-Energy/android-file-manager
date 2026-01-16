@@ -416,11 +416,102 @@ export function getYouTubeThumbnailUrl(url: string): string | null {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
+// Generate thumbnail from local video file using HTML5 video element
+async function generateVideoThumbnail(videoUri: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = 'anonymous';
+    
+    const cleanup = () => {
+      video.src = '';
+      video.load();
+    };
+    
+    video.onloadeddata = () => {
+      // Seek to 1 second or 10% of duration, whichever is smaller
+      const seekTime = Math.min(1, video.duration * 0.1);
+      video.currentTime = seekTime;
+    };
+    
+    video.onseeked = () => {
+      try {
+        // Create canvas and draw video frame
+        const canvas = document.createElement('canvas');
+        const size = 256; // Thumbnail size
+        canvas.width = size;
+        canvas.height = size;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          cleanup();
+          resolve(null);
+          return;
+        }
+        
+        // Calculate dimensions to maintain aspect ratio (center crop)
+        const aspectRatio = video.videoWidth / video.videoHeight;
+        let drawWidth = size;
+        let drawHeight = size;
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        if (aspectRatio > 1) {
+          // Wider than tall - fit height, crop width
+          drawWidth = size * aspectRatio;
+          offsetX = (size - drawWidth) / 2;
+        } else {
+          // Taller than wide - fit width, crop height
+          drawHeight = size / aspectRatio;
+          offsetY = (size - drawHeight) / 2;
+        }
+        
+        ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+        
+        // Convert to base64 data URL
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        cleanup();
+        resolve(dataUrl);
+      } catch (e) {
+        console.warn('[ContentResolver] Error capturing video frame:', e);
+        cleanup();
+        resolve(null);
+      }
+    };
+    
+    video.onerror = () => {
+      console.warn('[ContentResolver] Error loading video for thumbnail');
+      cleanup();
+      resolve(null);
+    };
+    
+    // Set timeout in case video doesn't load
+    setTimeout(() => {
+      if (video.readyState < 2) {
+        console.warn('[ContentResolver] Video thumbnail timeout');
+        cleanup();
+        resolve(null);
+      }
+    }, 5000);
+    
+    video.src = videoUri;
+    video.load();
+  });
+}
+
 // Generate thumbnail from content
 export async function generateThumbnail(source: ContentSource): Promise<string | null> {
   if (source.mimeType?.startsWith('image/')) {
     // For images, use the image itself as thumbnail
     return source.uri;
+  }
+  
+  // Handle local video files - extract first frame
+  if (source.mimeType?.startsWith('video/') && source.type === 'file') {
+    console.log('[ContentResolver] Generating video thumbnail for:', source.name);
+    return generateVideoThumbnail(source.uri);
   }
   
   if (source.type === 'url' || source.type === 'share') {
