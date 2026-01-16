@@ -36,9 +36,27 @@ function isVideoMimeType(mimeType?: string): boolean {
   return !!mimeType && mimeType.startsWith('video/');
 }
 
-// Check if MIME type is PDF
-function isPdfMimeType(mimeType?: string): boolean {
-  return mimeType === 'application/pdf';
+// Check if MIME type is PDF (more robust detection)
+function isPdfMimeType(mimeType?: string, uri?: string, fileName?: string): boolean {
+  // Check MIME type variations
+  if (mimeType) {
+    if (mimeType === 'application/pdf') return true;
+    if (mimeType.includes('pdf')) return true;
+  }
+  
+  // Check URI extension
+  if (uri) {
+    const ext = uri.split('.').pop()?.toLowerCase()?.split('?')[0];
+    if (ext === 'pdf') return true;
+  }
+  
+  // Check filename extension
+  if (fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return true;
+  }
+  
+  return false;
 }
 
 // Get specific MIME type based on file extension and detected type
@@ -142,8 +160,8 @@ export async function createHomeScreenShortcut(
   // Determine if this is a video - use proxy activity for videos
   const useVideoProxy = isVideoMimeType(mimeType);
   
-  // Determine if this is a PDF - use PDF proxy for PDFs with resume support
-  const usePDFProxy = isPdfMimeType(mimeType) || shortcut.fileType === 'pdf';
+  // Determine if this is a PDF - use PDF proxy for PDFs with resume support (robust detection)
+  const usePDFProxy = isPdfMimeType(mimeType, shortcut.contentUri, shortcut.name) || shortcut.fileType === 'pdf';
 
   if (useVideoProxy) {
     const sizeInfo = fileSize > 0 ? `(${(fileSize / (1024 * 1024)).toFixed(1)} MB)` : '(unknown size)';

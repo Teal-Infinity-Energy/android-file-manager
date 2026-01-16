@@ -97,12 +97,25 @@
         </activity>
 
         <!-- PDF Proxy Activity - transparent activity for launching PDF shortcuts -->
+        <!-- Also exported to appear in Android's app picker for PDFs -->
         <activity
             android:name=".PDFProxyActivity"
+            android:label="OneTap PDF Viewer"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:exported="false"
+            android:exported="true"
             android:noHistory="true"
             android:excludeFromRecents="true">
+            
+            <!-- Intent filter to appear in app picker when opening PDFs -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+            
         </activity>
 
         <!-- Native video player used for <=50MB videos (reliable vs WebView) -->
