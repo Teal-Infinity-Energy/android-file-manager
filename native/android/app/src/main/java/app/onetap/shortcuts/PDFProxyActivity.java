@@ -7,13 +7,21 @@ import android.os.Bundle;
 import android.util.Log;
 
 /**
- * Transparent proxy activity that handles PDF shortcut taps.
+ * Transparent proxy activity that handles PDF viewing.
  * 
- * This activity:
- * 1. Receives the PDF shortcut intent with URI and shortcut metadata
- * 2. Grants URI read permission
- * 3. Launches MainActivity with a special VIEW_PDF action
- * 4. MainActivity routes to the React PDF viewer with resume support
+ * This activity handles TWO scenarios:
+ * 
+ * 1. PDF SHORTCUT TAP (from home screen):
+ *    - Receives intent with shortcut_id and resume_enabled extras
+ *    - Forwards to MainActivity with VIEW_PDF action
+ *    - Resume is controlled by the shortcut's setting
+ * 
+ * 2. EXTERNAL "OPEN WITH" (from Files app, browser, etc.):
+ *    - Receives ACTION_VIEW intent with PDF URI
+ *    - No shortcut_id (generates one from URI for position tracking)
+ *    - Resume is enabled by default for external opens
+ *    
+ * Both scenarios route to the in-app PDF viewer via MainActivity.
  */
 public class PDFProxyActivity extends Activity {
     
@@ -30,20 +38,35 @@ public class PDFProxyActivity extends Activity {
             return;
         }
         
+        String action = incomingIntent.getAction();
         Uri pdfUri = incomingIntent.getData();
+        
         if (pdfUri == null) {
             Log.e(TAG, "No PDF URI in intent");
             finish();
             return;
         }
         
-        String shortcutId = incomingIntent.getStringExtra("shortcut_id");
-        boolean resumeEnabled = incomingIntent.getBooleanExtra("resume_enabled", false);
         String mimeType = incomingIntent.getType();
         
-        Log.d(TAG, "PDF shortcut tapped: uri=" + pdfUri + 
-              ", shortcutId=" + shortcutId + 
-              ", resumeEnabled=" + resumeEnabled);
+        // Check if this is from a shortcut (has shortcut_id) or external open
+        String shortcutId = incomingIntent.getStringExtra("shortcut_id");
+        boolean resumeEnabled;
+        
+        if (shortcutId != null) {
+            // From shortcut - use the shortcut's resume setting
+            resumeEnabled = incomingIntent.getBooleanExtra("resume_enabled", false);
+            Log.d(TAG, "PDF from shortcut: uri=" + pdfUri + 
+                  ", shortcutId=" + shortcutId + 
+                  ", resumeEnabled=" + resumeEnabled);
+        } else {
+            // From external "Open with" - generate ID from URI and enable resume by default
+            shortcutId = "external_" + Math.abs(pdfUri.toString().hashCode());
+            resumeEnabled = true; // Always resume for external opens
+            Log.d(TAG, "PDF from external open: uri=" + pdfUri + 
+                  ", generatedId=" + shortcutId + 
+                  ", action=" + action);
+        }
         
         openInternalViewer(pdfUri, shortcutId, resumeEnabled, mimeType);
         
@@ -52,6 +75,15 @@ public class PDFProxyActivity extends Activity {
     
     private void openInternalViewer(Uri pdfUri, String shortcutId, boolean resumeEnabled, String mimeType) {
         try {
+            // Take persistent URI permission if possible (for external opens)
+            try {
+                getContentResolver().takePersistableUriPermission(
+                    pdfUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Log.d(TAG, "Acquired persistent URI permission");
+            } catch (SecurityException e) {
+                Log.d(TAG, "Could not take persistent permission (normal for some URIs): " + e.getMessage());
+            }
+            
             // Launch MainActivity with VIEW_PDF action
             Intent webIntent = new Intent(this, MainActivity.class);
             webIntent.setAction("app.onetap.VIEW_PDF");
