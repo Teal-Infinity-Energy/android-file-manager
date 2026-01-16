@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { getLastPage, saveLastPage } from '@/lib/pdfResumeManager';
 import { useBackButton } from '@/hooks/useBackButton';
+import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 import * as pdfjs from 'pdfjs-dist';
 
 // Reading threshold before showing exit confirmation (30 seconds)
@@ -77,6 +78,12 @@ export default function PDFViewer() {
         
         console.log('[PDFViewer] Loading PDF from:', pdfSource);
         
+        // Clear the shared intent on native to prevent reopening on back navigation
+        if (Capacitor.isNativePlatform()) {
+          ShortcutPlugin.clearSharedIntent().catch(() => {});
+          console.log('[PDFViewer] Cleared shared intent');
+        }
+        
         const loadingTask = pdfjs.getDocument(pdfSource);
         const pdf = await loadingTask.promise;
         
@@ -136,12 +143,15 @@ export default function PDFViewer() {
     renderPage();
   }, [pdfDoc, currentPage, zoom]);
   
-  // Save page position when it changes
+  // Save page position when it changes (only after PDF is loaded to avoid overwriting with page 1)
   useEffect(() => {
+    // Don't save during initial load - wait until PDF is ready
+    if (!pdfDoc || loading) return;
+    
     if (resumeEnabled && shortcutId && currentPage > 0) {
       saveLastPage(shortcutId, currentPage);
     }
-  }, [currentPage, resumeEnabled, shortcutId]);
+  }, [currentPage, resumeEnabled, shortcutId, pdfDoc, loading]);
   
   // Auto-hide controls
   const resetControlsTimer = useCallback(() => {
@@ -236,12 +246,12 @@ export default function PDFViewer() {
     resetControlsTimer();
   };
   
-  // Confirm exit and navigate home
+  // Confirm exit and navigate home (replace to prevent back-bounce)
   const confirmExit = useCallback(() => {
     if (resumeEnabled && shortcutId && currentPage > 0) {
       saveLastPage(shortcutId, currentPage);
     }
-    navigate('/');
+    navigate('/', { replace: true });
   }, [resumeEnabled, shortcutId, currentPage, navigate]);
   
   // Close handler that checks reading duration before closing
