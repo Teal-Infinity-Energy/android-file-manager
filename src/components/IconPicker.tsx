@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Image, Type, Smile } from 'lucide-react';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import type { ShortcutIcon, IconType } from '@/types/shortcut';
@@ -17,6 +17,31 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
   const [textValue, setTextValue] = useState(
     selectedIcon.type === 'text' ? selectedIcon.value : ''
   );
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  
+  const selectedEmojiIndex = COMMON_EMOJIS.indexOf(selectedIcon.value);
+
+  // Sync carousel selection with emoji selection
+  useEffect(() => {
+    if (!carouselApi || selectedIcon.type !== 'emoji') return;
+    
+    const handleSelect = () => {
+      const index = carouselApi.selectedScrollSnap();
+      if (COMMON_EMOJIS[index] && COMMON_EMOJIS[index] !== selectedIcon.value) {
+        onSelect({ type: 'emoji', value: COMMON_EMOJIS[index] });
+      }
+    };
+    
+    carouselApi.on('select', handleSelect);
+    return () => { carouselApi.off('select', handleSelect); };
+  }, [carouselApi, selectedIcon.type, selectedIcon.value, onSelect]);
+
+  // Scroll to selected emoji when switching to emoji type
+  useEffect(() => {
+    if (carouselApi && selectedIcon.type === 'emoji' && selectedEmojiIndex >= 0) {
+      carouselApi.scrollTo(selectedEmojiIndex, true);
+    }
+  }, [carouselApi, selectedIcon.type]);
 
   const iconTypes: { type: IconType; icon: React.ReactNode; label: string }[] = [
     ...(thumbnail ? [{ type: 'thumbnail' as IconType, icon: <Image className="h-5 w-5" />, label: 'Image' }] : []),
@@ -55,53 +80,68 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
         ))}
       </div>
       
-      {/* Icon preview */}
-      <div className="flex justify-center py-4">
-        <div
-          className={cn(
-            "h-16 w-16 rounded-2xl flex items-center justify-center elevation-2",
-            selectedIcon.type === 'thumbnail' ? 'p-0 overflow-hidden' : 'bg-primary'
-          )}
-        >
-          {selectedIcon.type === 'thumbnail' && (
-            <img
-              src={selectedIcon.value}
-              alt="Icon preview"
-              className="h-full w-full object-cover"
-            />
-          )}
-          {selectedIcon.type === 'emoji' && (
-            <span className="text-3xl">{selectedIcon.value}</span>
-          )}
-          {selectedIcon.type === 'text' && (
-            <span className="text-2xl font-bold text-primary-foreground">
-              {selectedIcon.value.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-        </div>
-      </div>
-      
-      {/* Emoji picker - horizontal scroll */}
-      {selectedIcon.type === 'emoji' && (
-        <ScrollArea className="w-full">
-          <div className="flex gap-3 pb-3">
-            {COMMON_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => onSelect({ type: 'emoji', value: emoji })}
-                className={cn(
-                  "h-14 w-14 shrink-0 rounded-xl text-2xl flex items-center justify-center transition-all",
-                  selectedIcon.value === emoji
-                    ? "bg-primary/10 ring-2 ring-primary scale-110"
-                    : "bg-secondary hover:bg-muted active:scale-95"
-                )}
-              >
-                {emoji}
-              </button>
-            ))}
+      {/* Icon preview - only for thumbnail and text */}
+      {selectedIcon.type !== 'emoji' && (
+        <div className="flex justify-center py-4">
+          <div
+            className={cn(
+              "h-16 w-16 rounded-2xl flex items-center justify-center elevation-2",
+              selectedIcon.type === 'thumbnail' ? 'p-0 overflow-hidden' : 'bg-primary'
+            )}
+          >
+            {selectedIcon.type === 'thumbnail' && (
+              <img
+                src={selectedIcon.value}
+                alt="Icon preview"
+                className="h-full w-full object-cover"
+              />
+            )}
+            {selectedIcon.type === 'text' && (
+              <span className="text-2xl font-bold text-primary-foreground">
+                {selectedIcon.value.slice(0, 2).toUpperCase()}
+              </span>
+            )}
           </div>
-          <ScrollBar orientation="horizontal" className="h-1.5" />
-        </ScrollArea>
+        </div>
+      )}
+      
+      {/* Emoji picker - centered carousel */}
+      {selectedIcon.type === 'emoji' && (
+        <div className="py-4">
+          <Carousel
+            opts={{
+              align: 'center',
+              loop: true,
+              startIndex: selectedEmojiIndex >= 0 ? selectedEmojiIndex : 0,
+            }}
+            setApi={setCarouselApi}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-2">
+              {COMMON_EMOJIS.map((emoji, index) => (
+                <CarouselItem 
+                  key={emoji}
+                  className="basis-1/5 pl-2 flex items-center justify-center"
+                >
+                  <button
+                    onClick={() => {
+                      onSelect({ type: 'emoji', value: emoji });
+                      carouselApi?.scrollTo(index);
+                    }}
+                    className={cn(
+                      "h-14 w-14 rounded-xl text-2xl flex items-center justify-center transition-all duration-200",
+                      selectedIcon.value === emoji
+                        ? "scale-125 bg-primary/15 ring-2 ring-primary"
+                        : "scale-90 opacity-50 bg-secondary hover:opacity-75"
+                    )}
+                  >
+                    {emoji}
+                  </button>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
+        </div>
       )}
       
       {/* Text input */}
