@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Globe, Instagram, Youtube, Clipboard, Star, Tag, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Globe, Instagram, Youtube, Clipboard, Star, Tag } from 'lucide-react';
 import { Clipboard as CapClipboard } from '@capacitor/clipboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { isValidUrl, parseDeepLink } from '@/lib/contentResolver';
 import { addSavedLink, PRESET_TAGS } from '@/lib/savedLinksManager';
 import { cn } from '@/lib/utils';
@@ -51,8 +50,7 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
   const [saveToLibrary, setSaveToLibrary] = useState(false);
   const [linkTitle, setLinkTitle] = useState('');
   const [linkDescription, setLinkDescription] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [customTag, setCustomTag] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialUrl) {
@@ -61,22 +59,6 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
   }, [initialUrl]);
   
   const linkInfo = url ? parseDeepLink(url) : null;
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
-
-  const addCustomTag = () => {
-    const tag = customTag.trim();
-    if (tag && !selectedTags.includes(tag)) {
-      setSelectedTags(prev => [...prev, tag]);
-      setCustomTag('');
-    }
-  };
   
   const handleSubmit = () => {
     // Add protocol if missing
@@ -96,7 +78,7 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
         finalUrl, 
         linkTitle.trim() || undefined, 
         linkDescription.trim() || undefined, 
-        selectedTags
+        selectedTag
       );
       
       if (!result.isNew) {
@@ -238,21 +220,21 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
                 maxLength={200}
               />
               
-              {/* Tag selector with preset tags */}
+              {/* Single Tag Selector */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Tag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Tags</span>
+                  <span className="text-xs text-muted-foreground">Tag (optional)</span>
                 </div>
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div className="flex flex-wrap gap-2">
                   {PRESET_TAGS.map(tag => (
                     <button
                       key={tag}
                       type="button"
-                      onClick={() => toggleTag(tag)}
+                      onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                       className={cn(
                         "px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                        selectedTags.includes(tag)
+                        selectedTag === tag
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       )}
@@ -261,48 +243,6 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
                     </button>
                   ))}
                 </div>
-                
-                {/* Custom tag input */}
-                <div className="flex gap-2">
-                  <Input
-                    value={customTag}
-                    onChange={(e) => setCustomTag(e.target.value)}
-                    placeholder="Add custom tag..."
-                    className="flex-1 h-8 text-xs"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addCustomTag();
-                      }
-                    }}
-                  />
-                  <Button 
-                    type="button"
-                    variant="outline" 
-                    size="sm" 
-                    onClick={addCustomTag}
-                    disabled={!customTag.trim()}
-                    className="h-8"
-                  >
-                    Add
-                  </Button>
-                </div>
-                
-                {/* Display selected custom tags */}
-                {selectedTags.filter(t => !PRESET_TAGS.includes(t)).length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedTags.filter(t => !PRESET_TAGS.includes(t)).map(tag => (
-                      <Badge 
-                        key={tag} 
-                        variant="secondary"
-                        className="cursor-pointer hover:bg-destructive/20"
-                        onClick={() => toggleTag(tag)}
-                      >
-                        {tag} <X className="h-3 w-3 ml-1" />
-                      </Badge>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
