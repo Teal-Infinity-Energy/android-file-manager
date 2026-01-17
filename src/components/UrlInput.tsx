@@ -8,6 +8,33 @@ import { addSavedLink } from '@/lib/savedLinksManager';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+const URL_PATTERN = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+
+function extractUrlFromClipboard(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  
+  // Check if it's already a valid URL
+  if (isValidUrl(trimmed)) return trimmed;
+  
+  // Try adding https:// if it looks like a domain
+  if (trimmed.includes('.') && !trimmed.startsWith('http')) {
+    const withProtocol = `https://${trimmed}`;
+    if (isValidUrl(withProtocol)) return withProtocol;
+  }
+  
+  // Try to extract URL from text
+  const matches = trimmed.match(URL_PATTERN);
+  if (matches) {
+    for (const match of matches) {
+      const cleanUrl = match.replace(/[.,;:!?)]+$/, '');
+      if (isValidUrl(cleanUrl)) return cleanUrl;
+    }
+  }
+  
+  return null;
+}
+
 interface UrlInputProps {
   onSubmit: (url: string) => void;
   onBack: () => void;
@@ -45,16 +72,24 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
   const handlePaste = async () => {
     try {
       const { value } = await CapClipboard.read();
-      if (value) {
-        setUrl(value);
+      const url = value ? extractUrlFromClipboard(value) : null;
+      
+      if (url) {
+        setUrl(url);
         setError('');
+      } else {
+        toast.error('No URL detected on clipboard');
       }
     } catch {
       try {
         const text = await navigator.clipboard.readText();
-        if (text) {
-          setUrl(text);
+        const url = text ? extractUrlFromClipboard(text) : null;
+        
+        if (url) {
+          setUrl(url);
           setError('');
+        } else {
+          toast.error('No URL detected on clipboard');
         }
       } catch {
         toast.error('Unable to access clipboard');
