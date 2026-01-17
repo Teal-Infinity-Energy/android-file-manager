@@ -26,6 +26,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -38,7 +39,7 @@ import java.io.IOException;
 /**
  * NativeVideoPlayerActivity
  * Uses TextureView + MediaPlayer for reliable overlay rendering.
- * VideoView uses SurfaceView which can obscure overlays.
+ * Close button is added directly to root to ensure proper z-order and touch handling.
  */
 public class NativeVideoPlayerActivity extends Activity implements TextureView.SurfaceTextureListener, MediaController.MediaPlayerControl {
     private static final String TAG = "NativeVideoPlayer";
@@ -92,14 +93,16 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
     }
 
     private void showControls() {
+        Log.d(TAG, "showControls called");
         controlsVisible = true;
         if (closeButton != null) {
             closeButton.setVisibility(View.VISIBLE);
-            closeButton.animate().alpha(1f).setDuration(200).start();
+            closeButton.setAlpha(1f);
+            closeButton.bringToFront();
         }
         if (headerGradient != null) {
             headerGradient.setVisibility(View.VISIBLE);
-            headerGradient.animate().alpha(1f).setDuration(200).start();
+            headerGradient.setAlpha(1f);
         }
         if (mediaController != null) {
             mediaController.show(AUTO_HIDE_DELAY_MS);
@@ -108,6 +111,7 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
     }
 
     private void hideControls() {
+        Log.d(TAG, "hideControls called");
         controlsVisible = false;
         if (closeButton != null) {
             closeButton.animate().alpha(0f).setDuration(200).withEndAction(() -> {
@@ -200,6 +204,7 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate started");
 
         // Make fullscreen immersive
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -228,7 +233,7 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
         root.setBackgroundColor(Color.BLACK);
         setContentView(root);
 
-        // Create TextureView for video (behaves like a normal view, overlays work correctly)
+        // Create TextureView for video
         textureView = new TextureView(this);
         textureView.setSurfaceTextureListener(this);
         FrameLayout.LayoutParams videoParams = new FrameLayout.LayoutParams(
@@ -238,14 +243,8 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
         );
         root.addView(textureView, videoParams);
 
-        // Create overlay container (on top of video)
-        FrameLayout overlayContainer = new FrameLayout(this);
-        overlayContainer.setClickable(false);
-        FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        );
-        root.addView(overlayContainer, overlayParams);
+        // Tap on textureView toggles controls
+        textureView.setOnClickListener(v -> toggleControls());
 
         // Get safe area insets
         int statusBarHeight = 0;
@@ -259,8 +258,9 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
                 TypedValue.COMPLEX_UNIT_DIP, 24, getResources().getDisplayMetrics()
             );
         }
+        final int topInset = statusBarHeight;
 
-        // Create header gradient overlay
+        // Create header gradient overlay - added directly to root
         headerGradient = new View(this);
         int gradientHeight = (int) TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, 140, getResources().getDisplayMetrics()
@@ -275,32 +275,32 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
             gradientHeight,
             Gravity.TOP
         );
-        overlayContainer.addView(headerGradient, gradientParams);
+        root.addView(headerGradient, gradientParams);
 
-        // Create close button with custom X drawable
+        // Create close button - added directly to root (on top of everything)
         closeButton = new ImageButton(this);
         closeButton.setImageDrawable(new CloseIconDrawable());
         
-        // Create circular semi-transparent background
+        // Create circular semi-transparent background with solid color for visibility
         GradientDrawable buttonBg = new GradientDrawable();
         buttonBg.setShape(GradientDrawable.OVAL);
-        buttonBg.setColor(0x88000000); // Semi-transparent black (more visible)
+        buttonBg.setColor(0xAA000000); // More opaque for better visibility
         closeButton.setBackground(buttonBg);
         closeButton.setContentDescription("Close");
         closeButton.setClickable(true);
         closeButton.setFocusable(true);
         
         int buttonSize = (int) TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, 52, getResources().getDisplayMetrics()
+            TypedValue.COMPLEX_UNIT_DIP, 56, getResources().getDisplayMetrics()
         );
         int buttonMarginLeft = (int) TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics()
         );
-        int buttonMarginTop = statusBarHeight + (int) TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, 12, getResources().getDisplayMetrics()
+        int buttonMarginTop = topInset + (int) TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics()
         );
         int buttonPadding = (int) TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, 14, getResources().getDisplayMetrics()
+            TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics()
         );
         
         FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(buttonSize, buttonSize);
@@ -309,40 +309,38 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
         closeButton.setPadding(buttonPadding, buttonPadding, buttonPadding, buttonPadding);
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            closeButton.setElevation(16f);
-            closeButton.setTranslationZ(16f);
+            closeButton.setElevation(100f);
+            closeButton.setTranslationZ(100f);
         }
         
-        overlayContainer.addView(closeButton, buttonParams);
+        // Add close button directly to root (last child = on top)
+        root.addView(closeButton, buttonParams);
         
-        // Bring to front explicitly
-        closeButton.bringToFront();
-        headerGradient.bringToFront();
-        overlayContainer.bringToFront();
+        Log.d(TAG, "Close button added to root, visibility: " + closeButton.getVisibility());
 
         closeButton.setOnClickListener(v -> {
-            Log.d(TAG, "Close button clicked");
+            Log.d(TAG, "Close button clicked!");
             exitPlayerAndApp();
         });
 
-        // Tap anywhere on overlay toggles controls
-        overlayContainer.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                // Check if tap is not on the close button
-                int[] buttonLocation = new int[2];
-                closeButton.getLocationOnScreen(buttonLocation);
-                int[] touchLocation = new int[] {(int) event.getRawX(), (int) event.getRawY()};
-                
-                boolean onButton = touchLocation[0] >= buttonLocation[0] 
-                    && touchLocation[0] <= buttonLocation[0] + closeButton.getWidth()
-                    && touchLocation[1] >= buttonLocation[1]
-                    && touchLocation[1] <= buttonLocation[1] + closeButton.getHeight();
-                    
-                if (!onButton) {
-                    toggleControls();
+        // Ensure close button stays on top after layout
+        root.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                if (closeButton != null) {
+                    closeButton.bringToFront();
+                    closeButton.setVisibility(View.VISIBLE);
+                    Log.d(TAG, "onGlobalLayout: Close button brought to front");
                 }
+                if (headerGradient != null) {
+                    headerGradient.bringToFront();
+                }
+                if (closeButton != null) {
+                    closeButton.bringToFront(); // Bring close button to front again after headerGradient
+                }
+                // Remove listener after first layout
+                root.getViewTreeObserver().removeOnGlobalLayoutListener(this);
             }
-            return true;
         });
 
         // Get video URI
@@ -358,10 +356,13 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
             return;
         }
 
-        // Setup MediaController
+        // Setup MediaController - anchor to textureView to avoid covering close button
         mediaController = new MediaController(this);
         mediaController.setMediaPlayer(this);
-        mediaController.setAnchorView(root);
+        mediaController.setAnchorView(textureView);
+        
+        // Show controls immediately
+        showControls();
     }
 
     @Override
@@ -427,6 +428,11 @@ public class NativeVideoPlayerActivity extends Activity implements TextureView.S
         
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(newWidth, newHeight, Gravity.CENTER);
         textureView.setLayoutParams(params);
+        
+        // Ensure close button stays on top after layout change
+        if (closeButton != null) {
+            closeButton.bringToFront();
+        }
     }
 
     @Override
