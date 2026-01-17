@@ -131,6 +131,14 @@ export default function PDFViewer() {
   
   const momentumRef = useRef<number | null>(null);
   
+  // Scroll indicator state
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState({ x: 0, y: 0 });
+  const scrollIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Rubber-band overscroll state
+  const [overscroll, setOverscroll] = useState({ x: 0, y: 0 });
+  
   // Load PDF document
   useEffect(() => {
     if (!uri) {
@@ -407,11 +415,14 @@ export default function PDFViewer() {
     };
   }, [showControls, resetControlsTimer]);
   
-  // Cleanup momentum animation on unmount
+  // Cleanup animations on unmount
   useEffect(() => {
     return () => {
       if (momentumRef.current) {
         cancelAnimationFrame(momentumRef.current);
+      }
+      if (scrollIndicatorTimerRef.current) {
+        clearTimeout(scrollIndicatorTimerRef.current);
       }
     };
   }, []);
@@ -504,7 +515,7 @@ export default function PDFViewer() {
       
       setDisplayZoom(newZoom);
     } else if (e.touches.length === 1 && panState && displayZoom > 1) {
-      // Single finger pan with velocity tracking
+      // Single finger pan with velocity tracking and rubber-band overscroll
       e.preventDefault();
       
       const touch = e.touches[0];
@@ -518,11 +529,47 @@ export default function PDFViewer() {
       const vx = (panState.lastX - touch.clientX) / dt;
       const vy = (panState.lastY - touch.clientY) / dt;
       
-      // Update scroll position
+      // Calculate target scroll position
       const deltaX = panState.startX - touch.clientX;
       const deltaY = panState.startY - touch.clientY;
-      container.scrollLeft = panState.startScrollLeft + deltaX;
-      container.scrollTop = panState.startScrollTop + deltaY;
+      const targetScrollLeft = panState.startScrollLeft + deltaX;
+      const targetScrollTop = panState.startScrollTop + deltaY;
+      
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      const maxScrollTop = container.scrollHeight - container.clientHeight;
+      
+      // Calculate overscroll with elastic resistance
+      let overX = 0;
+      let overY = 0;
+      
+      if (targetScrollLeft < 0) {
+        overX = targetScrollLeft * 0.3; // Resistance factor
+        container.scrollLeft = 0;
+      } else if (targetScrollLeft > maxScrollLeft) {
+        overX = (targetScrollLeft - maxScrollLeft) * 0.3;
+        container.scrollLeft = maxScrollLeft;
+      } else {
+        container.scrollLeft = targetScrollLeft;
+      }
+      
+      if (targetScrollTop < 0) {
+        overY = targetScrollTop * 0.3;
+        container.scrollTop = 0;
+      } else if (targetScrollTop > maxScrollTop) {
+        overY = (targetScrollTop - maxScrollTop) * 0.3;
+        container.scrollTop = maxScrollTop;
+      } else {
+        container.scrollTop = targetScrollTop;
+      }
+      
+      setOverscroll({ x: overX, y: overY });
+      
+      // Update scroll progress for indicator
+      setScrollProgress({
+        x: maxScrollLeft > 0 ? container.scrollLeft / maxScrollLeft : 0,
+        y: maxScrollTop > 0 ? container.scrollTop / maxScrollTop : 0,
+      });
+      setShowScrollIndicator(true);
       
       // Update pan state with velocity (exponential smoothing for stability)
       setPanState(prev => prev ? {
@@ -548,8 +595,13 @@ export default function PDFViewer() {
     }
     setTouchState(null);
     
-    // Apply momentum when pan ends
+    // Spring back overscroll and apply momentum when pan ends
     if (panState && displayZoom > 1) {
+      // Spring back if overscrolled
+      if (overscroll.x !== 0 || overscroll.y !== 0) {
+        setOverscroll({ x: 0, y: 0 }); // CSS transition handles animation
+      }
+      
       const { velocityX, velocityY } = panState;
       const container = containerRef.current;
       
@@ -560,33 +612,79 @@ export default function PDFViewer() {
         const friction = 0.95; // Deceleration factor
         const minVelocity = 0.5; // Stop threshold
         
+        // Clear any pending hide timer
+        if (scrollIndicatorTimerRef.current) {
+          clearTimeout(scrollIndicatorTimerRef.current);
+        }
+        setShowScrollIndicator(true);
+        
         const applyMomentum = () => {
           vx *= friction;
           vy *= friction;
           
-          // Edge resistance - quick stop at boundaries
           const maxScrollLeft = container.scrollWidth - container.clientWidth;
           const maxScrollTop = container.scrollHeight - container.clientHeight;
           
-          if (container.scrollLeft <= 0 || container.scrollLeft >= maxScrollLeft) {
-            vx *= 0.3;
-          }
-          if (container.scrollTop <= 0 || container.scrollTop >= maxScrollTop) {
-            vy *= 0.3;
+          // Calculate next scroll positions
+          const nextScrollLeft = container.scrollLeft + vx;
+          const nextScrollTop = container.scrollTop + vy;
+          
+          // Bounce effect at edges with rubber-band
+          if (nextScrollLeft < 0) {
+            container.scrollLeft = 0;
+            setOverscroll({ x: vx * 2, y: 0 });
+            setTimeout(() => setOverscroll({ x: 0, y: 0 }), 50);
+            vx = 0;
+          } else if (nextScrollLeft > maxScrollLeft) {
+            container.scrollLeft = maxScrollLeft;
+            setOverscroll({ x: vx * 2, y: 0 });
+            setTimeout(() => setOverscroll({ x: 0, y: 0 }), 50);
+            vx = 0;
+          } else {
+            container.scrollLeft = nextScrollLeft;
           }
           
-          container.scrollLeft += vx;
-          container.scrollTop += vy;
+          if (nextScrollTop < 0) {
+            container.scrollTop = 0;
+            setOverscroll({ x: 0, y: vy * 2 });
+            setTimeout(() => setOverscroll({ x: 0, y: 0 }), 50);
+            vy = 0;
+          } else if (nextScrollTop > maxScrollTop) {
+            container.scrollTop = maxScrollTop;
+            setOverscroll({ x: 0, y: vy * 2 });
+            setTimeout(() => setOverscroll({ x: 0, y: 0 }), 50);
+            vy = 0;
+          } else {
+            container.scrollTop = nextScrollTop;
+          }
+          
+          // Update scroll progress for indicator
+          setScrollProgress({
+            x: maxScrollLeft > 0 ? container.scrollLeft / maxScrollLeft : 0,
+            y: maxScrollTop > 0 ? container.scrollTop / maxScrollTop : 0,
+          });
           
           // Continue if still moving significantly
           if (Math.abs(vx) > minVelocity || Math.abs(vy) > minVelocity) {
             momentumRef.current = requestAnimationFrame(applyMomentum);
           } else {
             momentumRef.current = null;
+            // Start hide timer when momentum ends
+            scrollIndicatorTimerRef.current = setTimeout(() => {
+              setShowScrollIndicator(false);
+            }, 800);
           }
         };
         
         momentumRef.current = requestAnimationFrame(applyMomentum);
+      } else {
+        // No momentum, hide indicator after delay
+        if (scrollIndicatorTimerRef.current) {
+          clearTimeout(scrollIndicatorTimerRef.current);
+        }
+        scrollIndicatorTimerRef.current = setTimeout(() => {
+          setShowScrollIndicator(false);
+        }, 800);
       }
       
       setPanState(null);
@@ -981,7 +1079,13 @@ export default function PDFViewer() {
         className={`flex-1 overflow-y-auto ${displayZoom > 1 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}
         style={{ touchAction: displayZoom > 1 ? 'none' : 'pan-y' }}
       >
-        <div className="flex flex-col items-center pb-24">
+        <div 
+          className="flex flex-col items-center pb-24"
+          style={{
+            transform: `translate(${overscroll.x}px, ${overscroll.y}px)`,
+            transition: overscroll.x === 0 && overscroll.y === 0 ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+          }}
+        >
           {Array.from({ length: totalPages }, (_, i) => {
             const pageNum = i + 1;
             const pageState = pageStates[i];
@@ -1067,6 +1171,37 @@ export default function PDFViewer() {
           })}
         </div>
       </div>
+      
+      {/* Scroll Position Indicator - appears during momentum when zoomed */}
+      {showScrollIndicator && displayZoom > 1 && (
+        <>
+          {/* Vertical indicator (right edge) */}
+          <div className="absolute right-1 top-16 bottom-20 w-1 pointer-events-none z-20">
+            <div 
+              className="absolute w-full bg-foreground/30 rounded-full"
+              style={{
+                height: '20%',
+                top: `${scrollProgress.y * 80}%`,
+                transition: 'top 0.05s ease-out',
+              }}
+            />
+          </div>
+          
+          {/* Horizontal indicator (bottom edge) - only when significantly zoomed */}
+          {displayZoom > 1.5 && (
+            <div className="absolute bottom-20 left-4 right-4 h-1 pointer-events-none z-20">
+              <div 
+                className="absolute h-full bg-foreground/30 rounded-full"
+                style={{
+                  width: '15%',
+                  left: `${scrollProgress.x * 85}%`,
+                  transition: 'left 0.05s ease-out',
+                }}
+              />
+            </div>
+          )}
+        </>
+      )}
       
       {/* Search Mini-Map */}
       {showMiniMap && searchResults.length > 0 && (
