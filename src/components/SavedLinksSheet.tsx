@@ -29,12 +29,11 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
   const [editingLink, setEditingLink] = useState<SavedLink | null>(null);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   
-  // Form state
+  // Form state - single tag instead of array
   const [newUrl, setNewUrl] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [customTag, setCustomTag] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   const allUsedTags = useMemo(() => getAllTags(), [links]);
   const availableTags = useMemo(() => {
@@ -46,8 +45,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
     setNewUrl('');
     setNewTitle('');
     setNewDescription('');
-    setSelectedTags([]);
-    setCustomTag('');
+    setSelectedTag(null);
     setShowAddForm(false);
     setEditingLink(null);
   };
@@ -67,7 +65,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
     
     // Filter by tag
     if (activeTagFilter) {
-      result = result.filter(link => link.tags.includes(activeTagFilter));
+      result = result.filter(link => link.tag === activeTagFilter);
     }
     
     // Filter by search
@@ -77,7 +75,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
         link.title.toLowerCase().includes(query) ||
         link.url.toLowerCase().includes(query) ||
         link.description?.toLowerCase().includes(query) ||
-        link.tags.some(tag => tag.toLowerCase().includes(query))
+        (link.tag && link.tag.toLowerCase().includes(query))
       );
     }
     
@@ -101,24 +99,8 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
     setNewUrl(link.url);
     setNewTitle(link.title);
     setNewDescription(link.description || '');
-    setSelectedTags(link.tags);
+    setSelectedTag(link.tag);
     setShowAddForm(true);
-  };
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
-
-  const addCustomTag = () => {
-    const tag = customTag.trim();
-    if (tag && !selectedTags.includes(tag)) {
-      setSelectedTags(prev => [...prev, tag]);
-      setCustomTag('');
-    }
   };
 
   const handleSaveLink = () => {
@@ -127,7 +109,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
       updateSavedLink(editingLink.id, {
         title: newTitle.trim() || undefined,
         description: newDescription.trim() || undefined,
-        tags: selectedTags,
+        tag: selectedTag,
       });
     } else {
       // Add new link
@@ -138,7 +120,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
         url = 'https://' + url;
       }
       
-      addSavedLink(url, newTitle.trim() || undefined, newDescription.trim() || undefined, selectedTags);
+      addSavedLink(url, newTitle.trim() || undefined, newDescription.trim() || undefined, selectedTag);
     }
     
     setLinks(getSavedLinks());
@@ -239,20 +221,20 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
               maxLength={200}
             />
             
-            {/* Tag Selector */}
+            {/* Single Tag Selector */}
             <div className="mb-3">
               <div className="flex items-center gap-2 mb-2">
                 <Tag className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Tags</span>
+                <span className="text-xs text-muted-foreground">Tag (optional)</span>
               </div>
-              <div className="flex flex-wrap gap-2 mb-2">
+              <div className="flex flex-wrap gap-2">
                 {PRESET_TAGS.map(tag => (
                   <button
                     key={tag}
-                    onClick={() => toggleTag(tag)}
+                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                     className={cn(
                       "px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                      selectedTags.includes(tag)
+                      selectedTag === tag
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                     )}
@@ -261,42 +243,6 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
                   </button>
                 ))}
               </div>
-              
-              {/* Custom tag input */}
-              <div className="flex gap-2">
-                <Input
-                  value={customTag}
-                  onChange={(e) => setCustomTag(e.target.value)}
-                  placeholder="Add custom tag..."
-                  className="flex-1 h-8 text-xs"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())}
-                />
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={addCustomTag}
-                  disabled={!customTag.trim()}
-                  className="h-8"
-                >
-                  Add
-                </Button>
-              </div>
-              
-              {/* Selected custom tags */}
-              {selectedTags.filter(t => !PRESET_TAGS.includes(t)).length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {selectedTags.filter(t => !PRESET_TAGS.includes(t)).map(tag => (
-                    <Badge 
-                      key={tag} 
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-destructive/20"
-                      onClick={() => toggleTag(tag)}
-                    >
-                      {tag} <X className="h-3 w-3 ml-1" />
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
             
             <Button 
@@ -360,13 +306,11 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink }: SavedLinks
                         {link.description}
                       </p>
                     )}
-                    {link.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {link.tags.map(tag => (
-                          <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
-                            {tag}
-                          </Badge>
-                        ))}
+                    {link.tag && (
+                      <div className="mt-2">
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {link.tag}
+                        </Badge>
                       </div>
                     )}
                   </div>

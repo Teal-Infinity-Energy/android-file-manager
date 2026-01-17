@@ -7,7 +7,7 @@ export interface SavedLink {
   url: string;
   title: string;
   description?: string;
-  tags: string[];
+  tag: string | null;
   createdAt: number;
 }
 
@@ -15,10 +15,11 @@ export function getSavedLinks(): SavedLink[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     const links = stored ? JSON.parse(stored) : [];
-    // Migrate old links without tags
-    return links.map((link: SavedLink) => ({
+    // Migrate old links with tags array to single tag
+    return links.map((link: any) => ({
       ...link,
-      tags: link.tags || [],
+      // Migration: use first tag from old array, or existing tag, or null
+      tag: link.tag !== undefined ? link.tag : (link.tags?.[0] || null),
       description: link.description || '',
     }));
   } catch {
@@ -35,7 +36,7 @@ export function addSavedLink(
   url: string, 
   title?: string, 
   description?: string, 
-  tags: string[] = []
+  tag?: string | null
 ): AddLinkResult {
   const links = getSavedLinks();
   
@@ -50,7 +51,7 @@ export function addSavedLink(
     url,
     title: title || extractTitleFromUrl(url),
     description: description || '',
-    tags,
+    tag: tag || null,
     createdAt: Date.now(),
   };
   
@@ -65,14 +66,14 @@ export function addSavedLink(
 
 export function updateSavedLink(
   id: string, 
-  updates: Partial<Pick<SavedLink, 'title' | 'description' | 'tags'>>
+  updates: Partial<Pick<SavedLink, 'title' | 'description' | 'tag'>>
 ): void {
   const links = getSavedLinks();
   const link = links.find(l => l.id === id);
   if (link) {
     if (updates.title !== undefined) link.title = updates.title;
     if (updates.description !== undefined) link.description = updates.description;
-    if (updates.tags !== undefined) link.tags = updates.tags;
+    if (updates.tag !== undefined) link.tag = updates.tag;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
   }
 }
@@ -80,13 +81,15 @@ export function updateSavedLink(
 export function getAllTags(): string[] {
   const links = getSavedLinks();
   const tagsSet = new Set<string>();
-  links.forEach(link => link.tags.forEach(tag => tagsSet.add(tag)));
+  links.forEach(link => {
+    if (link.tag) tagsSet.add(link.tag);
+  });
   return Array.from(tagsSet);
 }
 
 export function getLinksByTag(tag: string): SavedLink[] {
   const links = getSavedLinks();
-  return links.filter(link => link.tags.includes(tag));
+  return links.filter(link => link.tag === tag);
 }
 
 export function removeSavedLink(id: string): void {
