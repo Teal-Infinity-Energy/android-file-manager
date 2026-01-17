@@ -160,8 +160,25 @@ export default function PDFViewer() {
         // Convert native URIs to WebView-accessible URLs on native platforms
         let pdfSource = uri;
         if (Capacitor.isNativePlatform()) {
-          if (uri.startsWith('file://') || uri.startsWith('content://')) {
-            pdfSource = Capacitor.convertFileSrc(uri);
+          // For content:// URIs (FileProvider), resolve to a persistent file path first
+          if (uri.startsWith('content://')) {
+            try {
+              console.log('[PDFViewer] Resolving content URI to file path...');
+              const resolved = await ShortcutPlugin.resolveContentUri({ contentUri: uri });
+              if (resolved.success && resolved.filePath) {
+                pdfSource = 'file://' + resolved.filePath;
+                console.log('[PDFViewer] Resolved content URI to file path:', pdfSource);
+              } else {
+                console.warn('[PDFViewer] Could not resolve content URI, using as-is');
+              }
+            } catch (e) {
+              console.warn('[PDFViewer] Failed to resolve content URI:', e);
+            }
+          }
+          
+          // Convert file:// or remaining content:// URIs to WebView-accessible URL
+          if (pdfSource.startsWith('file://') || pdfSource.startsWith('content://')) {
+            pdfSource = Capacitor.convertFileSrc(pdfSource);
             console.log('[PDFViewer] Converted URI for native WebView:', pdfSource);
           }
         }
@@ -207,7 +224,13 @@ export default function PDFViewer() {
         setLoading(false);
       } catch (err) {
         console.error('[PDFViewer] Failed to load PDF:', err);
-        setError('The file may have been moved or is no longer accessible.');
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        
+        if (errorMessage.includes('Missing PDF') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+          setError('Unable to access the PDF file. The file may have been moved, deleted, or permissions may have expired. Try creating a new shortcut.');
+        } else {
+          setError('Failed to load PDF: ' + errorMessage);
+        }
         setLoading(false);
       }
     };
