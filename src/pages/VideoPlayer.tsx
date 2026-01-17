@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { ArrowLeft, AlertCircle, Loader2, RefreshCw, ExternalLink, Share2 } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Share } from '@capacitor/share';
 import { Button } from '@/components/ui/button';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
-import { useBackButton } from '@/hooks/useBackButton';
 
 /**
  * Resolve a URI to a playable file path.
@@ -63,7 +63,6 @@ function filePathToPlayableUrl(filePath: string): string {
 
 const VideoPlayer = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mountIdRef = useRef(Date.now());
@@ -257,15 +256,33 @@ const VideoPlayer = () => {
     };
   }, [playableUrl, state, resolvedPath]);
 
+  // Handle back button - exit app since video player is typically launched from shortcut
   const handleBack = useCallback(() => {
-    navigate('/', { replace: true });
-  }, [navigate]);
+    console.log('[VideoPlayer] Back pressed, exiting app');
+    if (Capacitor.isNativePlatform()) {
+      App.exitApp();
+    } else {
+      window.history.back();
+    }
+  }, []);
   
-  // Handle Android back button
-  useBackButton({
-    isHomeScreen: false,
-    onBack: handleBack,
-  });
+  // Custom back button handler with high priority
+  // We don't use useBackButton hook because native video controls interfere with it
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    console.log('[VideoPlayer] Setting up back button handler');
+    
+    const handler = App.addListener('backButton', () => {
+      console.log('[VideoPlayer] Back button pressed - exiting app');
+      App.exitApp();
+    });
+
+    return () => {
+      console.log('[VideoPlayer] Cleaning up back button handler');
+      handler.then(h => h.remove());
+    };
+  }, []);
 
   // Open in external app (ACTION_VIEW - shows video players)
   const handleOpenExternal = useCallback(async () => {
@@ -297,7 +314,7 @@ const VideoPlayer = () => {
     }
   }, [videoUri]);
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     // Force re-resolve by updating the mount ID
     mountIdRef.current = Date.now();
     setState('loading');
@@ -309,8 +326,10 @@ const VideoPlayer = () => {
     // Re-trigger the effect by navigating with new timestamp
     const newParams = new URLSearchParams(searchParams);
     newParams.set('t', Date.now().toString());
-    navigate(`/player?${newParams.toString()}`, { replace: true });
-  };
+    window.history.replaceState(null, '', `/player?${newParams.toString()}`);
+    // Trigger re-render
+    window.location.reload();
+  }, [searchParams]);
 
   // Loading state
   if (state === 'loading') {
