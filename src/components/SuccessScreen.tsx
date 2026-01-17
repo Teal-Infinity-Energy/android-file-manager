@@ -14,22 +14,22 @@ export function SuccessScreen({ shortcutName, onDone }: SuccessScreenProps) {
       </div>
       
       <h1 className="text-2xl font-semibold text-foreground mb-2">
-        Shortcut Created
+        Added to Home Screen
       </h1>
       
       <p className="text-muted-foreground mb-8">
-        "{shortcutName}" has been added to your home screen
+        "{shortcutName}" is ready
       </p>
       
       <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3 mb-8">
         <Home className="h-5 w-5 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          Tap the icon on your home screen to open your content instantly
+          One tap from your home screen to open instantly
         </p>
       </div>
       
       <Button onClick={onDone} variant="outline" className="w-full max-w-xs h-12">
-        Create Another
+        Add another
       </Button>
     </div>
   );

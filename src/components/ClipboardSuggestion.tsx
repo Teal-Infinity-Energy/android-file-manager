@@ -111,7 +111,7 @@ export function ClipboardSuggestion({ url, onUse, onDismiss }: ClipboardSuggesti
                 "active:scale-[0.98] transition-all"
               )}
             >
-              Use URL
+              Use this link
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
