@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Image, Type, Smile } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,14 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
     selectedIcon.type === 'text' ? selectedIcon.value : ''
   );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUserScrolling = useRef(true);
 
   // Scroll to selected emoji when switching to emoji type or on selection
   useEffect(() => {
     if (scrollContainerRef.current && selectedIcon.type === 'emoji') {
+      isUserScrolling.current = false; // Mark as programmatic scroll
+      
       const index = COMMON_EMOJIS.indexOf(selectedIcon.value);
       if (index >= 0) {
         const container = scrollContainerRef.current;
@@ -29,8 +33,56 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
         const scrollPosition = (index * itemWidth) - (containerWidth / 2) + (itemWidth / 2);
         container.scrollTo({ left: scrollPosition, behavior: 'smooth' });
       }
+      
+      // Reset flag after scroll completes
+      setTimeout(() => {
+        isUserScrolling.current = true;
+      }, 350);
     }
   }, [selectedIcon.type, selectedIcon.value]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle scroll to detect centered emoji and auto-select
+  const handleScroll = useCallback(() => {
+    if (!isUserScrolling.current) return; // Skip if programmatic scroll
+    
+    // Clear existing timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    
+    // Debounce: wait for scroll to settle
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (!scrollContainerRef.current) return;
+      
+      const container = scrollContainerRef.current;
+      const containerWidth = container.clientWidth;
+      const scrollLeft = container.scrollLeft;
+      const itemWidth = 64;
+      
+      // Calculate which item is at center
+      const paddingOffset = containerWidth / 2 - 28; // Account for px-[calc(50%-28px)]
+      const adjustedScrollLeft = scrollLeft + paddingOffset;
+      const centeredIndex = Math.round(adjustedScrollLeft / itemWidth);
+      
+      // Clamp to valid range
+      const validIndex = Math.max(0, Math.min(centeredIndex, COMMON_EMOJIS.length - 1));
+      const centeredEmoji = COMMON_EMOJIS[validIndex];
+      
+      // Only update if different from current selection
+      if (centeredEmoji && centeredEmoji !== selectedIcon.value) {
+        onSelect({ type: 'emoji', value: centeredEmoji });
+      }
+    }, 50); // 50ms debounce for responsive feel
+  }, [selectedIcon.value, onSelect]);
 
   const iconTypes: { type: IconType; icon: React.ReactNode; label: string }[] = [
     ...(thumbnail ? [{ type: 'thumbnail' as IconType, icon: <Image className="h-5 w-5" />, label: 'Image' }] : []),
@@ -103,10 +155,11 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
           key="emoji-scroll"
           className="py-4 animate-fade-in overflow-hidden"
         >
-          <div 
-            ref={scrollContainerRef}
-            className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-[calc(50%-28px)]"
-          >
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-[calc(50%-28px)]"
+        >
             {COMMON_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
