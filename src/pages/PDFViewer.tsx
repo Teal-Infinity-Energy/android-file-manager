@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 import { 
   Search, 
   Sun, 
@@ -10,6 +11,7 @@ import {
   ChevronDown,
   X,
   FileText,
+  Share2,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -915,6 +917,19 @@ export default function PDFViewer() {
     navigate('/', { replace: true });
   }, [resumeEnabled, shortcutId, currentPage, zoom, navigate]);
   
+  // Handle share/open in other apps
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        title: 'Open PDF',
+        url: uri,
+        dialogTitle: 'Open with...',
+      });
+    } catch (error) {
+      console.log('[PDFViewer] Share cancelled or failed:', error);
+    }
+  };
+  
   // Handle Android back button
   useBackButton({
     isHomeScreen: false,
@@ -1308,6 +1323,13 @@ export default function PDFViewer() {
               className="p-2.5 rounded-full hover:bg-muted active:scale-95 transition-all"
             >
               <Search className="h-5 w-5" />
+            </button>
+            
+            <button
+              onClick={handleShare}
+              className="p-2.5 rounded-full hover:bg-muted active:scale-95 transition-all"
+            >
+              <Share2 className="h-5 w-5" />
             </button>
             
             <button
