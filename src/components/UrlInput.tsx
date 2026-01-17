@@ -98,7 +98,7 @@ export function UrlInput({ onSubmit, onBack, initialUrl }: UrlInputProps) {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h2 className="text-lg font-medium">Add Link</h2>
+        <h2 className="text-lg font-medium">Enter link</h2>
       </header>
       
       <div className="flex-1 p-4">

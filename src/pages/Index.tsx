@@ -184,8 +184,8 @@ const Index = () => {
       } else {
         console.error('[Index] Failed to create shortcut');
         toast({
-          title: 'Shortcut failed',
-          description: 'Could not create this shortcut. Please try again.',
+          title: 'Something went wrong',
+          description: 'Could not add to home screen. Please try again.',
           variant: 'destructive',
         });
       }
@@ -193,7 +193,7 @@ const Index = () => {
       console.error('[Index] Shortcut creation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Could not create this shortcut. Please try again.';
       toast({
-        title: 'Cannot create shortcut',
+        title: 'Unable to add',
         description: errorMessage,
         variant: 'destructive',
       });
@@ -218,7 +218,7 @@ const Index = () => {
               <h1 className="text-xl font-semibold text-foreground">OneTap</h1>
             </div>
             <p className="text-muted-foreground mt-2">
-              Create shortcuts to your files and links
+              One tap to what matters
             </p>
           </header>
           <ContentSourcePicker

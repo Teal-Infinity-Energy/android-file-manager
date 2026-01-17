@@ -19,35 +19,35 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSource
   return (
     <>
     <div className="flex flex-col gap-5 p-5 animate-fade-in">
-      {/* Section 1: Local Files (Primary) */}
+      {/* Section 1: What Matters (Primary) */}
       <div className="rounded-2xl bg-card border border-border p-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-4">
-          Local file
+          What matters on your phone
         </h2>
         <div className="grid grid-cols-2 gap-3">
           <FileTypeButton
             icon={<Image className="h-6 w-6" />}
-            label="Image"
+            label="Access a photo"
             onClick={() => onSelectFile('image')}
           />
           <FileTypeButton
             icon={<Video className="h-6 w-6" />}
-            label="Video"
+            label="Access a video"
             onClick={() => onSelectFile('video')}
           />
           <FileTypeButton
             icon={<Music className="h-6 w-6" />}
-            label="Audio"
+            label="Access audio"
             onClick={() => onSelectFile('audio')}
           />
           <FileTypeButton
             icon={<FileText className="h-6 w-6" />}
-            label="Document"
+            label="Access a document"
             onClick={() => onSelectFile('document')}
           />
         </div>
         
-        {/* All files option */}
+        {/* Browse all files option */}
         <button
           onClick={() => onSelectFile('all')}
           className={cn(
@@ -57,17 +57,17 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSource
           )}
         >
           <FolderOpen className="h-5 w-5 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">All Files</span>
+          <span className="text-sm font-medium text-muted-foreground">Browse all files</span>
         </button>
       </div>
 
-      {/* Section 2: URL (Secondary) */}
+      {/* Section 2: Links (Secondary) */}
       <div className="rounded-2xl bg-card border border-border p-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-4">
-          Link
+          Distraction-free links
         </h2>
         
-        {/* Enter URL button */}
+        {/* Access a link button */}
         <button
           onClick={() => onSelectUrl()}
           className={cn(
@@ -79,7 +79,7 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSource
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Link className="h-5 w-5" />
           </div>
-          <span className="font-medium text-foreground">Enter URL</span>
+          <span className="font-medium text-foreground">Access a link directly</span>
         </button>
 
         {/* Saved links button */}
@@ -92,7 +92,7 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl }: ContentSource
           )}
         >
           <Star className="h-5 w-5 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">Saved Links</span>
+          <span className="text-sm font-medium text-muted-foreground">Saved links</span>
         </button>
       </div>
     </div>

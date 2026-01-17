@@ -25,7 +25,7 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-medium text-foreground">Shortcut Icon</p>
+      <p className="text-sm font-medium text-foreground">Icon</p>
       
       {/* Icon type selector */}
       <div className="flex gap-2">
@@ -65,7 +65,7 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
           {selectedIcon.type === 'thumbnail' && (
             <img
               src={selectedIcon.value}
-              alt="Shortcut icon"
+              alt="Icon preview"
               className="h-full w-full object-cover"
             />
           )}

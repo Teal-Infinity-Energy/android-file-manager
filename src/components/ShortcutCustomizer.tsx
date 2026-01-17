@@ -66,7 +66,7 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h2 className="text-lg font-medium">Customize Shortcut</h2>
+        <h2 className="text-lg font-medium">Set up access</h2>
       </header>
       
       <div className="flex-1 p-4 space-y-8 overflow-auto animate-fade-in">
@@ -122,8 +122,8 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
           <div className="space-y-2">
             <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
               <div className="flex-1 mr-4">
-                <p className="font-medium text-foreground">Resume where I left off</p>
-                <p className="text-sm text-muted-foreground">Open at last viewed page</p>
+                <p className="font-medium text-foreground">Return to last page</p>
+                <p className="text-sm text-muted-foreground">Open where you left off</p>
               </div>
               <Switch
                 checked={resumeEnabled}
@@ -161,7 +161,7 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
               )}
             </div>
             <span className="text-xs text-foreground max-w-[72px] text-center truncate">
-              {name || 'Shortcut'}
+              {name || 'Access'}
             </span>
           </div>
         </div>
