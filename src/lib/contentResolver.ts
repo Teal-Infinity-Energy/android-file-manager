@@ -441,6 +441,13 @@ export function getYouTubeThumbnailUrl(url: string): string | null {
 
 // Generate thumbnail from local video file using HTML5 video element
 async function generateVideoThumbnail(videoUri: string): Promise<string | null> {
+  // On native with content:// URIs, skip frontend thumbnail generation
+  // Let the native side handle it via MediaMetadataRetriever (it's more reliable)
+  if (Capacitor.isNativePlatform() && videoUri.startsWith('content://')) {
+    console.log('[ContentResolver] Skipping frontend video thumbnail for content:// URI - native will handle it');
+    return null;
+  }
+
   return new Promise((resolve) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
@@ -448,18 +455,39 @@ async function generateVideoThumbnail(videoUri: string): Promise<string | null> 
     video.playsInline = true;
     video.crossOrigin = 'anonymous';
     
+    let resolved = false;
+    let objectUrl: string | null = null;
+    
     const cleanup = () => {
-      video.src = '';
+      if (resolved) return;
+      resolved = true;
+      video.pause();
+      video.removeAttribute('src');
       video.load();
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
     };
     
+    // Strict 3-second timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        console.warn('[ContentResolver] Video thumbnail timeout - aborting');
+        cleanup();
+        resolve(null);
+      }
+    }, 3000);
+    
     video.onloadeddata = () => {
+      if (resolved) return;
       // Seek to 1 second or 10% of duration, whichever is smaller
       const seekTime = Math.min(1, video.duration * 0.1);
       video.currentTime = seekTime;
     };
     
     video.onseeked = () => {
+      if (resolved) return;
       try {
         // Create canvas and draw video frame
         const canvas = document.createElement('canvas');
@@ -469,6 +497,7 @@ async function generateVideoThumbnail(videoUri: string): Promise<string | null> 
         
         const ctx = canvas.getContext('2d');
         if (!ctx) {
+          clearTimeout(timeout);
           cleanup();
           resolve(null);
           return;
@@ -495,10 +524,12 @@ async function generateVideoThumbnail(videoUri: string): Promise<string | null> 
         
         // Convert to base64 data URL
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        clearTimeout(timeout);
         cleanup();
         resolve(dataUrl);
       } catch (e) {
         console.warn('[ContentResolver] Error capturing video frame:', e);
+        clearTimeout(timeout);
         cleanup();
         resolve(null);
       }
@@ -506,20 +537,20 @@ async function generateVideoThumbnail(videoUri: string): Promise<string | null> 
     
     video.onerror = () => {
       console.warn('[ContentResolver] Error loading video for thumbnail');
+      clearTimeout(timeout);
       cleanup();
       resolve(null);
     };
     
-    // Set timeout in case video doesn't load
-    setTimeout(() => {
-      if (video.readyState < 2) {
-        console.warn('[ContentResolver] Video thumbnail timeout');
-        cleanup();
-        resolve(null);
-      }
-    }, 5000);
-    
-    video.src = videoUri;
+    // Handle blob: URLs directly, otherwise create object URL
+    if (videoUri.startsWith('blob:')) {
+      video.src = videoUri;
+    } else if (videoUri.startsWith('http') || videoUri.startsWith('file:')) {
+      video.src = videoUri;
+    } else {
+      // Try to load directly
+      video.src = videoUri;
+    }
     video.load();
   });
 }

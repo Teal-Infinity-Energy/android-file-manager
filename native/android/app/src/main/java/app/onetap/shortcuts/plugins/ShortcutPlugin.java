@@ -148,130 +148,178 @@ public class ShortcutPlugin extends Plugin {
             return;
         }
 
-        Uri dataUri = null;
+        // Capture final values for background thread
+        final String finalId = id;
+        final String finalLabel = label;
+        final String finalIntentAction = intentAction;
+        final String finalIntentData = intentData;
+        final String finalIntentType = intentType;
+        final Boolean finalUseVideoProxy = useVideoProxy;
+        final Boolean finalUsePDFProxy = usePDFProxy;
+        final Boolean finalResumeEnabled = resumeEnabled;
+        final String finalFileData = fileData;
+        final String finalFileName = fileName;
+        final String finalFileMimeType = fileMimeType;
+        final long finalFileSize = fileSize;
         
-        // Handle base64 file data from web picker
-        if (fileData != null && fileName != null) {
-            android.util.Log.d("ShortcutPlugin", "Processing base64 file data, size: " + fileSize);
-            
-            if (fileSize > 0 && fileSize <= FILE_SIZE_THRESHOLD) {
-                Uri savedUri = saveBase64ToAppStorage(context, fileData, id, fileMimeType);
-                if (savedUri != null) {
-                    dataUri = savedUri;
-                    android.util.Log.d("ShortcutPlugin", "Saved small file to app storage: " + savedUri);
-                } else {
-                    android.util.Log.e("ShortcutPlugin", "Failed to save file to app storage");
-                    JSObject result = new JSObject();
-                    result.put("success", false);
-                    result.put("error", "Failed to save file");
-                    call.resolve(result);
+        // Run file operations on background thread to prevent UI freezing
+        new Thread(() -> {
+            try {
+                Uri dataUri = null;
+                
+                // Handle base64 file data from web picker
+                if (finalFileData != null && finalFileName != null) {
+                    android.util.Log.d("ShortcutPlugin", "Processing base64 file data on background thread, size: " + finalFileSize);
+                    
+                    if (finalFileSize > 0 && finalFileSize <= FILE_SIZE_THRESHOLD) {
+                        Uri savedUri = saveBase64ToAppStorage(context, finalFileData, finalId, finalFileMimeType);
+                        if (savedUri != null) {
+                            dataUri = savedUri;
+                            android.util.Log.d("ShortcutPlugin", "Saved small file to app storage: " + savedUri);
+                        } else {
+                            android.util.Log.e("ShortcutPlugin", "Failed to save file to app storage");
+                            resolveOnMainThread(call, false, "Failed to save file");
+                            return;
+                        }
+                    } else if (finalFileSize > FILE_SIZE_THRESHOLD) {
+                        android.util.Log.w("ShortcutPlugin", "File is larger than 5MB, attempting to save anyway");
+                        Uri savedUri = saveBase64ToAppStorage(context, finalFileData, finalId, finalFileMimeType);
+                        if (savedUri != null) {
+                            dataUri = savedUri;
+                        } else {
+                            resolveOnMainThread(call, false, "File too large to process");
+                            return;
+                        }
+                    } else {
+                        Uri savedUri = saveBase64ToAppStorage(context, finalFileData, finalId, finalFileMimeType);
+                        if (savedUri != null) {
+                            dataUri = savedUri;
+                        }
+                    }
+                } else if (finalIntentData != null) {
+                    dataUri = Uri.parse(finalIntentData);
+                    String scheme = dataUri.getScheme();
+                    
+                    android.util.Log.d("ShortcutPlugin", "URI scheme: " + scheme);
+                    
+                    if ("content".equals(scheme) && finalIntentType != null) {
+                        long contentSize = getContentSize(context, dataUri);
+
+                        // If JS provided a size (e.g. some pickers can), prefer that when ContentResolver reports 0.
+                        if (contentSize <= 0 && finalFileSize > 0) {
+                            contentSize = finalFileSize;
+                        }
+
+                        android.util.Log.d("ShortcutPlugin", "Content size: " + contentSize);
+
+                        boolean isVideo = finalIntentType.startsWith("video/");
+
+                        // Block videos larger than 50MB
+                        if (isVideo && contentSize > VIDEO_CACHE_THRESHOLD) {
+                            long sizeMB = contentSize / (1024 * 1024);
+                            android.util.Log.e("ShortcutPlugin", "Video too large (" + sizeMB + " MB). Video shortcuts are limited to 50 MB maximum.");
+                            resolveOnMainThread(call, false, "Video too large (" + sizeMB + " MB). Video shortcuts are limited to 50 MB maximum.");
+                            return;
+                        }
+
+                        // Copy to app storage for internal playback (this is the slow operation)
+                        android.util.Log.d("ShortcutPlugin", "Starting file copy to app storage on background thread...");
+                        Uri persistentUri = copyToAppStorage(context, dataUri, finalId, finalIntentType);
+                        if (persistentUri != null) {
+                            dataUri = persistentUri;
+                            android.util.Log.d("ShortcutPlugin", "Copied file to app storage: " + persistentUri);
+                        } else {
+                            android.util.Log.w("ShortcutPlugin", "Copy failed; falling back to original content URI");
+                            persistReadPermissionIfPossible(context, dataUri);
+                        }
+                    }
+                }
+                
+                if (dataUri == null) {
+                    android.util.Log.e("ShortcutPlugin", "No valid URI for shortcut");
+                    resolveOnMainThread(call, false, "No valid file URI");
                     return;
                 }
-            } else if (fileSize > FILE_SIZE_THRESHOLD) {
-                android.util.Log.w("ShortcutPlugin", "File is larger than 5MB, attempting to save anyway");
-                Uri savedUri = saveBase64ToAppStorage(context, fileData, id, fileMimeType);
-                if (savedUri != null) {
-                    dataUri = savedUri;
+
+                // Create intent - use proxy activities for videos and PDFs
+                final Uri finalDataUri = dataUri;
+                Intent intent;
+                if (finalUseVideoProxy != null && finalUseVideoProxy) {
+                    android.util.Log.d("ShortcutPlugin", "Using VideoProxyActivity for video shortcut");
+                    intent = new Intent(context, VideoProxyActivity.class);
+                    intent.setAction("app.onetap.OPEN_VIDEO");
+                    intent.setDataAndType(finalDataUri, finalIntentType != null ? finalIntentType : "video/*");
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } else if (finalUsePDFProxy != null && finalUsePDFProxy) {
+                    android.util.Log.d("ShortcutPlugin", "Using PDFProxyActivity for PDF shortcut, resumeEnabled=" + finalResumeEnabled);
+                    intent = new Intent(context, PDFProxyActivity.class);
+                    intent.setAction("app.onetap.OPEN_PDF");
+                    intent.setDataAndType(finalDataUri, finalIntentType != null ? finalIntentType : "application/pdf");
+                    intent.putExtra("shortcut_id", finalId);
+                    intent.putExtra("resume_enabled", finalResumeEnabled != null && finalResumeEnabled);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 } else {
-                    JSObject result = new JSObject();
-                    result.put("success", false);
-                    result.put("error", "File too large to process");
-                    call.resolve(result);
-                    return;
+                    intent = createCompatibleIntent(context, finalIntentAction, finalDataUri, finalIntentType);
                 }
-            } else {
-                Uri savedUri = saveBase64ToAppStorage(context, fileData, id, fileMimeType);
-                if (savedUri != null) {
-                    dataUri = savedUri;
-                }
+
+                // Create icon (this may also be slow for video thumbnails)
+                android.util.Log.d("ShortcutPlugin", "Creating icon on background thread...");
+                Icon icon = createIcon(call);
+
+                ShortcutInfo shortcutInfo = new ShortcutInfo.Builder(context, finalId)
+                        .setShortLabel(finalLabel)
+                        .setLongLabel(finalLabel)
+                        .setIcon(icon)
+                        .setIntent(intent)
+                        .build();
+
+                // Must request shortcut on main thread
+                final ShortcutInfo finalShortcutInfo = shortcutInfo;
+                getActivity().runOnUiThread(() -> {
+                    try {
+                        boolean requested = shortcutManager.requestPinShortcut(finalShortcutInfo, null);
+                        android.util.Log.d("ShortcutPlugin", "requestPinShortcut returned: " + requested);
+
+                        JSObject result = new JSObject();
+                        result.put("success", requested);
+                        call.resolve(result);
+                    } catch (Exception e) {
+                        android.util.Log.e("ShortcutPlugin", "Error pinning shortcut: " + e.getMessage());
+                        JSObject result = new JSObject();
+                        result.put("success", false);
+                        result.put("error", e.getMessage());
+                        call.resolve(result);
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("ShortcutPlugin", "Background thread error: " + e.getMessage());
+                e.printStackTrace();
+                resolveOnMainThread(call, false, e.getMessage());
             }
-        } else if (intentData != null) {
-            dataUri = Uri.parse(intentData);
-            String scheme = dataUri.getScheme();
-            
-            android.util.Log.d("ShortcutPlugin", "URI scheme: " + scheme);
-            
-            if ("content".equals(scheme) && intentType != null) {
-                long contentSize = getContentSize(context, dataUri);
-
-                // If JS provided a size (e.g. some pickers can), prefer that when ContentResolver reports 0.
-                if (contentSize <= 0 && fileSize > 0) {
-                    contentSize = fileSize;
+        }).start();
+    }
+    
+    // Helper to resolve plugin call on main thread with error
+    private void resolveOnMainThread(PluginCall call, boolean success, String error) {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                JSObject result = new JSObject();
+                result.put("success", success);
+                if (error != null) {
+                    result.put("error", error);
                 }
-
-                android.util.Log.d("ShortcutPlugin", "Content size: " + contentSize);
-
-                boolean isVideo = intentType.startsWith("video/");
-
-                // Block videos larger than 50MB
-                if (isVideo && contentSize > VIDEO_CACHE_THRESHOLD) {
-                    long sizeMB = contentSize / (1024 * 1024);
-                    android.util.Log.e("ShortcutPlugin", "Video too large (" + sizeMB + " MB). Video shortcuts are limited to 50 MB maximum.");
-                    JSObject result = new JSObject();
-                    result.put("success", false);
-                    result.put("error", "Video too large (" + sizeMB + " MB). Video shortcuts are limited to 50 MB maximum.");
-                    call.resolve(result);
-                    return;
-                }
-
-                // Copy to app storage for internal playback
-                Uri persistentUri = copyToAppStorage(context, dataUri, id, intentType);
-                if (persistentUri != null) {
-                    dataUri = persistentUri;
-                    android.util.Log.d("ShortcutPlugin", "Copied file to app storage: " + persistentUri);
-                } else {
-                    android.util.Log.w("ShortcutPlugin", "Copy failed; falling back to original content URI");
-                    persistReadPermissionIfPossible(context, dataUri);
-                }
-            }
-        }
-        
-        if (dataUri == null) {
-            android.util.Log.e("ShortcutPlugin", "No valid URI for shortcut");
-            JSObject result = new JSObject();
-            result.put("success", false);
-            result.put("error", "No valid file URI");
-            call.resolve(result);
-            return;
-        }
-
-        // Create intent - use proxy activities for videos and PDFs
-        Intent intent;
-        if (useVideoProxy != null && useVideoProxy) {
-            android.util.Log.d("ShortcutPlugin", "Using VideoProxyActivity for video shortcut");
-            intent = new Intent(context, VideoProxyActivity.class);
-            intent.setAction("app.onetap.OPEN_VIDEO");
-            intent.setDataAndType(dataUri, intentType != null ? intentType : "video/*");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        } else if (usePDFProxy != null && usePDFProxy) {
-            android.util.Log.d("ShortcutPlugin", "Using PDFProxyActivity for PDF shortcut, resumeEnabled=" + resumeEnabled);
-            intent = new Intent(context, PDFProxyActivity.class);
-            intent.setAction("app.onetap.OPEN_PDF");
-            intent.setDataAndType(dataUri, intentType != null ? intentType : "application/pdf");
-            intent.putExtra("shortcut_id", id);
-            intent.putExtra("resume_enabled", resumeEnabled != null && resumeEnabled);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                call.resolve(result);
+            });
         } else {
-            intent = createCompatibleIntent(context, intentAction, dataUri, intentType);
+            JSObject result = new JSObject();
+            result.put("success", success);
+            if (error != null) {
+                result.put("error", error);
+            }
+            call.resolve(result);
         }
-
-        Icon icon = createIcon(call);
-
-        ShortcutInfo shortcutInfo = new ShortcutInfo.Builder(context, id)
-                .setShortLabel(label)
-                .setLongLabel(label)
-                .setIcon(icon)
-                .setIntent(intent)
-                .build();
-
-        boolean requested = shortcutManager.requestPinShortcut(shortcutInfo, null);
-        android.util.Log.d("ShortcutPlugin", "requestPinShortcut returned: " + requested);
-
-        JSObject result = new JSObject();
-        result.put("success", requested);
-        call.resolve(result);
     }
     
 
@@ -1148,15 +1196,16 @@ public class ShortcutPlugin extends Plugin {
         }
     }
     
-    // Create video thumbnail for shortcut icon
+    // Create video thumbnail for shortcut icon with timeout protection
     private Icon createVideoThumbnailIcon(Context context, Uri videoUri) {
+        MediaMetadataRetriever retriever = null;
         try {
-            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            android.util.Log.d("ShortcutPlugin", "Extracting video thumbnail from: " + videoUri);
+            retriever = new MediaMetadataRetriever();
             retriever.setDataSource(context, videoUri);
             
             // Get a frame at 1 second (or first frame)
             Bitmap frame = retriever.getFrameAtTime(1000000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-            retriever.release();
             
             if (frame == null) {
                 android.util.Log.w("ShortcutPlugin", "Could not extract video frame");
@@ -1173,9 +1222,24 @@ public class ShortcutPlugin extends Plugin {
             
             android.util.Log.d("ShortcutPlugin", "Created video thumbnail icon");
             return Icon.createWithBitmap(scaled);
+        } catch (IllegalArgumentException e) {
+            android.util.Log.w("ShortcutPlugin", "Video thumbnail failed (invalid data source): " + e.getMessage());
+            return null;
+        } catch (RuntimeException e) {
+            android.util.Log.w("ShortcutPlugin", "Video thumbnail failed (runtime error): " + e.getMessage());
+            return null;
         } catch (Exception e) {
             android.util.Log.e("ShortcutPlugin", "Error creating video thumbnail: " + e.getMessage());
             return null;
+        } finally {
+            // Always release retriever to prevent resource leaks
+            if (retriever != null) {
+                try {
+                    retriever.release();
+                } catch (Exception ignored) {
+                    android.util.Log.w("ShortcutPlugin", "Error releasing MediaMetadataRetriever");
+                }
+            }
         }
     }
 
