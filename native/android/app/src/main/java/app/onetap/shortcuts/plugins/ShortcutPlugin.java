@@ -444,10 +444,13 @@ public class ShortcutPlugin extends Plugin {
     public void openWithExternalApp(PluginCall call) {
         android.util.Log.d("ShortcutPlugin", "openWithExternalApp called");
 
-        if (getActivity() == null) {
+        Activity activity = getActivity();
+        Context context = getContext();
+        
+        if (activity == null || context == null) {
             JSObject result = new JSObject();
             result.put("success", false);
-            result.put("error", "Activity is null");
+            result.put("error", "Activity or context is null");
             call.resolve(result);
             return;
         }
@@ -465,28 +468,64 @@ public class ShortcutPlugin extends Plugin {
 
         try {
             Uri uri = Uri.parse(uriString);
+            
+            // If it's a file:// URI pointing to our app storage, convert to content:// via FileProvider
+            if ("file".equals(uri.getScheme())) {
+                String path = uri.getPath();
+                File appFilesDir = context.getFilesDir();
+                
+                // Check if this file is in our app's storage
+                if (path != null && path.startsWith(appFilesDir.getAbsolutePath())) {
+                    File file = new File(path);
+                    if (file.exists()) {
+                        String authority = context.getPackageName() + ".fileprovider";
+                        uri = FileProvider.getUriForFile(context, authority, file);
+                        android.util.Log.d("ShortcutPlugin", "Converted file:// to content:// URI: " + uri);
+                    }
+                }
+            }
+            
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, mimeType);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
             // ClipData helps propagate URI grants reliably
             if ("content".equals(uri.getScheme())) {
                 try {
-                    intent.setClipData(ClipData.newUri(getActivity().getContentResolver(), "onetap-file", uri));
+                    intent.setClipData(ClipData.newUri(activity.getContentResolver(), "onetap-file", uri));
                 } catch (Exception e) {
                     android.util.Log.w("ShortcutPlugin", "Failed to set ClipData: " + e.getMessage());
                 }
+                
+                // Grant URI permission to all apps that can handle this intent
+                try {
+                    List<android.content.pm.ResolveInfo> resolveInfos =
+                        context.getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+                    
+                    for (android.content.pm.ResolveInfo resolveInfo : resolveInfos) {
+                        String packageName = resolveInfo.activityInfo.packageName;
+                        context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        android.util.Log.d("ShortcutPlugin", "Granted URI permission to: " + packageName);
+                    }
+                } catch (Exception e) {
+                    android.util.Log.w("ShortcutPlugin", "Error granting URI permissions: " + e.getMessage());
+                }
             }
 
-            // Use chooser to show app picker
+            // Use chooser but also add flags to it
             Intent chooser = Intent.createChooser(intent, "Open with...");
-            getActivity().startActivity(chooser);
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            activity.startActivity(chooser);
 
             JSObject result = new JSObject();
             result.put("success", true);
             call.resolve(result);
         } catch (Exception e) {
             android.util.Log.e("ShortcutPlugin", "openWithExternalApp failed: " + e.getMessage());
+            e.printStackTrace();
             JSObject result = new JSObject();
             result.put("success", false);
             result.put("error", e.getMessage());
