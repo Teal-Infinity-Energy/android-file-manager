@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,7 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
   
   const [icon, setIcon] = useState<ShortcutIcon>(getInitialIcon);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   
   useEffect(() => {
     setIsLoadingThumbnail(true);
@@ -51,11 +52,16 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
       });
   }, [source]);
   
-  const handleConfirm = () => {
-    if (name.trim()) {
-      onConfirm(name.trim(), icon, isPdf ? resumeEnabled : undefined);
+  const handleConfirm = useCallback(async () => {
+    if (name.trim() && !isCreating) {
+      setIsCreating(true);
+      try {
+        await onConfirm(name.trim(), icon, isPdf ? resumeEnabled : undefined);
+      } finally {
+        setIsCreating(false);
+      }
     }
-  };
+  }, [name, isCreating, onConfirm, icon, isPdf, resumeEnabled]);
 
   return (
     <div className="flex flex-col h-full">
@@ -170,11 +176,20 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
       <div className="p-4 safe-bottom">
         <Button
           onClick={handleConfirm}
-          disabled={!name.trim()}
+          disabled={!name.trim() || isCreating}
           className="w-full h-12 text-base font-medium"
         >
-          <Check className="mr-2 h-5 w-5" />
-          Add to Home Screen
+          {isCreating ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Adding...
+            </>
+          ) : (
+            <>
+              <Check className="mr-2 h-5 w-5" />
+              Add to Home Screen
+            </>
+          )}
         </Button>
       </div>
     </div>
