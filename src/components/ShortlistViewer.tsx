@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, ExternalLink, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { X, ExternalLink, ChevronLeft, ChevronRight, Loader2, Smartphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
+import { isDeepLink, getAppNameFromUrl } from '@/lib/urlUtils';
 import type { SavedLink } from '@/lib/savedLinksManager';
 
 interface ShortlistViewerProps {
@@ -35,6 +36,10 @@ export function ShortlistViewer({
   // Current link
   const currentLink = links[currentIndex];
   const totalLinks = links.length;
+  
+  // Check if current link is a deep link (cannot be loaded in iframe)
+  const isCurrentDeepLink = currentLink ? isDeepLink(currentLink.url) : false;
+  const appName = currentLink ? getAppNameFromUrl(currentLink.url) : null;
 
   const handlePrevious = useCallback(() => {
     if (totalLinks <= 1) return;
@@ -126,7 +131,7 @@ export function ShortlistViewer({
       {/* WebView Container */}
       <div className="flex-1 relative overflow-hidden">
         {/* Loading indicator */}
-        {isLoading && (
+        {isLoading && !isCurrentDeepLink && (
           <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -135,8 +140,34 @@ export function ShortlistViewer({
           </div>
         )}
 
+        {/* Deep link state - cannot load in iframe */}
+        {isCurrentDeepLink && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+            <div className="flex flex-col items-center gap-4 p-6 text-center max-w-xs">
+              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+                <Smartphone className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium">
+                  {appName ? `${appName} Link` : 'App Link'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This link opens in {appName || 'another app'} and cannot be previewed here
+                </p>
+              </div>
+              <button
+                onClick={handleOpenExternal}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in {appName || 'App'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Error state */}
-        {loadError && (
+        {loadError && !isCurrentDeepLink && (
           <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
             <div className="flex flex-col items-center gap-4 p-6 text-center">
               <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
@@ -159,16 +190,18 @@ export function ShortlistViewer({
           </div>
         )}
 
-        {/* iframe - NO address bar, NO tabs, NO history */}
-        <iframe
-          key={currentLink.url}
-          src={currentLink.url}
-          className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          onLoad={handleIframeLoad}
-          onError={handleIframeError}
-          title={currentLink.title}
-        />
+        {/* iframe - Only render for non-deep links */}
+        {!isCurrentDeepLink && (
+          <iframe
+            key={currentLink.url}
+            src={currentLink.url}
+            className="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            title={currentLink.title}
+          />
+        )}
       </div>
 
       {/* Navigation Footer - Only if multiple links */}
