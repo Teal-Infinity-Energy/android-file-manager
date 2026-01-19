@@ -18,6 +18,7 @@ import {
   type SavedLink 
 } from '@/lib/savedLinksManager';
 import { BookmarkItem } from './BookmarkItem';
+import { BookmarkDragOverlay } from './BookmarkDragOverlay';
 import { BookmarkActionSheet } from './BookmarkActionSheet';
 import { ShortlistViewer } from './ShortlistViewer';
 import { AddBookmarkForm } from './AddBookmarkForm';
@@ -32,6 +33,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -57,6 +60,9 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
   // Shortlist viewer state
   const [showViewer, setShowViewer] = useState(false);
   const [viewerStartIndex, setViewerStartIndex] = useState(0);
+  
+  // Drag state for overlay
+  const [activeId, setActiveId] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -121,8 +127,14 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
     })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+    triggerHaptic('light');
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
     
     if (over && active.id !== over.id) {
       const oldIndex = links.findIndex(link => link.id === active.id);
@@ -131,9 +143,15 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
       const newOrder = arrayMove(links, oldIndex, newIndex);
       setLinks(newOrder);
       reorderLinks(newOrder.map(l => l.id));
-      triggerHaptic('light');
+      triggerHaptic('success');
     }
   };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
+  const activeLink = activeId ? links.find(l => l.id === activeId) : null;
 
   // Handlers
   const handleBookmarkTap = (link: SavedLink) => {
@@ -397,7 +415,9 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
           >
             <SortableContext
               items={filteredLinks.map(l => l.id)}
@@ -415,6 +435,15 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
                 ))}
               </div>
             </SortableContext>
+            
+            <DragOverlay dropAnimation={{
+              duration: 200,
+              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+            }}>
+              {activeLink ? (
+                <BookmarkDragOverlay link={activeLink} />
+              ) : null}
+            </DragOverlay>
           </DndContext>
           </>
         )}
