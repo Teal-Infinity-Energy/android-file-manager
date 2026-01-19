@@ -1,10 +1,16 @@
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 
-// Desktop User Agent for requesting desktop sites
+export type ViewMode = 'desktop' | 'mobile';
+
+// User Agent strings
 const DESKTOP_USER_AGENT = 
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+const MOBILE_USER_AGENT = 
+  "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
 let browserCloseCallback: (() => void) | null = null;
 
@@ -12,13 +18,16 @@ export function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
 
+export function getUserAgent(viewMode: ViewMode): string {
+  return viewMode === 'desktop' ? DESKTOP_USER_AGENT : MOBILE_USER_AGENT;
+}
+
 /**
- * Opens URL in native in-app browser with desktop User-Agent.
- * On Android, this uses Chrome Custom Tabs which respects the system-level
- * "Request desktop site" setting. For true desktop viewing, users should
- * enable this in Chrome settings.
+ * Opens URL in native in-app browser.
+ * Note: Chrome Custom Tabs and SFSafariViewController don't support
+ * programmatic User-Agent changes. The viewMode is stored for user intent.
  */
-export async function openInAppBrowserDesktop(url: string): Promise<void> {
+export async function openInAppBrowser(url: string, viewMode: ViewMode = 'desktop'): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     await Browser.open({ 
       url,

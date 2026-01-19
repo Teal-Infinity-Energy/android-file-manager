@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, Globe, ExternalLink, Loader2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Globe, ExternalLink, Loader2, Smartphone, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
 import { 
-  openInAppBrowserDesktop, 
+  openInAppBrowser, 
   addBrowserCloseListener,
   removeBrowserListeners,
-  isNativePlatform 
+  isNativePlatform,
+  type ViewMode
 } from '@/lib/embeddedWebView';
 import type { SavedLink } from '@/lib/savedLinksManager';
 
@@ -28,6 +29,8 @@ function extractFaviconUrl(url: string): string {
   }
 }
 
+const VIEW_MODE_STORAGE_KEY = 'shortlist-view-mode';
+
 export function ShortlistViewer({
   isOpen,
   onClose,
@@ -36,12 +39,26 @@ export function ShortlistViewer({
 }: ShortlistViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [isLoading, setIsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return (stored === 'mobile' || stored === 'desktop') ? stored : 'desktop';
+  });
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isNative = isNativePlatform();
 
   // Current link
   const currentLink = links[currentIndex];
   const totalLinks = links.length;
+
+  // Persist view mode
+  useEffect(() => {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
+
+  const toggleViewMode = useCallback(() => {
+    triggerHaptic('light');
+    setViewMode((prev) => prev === 'desktop' ? 'mobile' : 'desktop');
+  }, []);
 
   // Reset index when viewer opens
   useEffect(() => {
@@ -86,14 +103,14 @@ export function ShortlistViewer({
     setIsLoading(true);
     
     if (isNative) {
-      await openInAppBrowserDesktop(currentLink.url);
+      await openInAppBrowser(currentLink.url, viewMode);
       // Loading will be cleared when browser closes
     } else {
       // Web: Open in iframe or new tab
       window.open(currentLink.url, '_blank', 'noopener,noreferrer');
       setIsLoading(false);
     }
-  }, [currentLink, isNative]);
+  }, [currentLink, isNative, viewMode]);
 
   const handleIframeLoad = useCallback(() => {
     setIsLoading(false);
@@ -142,8 +159,33 @@ export function ShortlistViewer({
           </p>
         </div>
 
-        {/* Placeholder for symmetry */}
-        <div className="w-9" />
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-0.5 bg-muted rounded-full p-0.5">
+          <button
+            onClick={toggleViewMode}
+            className={cn(
+              "p-1.5 rounded-full transition-colors",
+              viewMode === 'mobile' 
+                ? "bg-primary text-primary-foreground" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-label="Mobile view"
+          >
+            <Smartphone className="h-4 w-4" />
+          </button>
+          <button
+            onClick={toggleViewMode}
+            className={cn(
+              "p-1.5 rounded-full transition-colors",
+              viewMode === 'desktop' 
+                ? "bg-primary text-primary-foreground" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-label="Desktop view"
+          >
+            <Monitor className="h-4 w-4" />
+          </button>
+        </div>
       </header>
 
       {/* Content Area */}
@@ -192,13 +234,15 @@ export function ShortlistViewer({
                 ) : (
                   <>
                     <ExternalLink className="h-5 w-5" />
-                    View Desktop Site
+                    View {viewMode === 'desktop' ? 'Desktop' : 'Mobile'} Site
                   </>
                 )}
               </button>
               
               <p className="text-xs text-muted-foreground mt-4">
-                Opens in native browser with full functionality
+                {viewMode === 'desktop' 
+                  ? 'Opens in browser with desktop layout' 
+                  : 'Opens in browser with mobile layout'}
               </p>
             </div>
           </div>
