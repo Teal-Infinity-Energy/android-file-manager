@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, Plus, X, Bookmark, ListChecks, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { 
   getSavedLinks, 
@@ -95,6 +96,35 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
 
   const handleToggleShortlist = (id: string) => {
     toggleShortlist(id);
+    refreshLinks();
+    triggerHaptic('success');
+  };
+
+  // Check if all filtered links are shortlisted
+  const allFilteredShortlisted = useMemo(() => {
+    return filteredLinks.length > 0 && filteredLinks.every(link => link.isShortlisted);
+  }, [filteredLinks]);
+
+  const someFilteredShortlisted = useMemo(() => {
+    return filteredLinks.some(link => link.isShortlisted) && !allFilteredShortlisted;
+  }, [filteredLinks, allFilteredShortlisted]);
+
+  const handleToggleAllShortlist = () => {
+    if (allFilteredShortlisted) {
+      // Uncheck all filtered
+      filteredLinks.forEach(link => {
+        if (link.isShortlisted) {
+          toggleShortlist(link.id);
+        }
+      });
+    } else {
+      // Check all filtered
+      filteredLinks.forEach(link => {
+        if (!link.isShortlisted) {
+          toggleShortlist(link.id);
+        }
+      });
+    }
     refreshLinks();
     triggerHaptic('success');
   };
@@ -291,6 +321,21 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
             )}
           </div>
         ) : (
+          <>
+            {/* Select All Row */}
+            <div className="flex items-center gap-3 py-2 mb-2 border-b border-border/50">
+              <Checkbox
+                checked={allFilteredShortlisted}
+                className="h-5 w-5"
+                onClick={handleToggleAllShortlist}
+                data-state={someFilteredShortlisted ? "indeterminate" : allFilteredShortlisted ? "checked" : "unchecked"}
+              />
+              <span className="text-sm text-muted-foreground">
+                {allFilteredShortlisted 
+                  ? `Deselect all (${filteredLinks.length})` 
+                  : `Select all (${filteredLinks.length})`}
+              </span>
+            </div>
           <div className="space-y-2 pb-6">
             {filteredLinks.map((link) => (
               <BookmarkItem
@@ -301,6 +346,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
               />
             ))}
           </div>
+          </>
         )}
       </div>
 
