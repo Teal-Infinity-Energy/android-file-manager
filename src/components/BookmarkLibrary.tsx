@@ -13,13 +13,17 @@ import {
   getShortlistedLinks,
   clearAllShortlist,
   getAllTags,
+  getAllFolders,
   PRESET_TAGS,
   reorderLinks,
+  moveToFolder,
+  removeCustomFolder,
   type SavedLink 
 } from '@/lib/savedLinksManager';
 import { BookmarkItem } from './BookmarkItem';
 import { BookmarkDragOverlay } from './BookmarkDragOverlay';
 import { BookmarkFolderSection } from './BookmarkFolderSection';
+import { CreateFolderDialog } from './CreateFolderDialog';
 import { BookmarkActionSheet } from './BookmarkActionSheet';
 import { ShortlistViewer } from './ShortlistViewer';
 import { AddBookmarkForm } from './AddBookmarkForm';
@@ -36,6 +40,9 @@ import {
   DragEndEvent,
   DragStartEvent,
   DragOverlay,
+  DragOverEvent,
+  pointerWithin,
+  rectIntersection,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -67,6 +74,8 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
   
   // Drag state for overlay
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [overFolderId, setOverFolderId] = useState<string | null>(null);
+  const [folderRefreshKey, setFolderRefreshKey] = useState(0);
   
   const { toast } = useToast();
 
@@ -80,7 +89,8 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
   }, [refreshLinks]);
 
   // Derived data
-  const allUsedTags = useMemo(() => getAllTags(), [links]);
+  const allUsedTags = useMemo(() => getAllTags(), [links, folderRefreshKey]);
+  const allFolders = useMemo(() => getAllFolders(), [links, folderRefreshKey]);
   const availableTags = useMemo(() => {
     const combined = new Set([...PRESET_TAGS, ...allUsedTags]);
     return Array.from(combined);
@@ -115,12 +125,16 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
     const groups: Record<string, SavedLink[]> = {};
     const uncategorized: SavedLink[] = [];
     
+    // Initialize all folders (even empty ones)
+    allFolders.forEach(folder => {
+      groups[folder] = [];
+    });
+    
     filteredLinks.forEach(link => {
-      if (link.tag) {
-        if (!groups[link.tag]) {
-          groups[link.tag] = [];
-        }
+      if (link.tag && groups[link.tag] !== undefined) {
         groups[link.tag].push(link);
+      } else if (link.tag) {
+        groups[link.tag] = [link];
       } else {
         uncategorized.push(link);
       }
@@ -130,7 +144,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
     const sortedTags = Object.keys(groups).sort();
     
     return { groups, sortedTags, uncategorized };
-  }, [filteredLinks]);
+  }, [filteredLinks, allFolders]);
 
   // Check if filtering/searching is active (disable drag in this case)
   const isDragDisabled = Boolean(searchQuery.trim() || activeTagFilter);
@@ -158,26 +172,88 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
     triggerHaptic('light');
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (over && String(over.id).startsWith('folder-')) {
+      setOverFolderId(String(over.id));
+    } else {
+      setOverFolderId(null);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setOverFolderId(null);
     
-    if (over && active.id !== over.id) {
+    if (!over) return;
+    
+    // Check if dropping on a folder
+    if (String(over.id).startsWith('folder-')) {
+      const folderData = over.data.current;
+      if (folderData?.type === 'folder') {
+        const targetFolder = folderData.folderName;
+        const linkId = active.id as string;
+        const link = links.find(l => l.id === linkId);
+        
+        if (link && link.tag !== targetFolder) {
+          moveToFolder(linkId, targetFolder);
+          refreshLinks();
+          toast({
+            title: `Moved to ${targetFolder || 'Uncategorized'}`,
+            duration: 2000,
+          });
+          triggerHaptic('success');
+        }
+        return;
+      }
+    }
+    
+    // Normal reordering
+    if (active.id !== over.id) {
       const oldIndex = links.findIndex(link => link.id === active.id);
       const newIndex = links.findIndex(link => link.id === over.id);
       
-      const newOrder = arrayMove(links, oldIndex, newIndex);
-      setLinks(newOrder);
-      reorderLinks(newOrder.map(l => l.id));
-      triggerHaptic('success');
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(links, oldIndex, newIndex);
+        setLinks(newOrder);
+        reorderLinks(newOrder.map(l => l.id));
+        triggerHaptic('success');
+      }
     }
   };
 
   const handleDragCancel = () => {
     setActiveId(null);
+    setOverFolderId(null);
   };
 
   const activeLink = activeId ? links.find(l => l.id === activeId) : null;
+
+  // Custom collision detection for folder drops
+  const collisionDetection = (args: any) => {
+    // First check for folder intersections
+    const pointerCollisions = pointerWithin(args);
+    const folderCollision = pointerCollisions.find(c => String(c.id).startsWith('folder-'));
+    if (folderCollision) {
+      return [folderCollision];
+    }
+    
+    // Fall back to closest center for item reordering
+    return closestCenter(args);
+  };
+  
+  const handleDeleteFolder = (folderName: string) => {
+    removeCustomFolder(folderName);
+    refreshLinks();
+    setFolderRefreshKey(k => k + 1);
+    toast({
+      title: 'Folder deleted',
+      description: 'Bookmarks moved to Uncategorized',
+      duration: 2000,
+    });
+    triggerHaptic('warning');
+  };
 
   // Handlers
   const handleBookmarkTap = (link: SavedLink) => {
@@ -470,8 +546,9 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
             </div>
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={collisionDetection}
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
@@ -496,27 +573,37 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
             ) : (
               /* Folder View */
               <div className="pb-6">
+                {/* Create Folder Button */}
+                <div className="mb-4">
+                  <CreateFolderDialog 
+                    onFolderCreated={() => {
+                      setFolderRefreshKey(k => k + 1);
+                    }} 
+                  />
+                </div>
+                
                 {groupedLinks.sortedTags.map((tag) => (
                   <BookmarkFolderSection
                     key={tag}
                     title={tag}
+                    folderId={tag}
                     links={groupedLinks.groups[tag]}
                     onBookmarkTap={handleBookmarkTap}
                     onToggleShortlist={handleToggleShortlist}
+                    onDeleteFolder={handleDeleteFolder}
                     isDragDisabled={isDragDisabled}
                   />
                 ))}
                 
-                {groupedLinks.uncategorized.length > 0 && (
-                  <BookmarkFolderSection
-                    title="Uncategorized"
-                    links={groupedLinks.uncategorized}
-                    onBookmarkTap={handleBookmarkTap}
-                    onToggleShortlist={handleToggleShortlist}
-                    isDragDisabled={isDragDisabled}
-                    defaultOpen={groupedLinks.sortedTags.length === 0}
-                  />
-                )}
+                <BookmarkFolderSection
+                  title="Uncategorized"
+                  folderId="uncategorized"
+                  links={groupedLinks.uncategorized}
+                  onBookmarkTap={handleBookmarkTap}
+                  onToggleShortlist={handleToggleShortlist}
+                  isDragDisabled={isDragDisabled}
+                  defaultOpen={groupedLinks.sortedTags.length === 0}
+                />
               </div>
             )}
             
