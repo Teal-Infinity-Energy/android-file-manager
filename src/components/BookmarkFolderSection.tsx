@@ -5,7 +5,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { BookmarkItem } from './BookmarkItem';
-import { PRESET_TAGS, type SavedLink } from '@/lib/savedLinksManager';
+import { PRESET_TAGS, getFolderIcon, type SavedLink } from '@/lib/savedLinksManager';
+import { getIconByName } from './FolderIconPicker';
 
 interface BookmarkFolderSectionProps {
   title: string;
@@ -43,6 +44,10 @@ export function BookmarkFolderSection({
   const selectedCount = links.filter(l => l.isShortlisted).length;
   const isPreset = PRESET_TAGS.includes(title);
   const canDelete = !isPreset && title !== 'Uncategorized' && onDeleteFolder;
+  
+  // Get custom icon for this folder
+  const customIconName = getFolderIcon(title);
+  const CustomIcon = customIconName ? getIconByName(customIconName) : null;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mb-4">
@@ -76,7 +81,9 @@ export function BookmarkFolderSection({
               "text-muted-foreground",
               isOver && "text-primary"
             )}>
-              {isOpen ? (
+              {CustomIcon ? (
+                <CustomIcon className="h-4 w-4" />
+              ) : isOpen ? (
                 <FolderOpen className="h-4 w-4" />
               ) : (
                 <Folder className="h-4 w-4" />
