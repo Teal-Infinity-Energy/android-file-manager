@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'saved_links';
+const CUSTOM_FOLDERS_KEY = 'custom_folders';
 
 export const PRESET_TAGS = ['Work', 'Personal', 'Social', 'News', 'Entertainment', 'Shopping'];
 
@@ -14,29 +15,19 @@ export interface SavedLink {
 
 /**
  * Normalize URL for consistent duplicate detection
- * - Ensures protocol exists (defaults to https://)
- * - Lowercases hostname
- * - Removes trailing slash for cleaner comparison
- * - Removes fragment (#...) as it's usually not meaningful for bookmarks
  */
 function normalizeUrl(url: string): string {
   try {
     let normalized = url.trim();
     
-    // Add protocol if missing
     if (!/^https?:\/\//i.test(normalized)) {
       normalized = 'https://' + normalized;
     }
     
     const urlObj = new URL(normalized);
-    
-    // Lowercase hostname
     urlObj.hostname = urlObj.hostname.toLowerCase();
-    
-    // Remove fragment
     urlObj.hash = '';
     
-    // Get the full URL and remove trailing slash (but not for paths like /page/)
     let result = urlObj.href;
     if (result.endsWith('/') && urlObj.pathname === '/') {
       result = result.slice(0, -1);
@@ -44,8 +35,16 @@ function normalizeUrl(url: string): string {
     
     return result;
   } catch {
-    // If URL parsing fails, return trimmed original
     return url.trim().toLowerCase();
+  }
+}
+
+function extractTitleFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch {
+    return url;
   }
 }
 
@@ -57,10 +56,8 @@ export function getSavedLinks(): SavedLink[] {
     const links = JSON.parse(stored);
     if (!Array.isArray(links)) return [];
     
-    // Migrate old links with tags array to single tag
     return links.map((link: any) => ({
       ...link,
-      // Migration: use first tag from old array, or existing tag, or null
       tag: link.tag !== undefined ? link.tag : (link.tags?.[0] || null),
       description: link.description || '',
     }));
@@ -87,7 +84,6 @@ export function addSavedLink(
     const links = getSavedLinks();
     const normalizedNewUrl = normalizeUrl(url);
     
-    // Check if URL already exists (using normalized comparison)
     const existing = links.find(link => normalizeUrl(link.url) === normalizedNewUrl);
     if (existing) {
       console.log('[SavedLinks] Duplicate detected:', url);
@@ -96,7 +92,7 @@ export function addSavedLink(
     
     const newLink: SavedLink = {
       id: crypto.randomUUID(),
-      url: normalizedNewUrl, // Store the normalized URL
+      url: normalizedNewUrl,
       title: title || extractTitleFromUrl(normalizedNewUrl),
       description: description || '',
       tag: tag || null,
@@ -106,7 +102,6 @@ export function addSavedLink(
     links.unshift(newLink);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
     
-    // Verify save was successful
     const verified = getSavedLinks().find(l => l.id === newLink.id);
     if (!verified) {
       console.error('[SavedLinks] Failed to verify save');
@@ -164,16 +159,6 @@ export function updateSavedLinkTitle(id: string, title: string): void {
   }
 }
 
-function extractTitleFromUrl(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    // Remove www. prefix and return hostname
-    return urlObj.hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
 export function searchSavedLinks(query: string): SavedLink[] {
   const links = getSavedLinks();
   const lowerQuery = query.toLowerCase();
@@ -212,7 +197,6 @@ export function reorderLinks(orderedIds: string[]): void {
   const links = getSavedLinks();
   const linkMap = new Map(links.map(link => [link.id, link]));
   
-  // Create new order based on provided IDs
   const reordered: SavedLink[] = [];
   orderedIds.forEach(id => {
     const link = linkMap.get(id);
@@ -222,8 +206,56 @@ export function reorderLinks(orderedIds: string[]): void {
     }
   });
   
-  // Append any remaining links not in the ordered list
   linkMap.forEach(link => reordered.push(link));
   
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reordered));
+}
+
+// Custom folder management
+export function getCustomFolders(): string[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_FOLDERS_KEY);
+    if (!stored) return [];
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+}
+
+export function addCustomFolder(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  
+  const existing = getCustomFolders();
+  if (existing.includes(trimmed) || PRESET_TAGS.includes(trimmed)) {
+    return false;
+  }
+  
+  existing.push(trimmed);
+  localStorage.setItem(CUSTOM_FOLDERS_KEY, JSON.stringify(existing));
+  return true;
+}
+
+export function removeCustomFolder(name: string): void {
+  const folders = getCustomFolders().filter(f => f !== name);
+  localStorage.setItem(CUSTOM_FOLDERS_KEY, JSON.stringify(folders));
+  
+  const links = getSavedLinks();
+  links.forEach(link => {
+    if (link.tag === name) {
+      link.tag = null;
+    }
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+}
+
+export function getAllFolders(): string[] {
+  const custom = getCustomFolders();
+  const used = getAllTags();
+  const combined = new Set([...PRESET_TAGS, ...custom, ...used]);
+  return Array.from(combined).sort();
+}
+
+export function moveToFolder(linkId: string, folderName: string | null): void {
+  updateSavedLink(linkId, { tag: folderName });
 }

@@ -1,0 +1,108 @@
+import { useState } from 'react';
+import { FolderPlus, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { addCustomFolder, PRESET_TAGS, getCustomFolders } from '@/lib/savedLinksManager';
+import { useToast } from '@/hooks/use-toast';
+import { triggerHaptic } from '@/lib/haptics';
+
+interface CreateFolderDialogProps {
+  onFolderCreated: () => void;
+}
+
+export function CreateFolderDialog({ onFolderCreated }: CreateFolderDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const { toast } = useToast();
+
+  const handleCreate = () => {
+    const trimmed = folderName.trim();
+    
+    if (!trimmed) {
+      toast({
+        title: 'Please enter a folder name',
+        duration: 2000,
+      });
+      return;
+    }
+    
+    if (PRESET_TAGS.includes(trimmed) || getCustomFolders().includes(trimmed)) {
+      toast({
+        title: 'Folder already exists',
+        description: 'Please choose a different name',
+        duration: 2000,
+      });
+      return;
+    }
+    
+    const success = addCustomFolder(trimmed);
+    
+    if (success) {
+      toast({
+        title: 'Folder created',
+        duration: 2000,
+      });
+      triggerHaptic('success');
+      setFolderName('');
+      setOpen(false);
+      onFolderCreated();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <FolderPlus className="h-4 w-4" />
+          New Folder
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create New Folder</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-4">
+          <div className="relative">
+            <Input
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              placeholder="Folder name..."
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleCreate();
+                }
+              }}
+            />
+            {folderName && (
+              <button
+                type="button"
+                onClick={() => setFolderName('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate}>
+              Create Folder
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
