@@ -212,6 +212,40 @@ export function reorderLinks(orderedIds: string[]): void {
 }
 
 // Custom folder management
+export interface CustomFolder {
+  name: string;
+  icon: string;
+}
+
+const FOLDER_ICONS_KEY = 'folder_icons';
+
+export function getFolderIcons(): Record<string, string> {
+  try {
+    const stored = localStorage.getItem(FOLDER_ICONS_KEY);
+    if (!stored) return {};
+    return JSON.parse(stored);
+  } catch {
+    return {};
+  }
+}
+
+export function setFolderIcon(folderName: string, iconName: string): void {
+  const icons = getFolderIcons();
+  icons[folderName] = iconName;
+  localStorage.setItem(FOLDER_ICONS_KEY, JSON.stringify(icons));
+}
+
+export function getFolderIcon(folderName: string): string | null {
+  const icons = getFolderIcons();
+  return icons[folderName] || null;
+}
+
+export function removeFolderIcon(folderName: string): void {
+  const icons = getFolderIcons();
+  delete icons[folderName];
+  localStorage.setItem(FOLDER_ICONS_KEY, JSON.stringify(icons));
+}
+
 export function getCustomFolders(): string[] {
   try {
     const stored = localStorage.getItem(CUSTOM_FOLDERS_KEY);
@@ -222,7 +256,7 @@ export function getCustomFolders(): string[] {
   }
 }
 
-export function addCustomFolder(name: string): boolean {
+export function addCustomFolder(name: string, icon?: string): boolean {
   const trimmed = name.trim();
   if (!trimmed) return false;
   
@@ -233,12 +267,20 @@ export function addCustomFolder(name: string): boolean {
   
   existing.push(trimmed);
   localStorage.setItem(CUSTOM_FOLDERS_KEY, JSON.stringify(existing));
+  
+  if (icon) {
+    setFolderIcon(trimmed, icon);
+  }
+  
   return true;
 }
 
 export function removeCustomFolder(name: string): void {
   const folders = getCustomFolders().filter(f => f !== name);
   localStorage.setItem(CUSTOM_FOLDERS_KEY, JSON.stringify(folders));
+  
+  // Remove the icon
+  removeFolderIcon(name);
   
   const links = getSavedLinks();
   links.forEach(link => {

@@ -12,6 +12,7 @@ import {
 import { addCustomFolder, PRESET_TAGS, getCustomFolders } from '@/lib/savedLinksManager';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/lib/haptics';
+import { FolderIconPicker } from './FolderIconPicker';
 
 interface CreateFolderDialogProps {
   onFolderCreated: () => void;
@@ -20,6 +21,7 @@ interface CreateFolderDialogProps {
 export function CreateFolderDialog({ onFolderCreated }: CreateFolderDialogProps) {
   const [open, setOpen] = useState(false);
   const [folderName, setFolderName] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('Folder');
   const { toast } = useToast();
 
   const handleCreate = () => {
@@ -42,7 +44,7 @@ export function CreateFolderDialog({ onFolderCreated }: CreateFolderDialogProps)
       return;
     }
     
-    const success = addCustomFolder(trimmed);
+    const success = addCustomFolder(trimmed, selectedIcon);
     
     if (success) {
       toast({
@@ -51,13 +53,22 @@ export function CreateFolderDialog({ onFolderCreated }: CreateFolderDialogProps)
       });
       triggerHaptic('success');
       setFolderName('');
+      setSelectedIcon('Folder');
       setOpen(false);
       onFolderCreated();
     }
   };
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setFolderName('');
+      setSelectedIcon('Folder');
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <button
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -93,7 +104,17 @@ export function CreateFolderDialog({ onFolderCreated }: CreateFolderDialogProps)
               </button>
             )}
           </div>
-          <div className="flex gap-2 justify-end">
+          
+          {/* Icon Picker */}
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-3">Choose an icon</p>
+            <FolderIconPicker 
+              selectedIcon={selectedIcon} 
+              onSelectIcon={setSelectedIcon} 
+            />
+          </div>
+          
+          <div className="flex gap-2 justify-end pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
