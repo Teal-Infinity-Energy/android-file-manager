@@ -206,3 +206,24 @@ export function clearAllShortlist(): void {
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
 }
+
+// Reorder links
+export function reorderLinks(orderedIds: string[]): void {
+  const links = getSavedLinks();
+  const linkMap = new Map(links.map(link => [link.id, link]));
+  
+  // Create new order based on provided IDs
+  const reordered: SavedLink[] = [];
+  orderedIds.forEach(id => {
+    const link = linkMap.get(id);
+    if (link) {
+      reordered.push(link);
+      linkMap.delete(id);
+    }
+  });
+  
+  // Append any remaining links not in the ordered list
+  linkMap.forEach(link => reordered.push(link));
+  
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reordered));
+}

@@ -1,13 +1,16 @@
-import { Globe } from 'lucide-react';
+import { Globe, GripVertical } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { SavedLink } from '@/lib/savedLinksManager';
 
 interface BookmarkItemProps {
   link: SavedLink;
   onTap: () => void;
   onToggleShortlist: (id: string) => void;
+  isDragDisabled?: boolean;
 }
 
 function extractFaviconUrl(url: string): string {
@@ -19,8 +22,25 @@ function extractFaviconUrl(url: string): string {
   }
 }
 
-export function BookmarkItem({ link, onTap, onToggleShortlist }: BookmarkItemProps) {
+export function BookmarkItem({ link, onTap, onToggleShortlist, isDragDisabled }: BookmarkItemProps) {
   const faviconUrl = extractFaviconUrl(link.url);
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: link.id,
+    disabled: isDragDisabled,
+  });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
   
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -28,15 +48,29 @@ export function BookmarkItem({ link, onTap, onToggleShortlist }: BookmarkItemPro
   };
   
   return (
-    <button
-      onClick={onTap}
+    <div
+      ref={setNodeRef}
+      style={style}
       className={cn(
-        "w-full flex items-start gap-3 p-4 rounded-xl",
+        "w-full flex items-start gap-2 p-4 rounded-xl",
         "bg-card hover:bg-muted/50",
-        "active:scale-[0.98] transition-all",
-        "text-left group border border-border/50"
+        "transition-all",
+        "text-left group border border-border/50",
+        isDragging && "opacity-50 shadow-lg scale-[1.02] z-50"
       )}
     >
+      {/* Drag Handle */}
+      {!isDragDisabled && (
+        <button
+          type="button"
+          className="flex items-center justify-center pt-1 cursor-grab active:cursor-grabbing touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-5 w-5 text-muted-foreground/50" />
+        </button>
+      )}
+      
       {/* Checkbox for shortlisting */}
       <div 
         className="flex items-center justify-center pt-1"
@@ -48,39 +82,46 @@ export function BookmarkItem({ link, onTap, onToggleShortlist }: BookmarkItemPro
         />
       </div>
       
-      {/* Favicon or fallback icon */}
-      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden">
-        {faviconUrl ? (
-          <img 
-            src={faviconUrl} 
-            alt="" 
-            className="h-6 w-6 object-contain"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-            }}
-          />
-        ) : null}
-        <Globe className={cn("h-5 w-5 text-muted-foreground", faviconUrl && "hidden")} />
-      </div>
-      
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-foreground truncate">{link.title}</p>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{link.url}</p>
-        {link.description && (
-          <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">
-            {link.description}
-          </p>
-        )}
-        {link.tag && (
-          <div className="mt-2">
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
-              {link.tag}
-            </Badge>
-          </div>
-        )}
-      </div>
-    </button>
+      {/* Clickable content area */}
+      <button
+        type="button"
+        onClick={onTap}
+        className="flex-1 flex items-start gap-3 text-left active:scale-[0.99] transition-transform"
+      >
+        {/* Favicon or fallback icon */}
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden">
+          {faviconUrl ? (
+            <img 
+              src={faviconUrl} 
+              alt="" 
+              className="h-6 w-6 object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+          ) : null}
+          <Globe className={cn("h-5 w-5 text-muted-foreground", faviconUrl && "hidden")} />
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground truncate">{link.title}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{link.url}</p>
+          {link.description && (
+            <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">
+              {link.description}
+            </p>
+          )}
+          {link.tag && (
+            <div className="mt-2">
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+                {link.tag}
+              </Badge>
+            </div>
+          )}
+        </div>
+      </button>
+    </div>
   );
 }
