@@ -14,6 +14,7 @@ import {
   clearAllShortlist,
   getAllTags,
   PRESET_TAGS,
+  reorderLinks,
   type SavedLink 
 } from '@/lib/savedLinksManager';
 import { BookmarkItem } from './BookmarkItem';
@@ -22,6 +23,22 @@ import { ShortlistViewer } from './ShortlistViewer';
 import { AddBookmarkForm } from './AddBookmarkForm';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/lib/haptics';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 interface BookmarkLibraryProps {
   onCreateShortcut: (url: string) => void;
@@ -82,6 +99,41 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
     
     return result;
   }, [links, searchQuery, activeTagFilter]);
+
+  // Check if filtering/searching is active (disable drag in this case)
+  const isDragDisabled = Boolean(searchQuery.trim() || activeTagFilter);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = links.findIndex(link => link.id === active.id);
+      const newIndex = links.findIndex(link => link.id === over.id);
+      
+      const newOrder = arrayMove(links, oldIndex, newIndex);
+      setLinks(newOrder);
+      reorderLinks(newOrder.map(l => l.id));
+      triggerHaptic('light');
+    }
+  };
 
   // Handlers
   const handleBookmarkTap = (link: SavedLink) => {
@@ -342,16 +394,28 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
                   : `Select all (${filteredLinks.length})`}
               </span>
             </div>
-          <div className="space-y-2 pb-6">
-            {filteredLinks.map((link) => (
-              <BookmarkItem
-                key={link.id}
-                link={link}
-                onTap={() => handleBookmarkTap(link)}
-                onToggleShortlist={handleToggleShortlist}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={filteredLinks.map(l => l.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2 pb-6">
+                {filteredLinks.map((link) => (
+                  <BookmarkItem
+                    key={link.id}
+                    link={link}
+                    onTap={() => handleBookmarkTap(link)}
+                    onToggleShortlist={handleToggleShortlist}
+                    isDragDisabled={isDragDisabled}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
           </>
         )}
       </div>
