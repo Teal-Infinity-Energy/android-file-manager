@@ -3,6 +3,16 @@ import { Search, Plus, X, Bookmark, ListChecks, Trash2, Home, Eye, LayoutGrid, L
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { 
   getSavedLinks, 
@@ -76,6 +86,9 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overFolderId, setOverFolderId] = useState<string | null>(null);
   const [folderRefreshKey, setFolderRefreshKey] = useState(0);
+  
+  // Bulk delete confirmation
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
   const { toast } = useToast();
 
@@ -369,6 +382,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
       removeSavedLink(link.id);
     });
     refreshLinks();
+    setShowBulkDeleteConfirm(false);
     toast({
       title: `${selectedCount} bookmark${selectedCount > 1 ? 's' : ''} deleted`,
       duration: 2000,
@@ -682,7 +696,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
         </button>
         
         <button
-          onClick={handleBulkDelete}
+          onClick={() => setShowBulkDeleteConfirm(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium"
           aria-label="Delete selected"
         >
@@ -700,6 +714,27 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
           <X className="h-4 w-4" />
         </button>
       </div>
+      
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {shortlistedLinks.length} bookmark{shortlistedLinks.length > 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the selected bookmarks. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
