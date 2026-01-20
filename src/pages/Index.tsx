@@ -80,19 +80,23 @@ const Index = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Access Tab Content */}
       {activeTab === 'access' && (
-        <AccessFlow
-          onStepChange={handleAccessStepChange}
-          onContentSourceTypeChange={handleContentSourceTypeChange}
-        />
+        <div className="flex-1 flex flex-col animate-fade-in">
+          <AccessFlow
+            onStepChange={handleAccessStepChange}
+            onContentSourceTypeChange={handleContentSourceTypeChange}
+          />
+        </div>
       )}
 
       {/* Bookmarks Tab Content */}
       {activeTab === 'bookmarks' && (
-        <BookmarkLibrary
-          onCreateShortcut={handleCreateShortcutFromBookmark}
-          onSelectionModeChange={setIsBookmarkSelectionMode}
-          clearSelectionSignal={bookmarkClearSignal}
-        />
+        <div className="flex-1 flex flex-col animate-fade-in">
+          <BookmarkLibrary
+            onCreateShortcut={handleCreateShortcutFromBookmark}
+            onSelectionModeChange={setIsBookmarkSelectionMode}
+            clearSelectionSignal={bookmarkClearSignal}
+          />
+        </div>
       )}
 
       {/* Bottom Navigation */}
