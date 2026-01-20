@@ -4,10 +4,11 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
-import android.view.Window;
+import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -15,11 +16,12 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,56 +30,60 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Custom WebView Activity that allows setting a custom User-Agent.
- * This enables true desktop/mobile site viewing regardless of device.
- * Also intercepts deep links and keeps all navigation within the WebView.
+ * Custom WebView Activity that displays web content with desktop or mobile user agent.
+ * This allows viewing desktop versions of websites in the app.
+ * 
+ * Features:
+ * - Desktop/Mobile User-Agent switching
+ * - Custom header with close, share, and refresh buttons
+ * - Progress bar for loading indication
+ * - Deep link interception (converts to web URLs)
+ * - Tracking parameter removal
+ * - Pull-to-refresh support
  */
 public class DesktopWebViewActivity extends Activity {
 
-    public static final String EXTRA_URL = "url";
-    public static final String EXTRA_VIEW_MODE = "view_mode";
-    public static final String EXTRA_TITLE = "title";
+    public static final String EXTRA_URL = "extra_url";
+    public static final String EXTRA_VIEW_MODE = "extra_view_mode";
+    public static final String EXTRA_TITLE = "extra_title";
 
-    // Desktop User-Agent (Chrome on Windows)
     private static final String DESKTOP_USER_AGENT = 
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-    // Mobile User-Agent (Chrome on Android)
     private static final String MOBILE_USER_AGENT = 
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
-    // Tracking parameters to strip from URLs
+    // Common tracking parameters to strip from URLs
     private static final Set<String> TRACKING_PARAMS = new HashSet<>(Arrays.asList(
-        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
-        "fbclid", "gclid", "dclid", "twclid", "msclkid", "mc_eid",
-        "oly_anon_id", "oly_enc_id", "_openstat", "vero_id", "wickedid", "yclid",
-        "ref", "ref_src", "ref_url", "source", "feature",
-        "_ga", "_gl", "si", "igshid"
+        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+        "fbclid", "gclid", "msclkid", "dclid", "zanpid", "igshid",
+        "mc_cid", "mc_eid", "oly_anon_id", "oly_enc_id",
+        "_ga", "_gl", "ref", "source", "si"
     ));
 
-    // Deep link to web URL mappings
+    // Map of deep link schemes to their web equivalents
     private static final Map<String, String> DEEP_LINK_TO_WEB = new HashMap<>();
     static {
-        DEEP_LINK_TO_WEB.put("youtube://", "https://www.youtube.com/");
-        DEEP_LINK_TO_WEB.put("vnd.youtube:", "https://www.youtube.com/");
-        DEEP_LINK_TO_WEB.put("instagram://", "https://www.instagram.com/");
-        DEEP_LINK_TO_WEB.put("twitter://", "https://twitter.com/");
-        DEEP_LINK_TO_WEB.put("x://", "https://x.com/");
-        DEEP_LINK_TO_WEB.put("spotify://", "https://open.spotify.com/");
-        DEEP_LINK_TO_WEB.put("fb://", "https://www.facebook.com/");
-        DEEP_LINK_TO_WEB.put("messenger://", "https://www.messenger.com/");
-        DEEP_LINK_TO_WEB.put("linkedin://", "https://www.linkedin.com/");
-        DEEP_LINK_TO_WEB.put("reddit://", "https://www.reddit.com/");
-        DEEP_LINK_TO_WEB.put("tiktok://", "https://www.tiktok.com/");
-        DEEP_LINK_TO_WEB.put("discord://", "https://discord.com/");
+        DEEP_LINK_TO_WEB.put("youtube", "https://www.youtube.com");
+        DEEP_LINK_TO_WEB.put("vnd.youtube", "https://www.youtube.com");
+        DEEP_LINK_TO_WEB.put("instagram", "https://www.instagram.com");
+        DEEP_LINK_TO_WEB.put("twitter", "https://twitter.com");
+        DEEP_LINK_TO_WEB.put("fb", "https://www.facebook.com");
+        DEEP_LINK_TO_WEB.put("linkedin", "https://www.linkedin.com");
+        DEEP_LINK_TO_WEB.put("reddit", "https://www.reddit.com");
+        DEEP_LINK_TO_WEB.put("tiktok", "https://www.tiktok.com");
+        DEEP_LINK_TO_WEB.put("spotify", "https://open.spotify.com");
+        DEEP_LINK_TO_WEB.put("whatsapp", "https://web.whatsapp.com");
     }
 
+    private String currentUrl;
     private WebView webView;
     private ProgressBar progressBar;
     private TextView titleText;
     private ImageButton closeButton;
+    private ImageButton shareButton;
     private ImageButton refreshButton;
     private SwipeRefreshLayout swipeRefreshLayout;
 
@@ -85,24 +91,30 @@ public class DesktopWebViewActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Remove title bar
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
-        
-        // Create UI programmatically
-        createUI();
 
-        Intent intent = getIntent();
-        String url = intent.getStringExtra(EXTRA_URL);
-        String viewMode = intent.getStringExtra(EXTRA_VIEW_MODE);
-        String title = intent.getStringExtra(EXTRA_TITLE);
+        // Get intent extras
+        String url = getIntent().getStringExtra(EXTRA_URL);
+        String viewMode = getIntent().getStringExtra(EXTRA_VIEW_MODE);
+        String title = getIntent().getStringExtra(EXTRA_TITLE);
 
         if (url == null || url.isEmpty()) {
+            android.util.Log.e("DesktopWebView", "No URL provided");
             finish();
             return;
         }
 
-        // Set initial title
+        // Store current URL
+        currentUrl = url;
+
+        // Default to desktop mode
+        if (viewMode == null || viewMode.isEmpty()) {
+            viewMode = "desktop";
+        }
+
+        // Create UI programmatically
+        createUI();
+
+        // Set title if provided
         if (title != null && !title.isEmpty()) {
             titleText.setText(title);
         } else {
@@ -119,17 +131,13 @@ public class DesktopWebViewActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setDatabaseEnabled(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
         
-        // Enable desktop mode by default for wider viewport
-        settings.setLoadWithOverviewMode(true);
-        settings.setUseWideViewPort(true);
-
-        // Set User-Agent based on view mode
-        String userAgent = "desktop".equals(viewMode) ? DESKTOP_USER_AGENT : MOBILE_USER_AGENT;
-        settings.setUserAgentString(userAgent);
+        // Set user agent based on view mode
+        if ("desktop".equals(viewMode)) {
+            settings.setUserAgentString(DESKTOP_USER_AGENT);
+        } else {
+            settings.setUserAgentString(MOBILE_USER_AGENT);
+        }
         
         android.util.Log.d("DesktopWebView", "Opening URL: " + url + " with User-Agent mode: " + viewMode);
 
@@ -146,22 +154,24 @@ public class DesktopWebViewActivity extends Activity {
                 super.onPageFinished(view, url);
                 progressBar.setVisibility(View.GONE);
                 
-                // Stop pull-to-refresh indicator
+                // Update current URL
+                currentUrl = url;
+                
+                // Stop refresh animation if it was triggered by pull-to-refresh
                 if (swipeRefreshLayout != null && swipeRefreshLayout.isRefreshing()) {
                     swipeRefreshLayout.setRefreshing(false);
                 }
                 
-                // Update title from page if available
+                // Update title from page title
                 String pageTitle = view.getTitle();
-                if (pageTitle != null && !pageTitle.isEmpty() && !pageTitle.equals(url)) {
+                if (pageTitle != null && !pageTitle.isEmpty()) {
                     titleText.setText(pageTitle);
                 }
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                return handleUrlLoading(view, url);
+                return handleUrlLoading(view, request.getUrl().toString());
             }
 
             @Override
@@ -171,212 +181,195 @@ public class DesktopWebViewActivity extends Activity {
             }
         });
 
-        // Chrome client for progress
+        // WebChromeClient for progress updates
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 progressBar.setProgress(newProgress);
-                if (newProgress == 100) {
-                    progressBar.setVisibility(View.GONE);
-                }
             }
 
             @Override
             public void onReceivedTitle(WebView view, String title) {
-                super.onReceivedTitle(view, title);
                 if (title != null && !title.isEmpty()) {
                     titleText.setText(title);
                 }
             }
         });
 
-        // Clean URL before loading
-        String cleanedUrl = stripTrackingParams(url);
-        webView.loadUrl(cleanedUrl);
+        // Load URL with tracking params stripped
+        String cleanUrl = stripTrackingParams(url);
+        webView.loadUrl(cleanUrl);
     }
 
     /**
-     * Handle URL loading - intercept deep links and keep navigation in WebView
+     * Handle URL loading - intercept deep links and convert to web URLs
      */
     private boolean handleUrlLoading(WebView view, String url) {
-        android.util.Log.d("DesktopWebView", "Intercepted URL: " + url);
-        
+        if (url == null) return false;
+
+        android.util.Log.d("DesktopWebView", "Intercepting URL: " + url);
+
         // Handle intent:// URLs
         if (url.startsWith("intent://")) {
             String fallbackUrl = extractIntentFallbackUrl(url);
             if (fallbackUrl != null) {
-                android.util.Log.d("DesktopWebView", "Loading intent fallback URL: " + fallbackUrl);
+                android.util.Log.d("DesktopWebView", "Intent URL fallback: " + fallbackUrl);
                 view.loadUrl(stripTrackingParams(fallbackUrl));
+                return true;
             }
-            return true; // Block the intent:// URL
+            // Block intent if no fallback
+            return true;
         }
+
+        // Check for deep link schemes and convert to web
+        Uri uri = Uri.parse(url);
+        String scheme = uri.getScheme();
         
-        // Handle non-HTTP schemes (deep links)
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            // Skip tel:, mailto:, sms: - these should be blocked entirely
-            if (url.startsWith("tel:") || url.startsWith("mailto:") || 
-                url.startsWith("sms:") || url.startsWith("geo:") || url.startsWith("maps:")) {
-                android.util.Log.d("DesktopWebView", "Blocking non-web URL: " + url);
-                return true; // Block these URLs
-            }
-            
-            // Try to convert deep link to web URL
+        if (scheme != null && !scheme.equals("http") && !scheme.equals("https")) {
             String webUrl = convertDeepLinkToWebUrl(url);
             if (webUrl != null) {
-                android.util.Log.d("DesktopWebView", "Converted deep link to web URL: " + webUrl);
+                android.util.Log.d("DesktopWebView", "Converted deep link to: " + webUrl);
                 view.loadUrl(stripTrackingParams(webUrl));
                 return true;
             }
-            
-            // Block unknown deep links
-            android.util.Log.d("DesktopWebView", "Blocking unknown deep link: " + url);
+            // Block unknown schemes
+            android.util.Log.d("DesktopWebView", "Blocking unknown scheme: " + scheme);
             return true;
         }
-        
-        // For HTTP/HTTPS URLs, strip tracking params
-        String cleanedUrl = stripTrackingParams(url);
-        if (!cleanedUrl.equals(url)) {
-            android.util.Log.d("DesktopWebView", "Loading cleaned URL: " + cleanedUrl);
-            view.loadUrl(cleanedUrl);
+
+        // Strip tracking params for regular URLs
+        String cleanUrl = stripTrackingParams(url);
+        if (!cleanUrl.equals(url)) {
+            view.loadUrl(cleanUrl);
             return true;
         }
-        
-        // Allow normal navigation within WebView
-        return false;
+
+        return false; // Let WebView handle normally
     }
 
     /**
-     * Extract browser fallback URL from intent:// URL
+     * Extract fallback URL from intent:// URI
      */
     private String extractIntentFallbackUrl(String intentUrl) {
-        // Look for S.browser_fallback_url= parameter
-        int start = intentUrl.indexOf("S.browser_fallback_url=");
-        if (start == -1) {
-            start = intentUrl.indexOf("browser_fallback_url=");
-        }
-        
-        if (start != -1) {
-            int valueStart = intentUrl.indexOf("=", start) + 1;
-            int end = intentUrl.indexOf(";", valueStart);
-            if (end == -1) {
-                end = intentUrl.length();
+        try {
+            // intent://...#Intent;...;S.browser_fallback_url=...;end
+            if (intentUrl.contains("S.browser_fallback_url=")) {
+                int start = intentUrl.indexOf("S.browser_fallback_url=") + 23;
+                int end = intentUrl.indexOf(";", start);
+                if (end == -1) end = intentUrl.indexOf("#", start);
+                if (end == -1) end = intentUrl.length();
+                String fallback = intentUrl.substring(start, end);
+                return URLDecoder.decode(fallback, "UTF-8");
             }
-            
-            String encoded = intentUrl.substring(valueStart, end);
-            try {
-                return URLDecoder.decode(encoded, "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                return null;
-            }
+        } catch (Exception e) {
+            android.util.Log.e("DesktopWebView", "Error extracting fallback URL: " + e.getMessage());
         }
-        
-        // Try to extract scheme from intent URL
-        // intent://video/xyz#Intent;scheme=https;package=com.google.android.youtube;end
-        int schemeStart = intentUrl.indexOf("scheme=");
-        if (schemeStart != -1) {
-            int schemeEnd = intentUrl.indexOf(";", schemeStart);
-            String scheme = intentUrl.substring(schemeStart + 7, schemeEnd);
-            
-            // Get the path from intent://
-            String path = intentUrl.substring(9); // Skip "intent://"
-            int hashIndex = path.indexOf("#");
-            if (hashIndex != -1) {
-                path = path.substring(0, hashIndex);
-            }
-            
-            return scheme + "://" + path;
-        }
-        
         return null;
     }
 
     /**
-     * Convert a deep link scheme to its web URL equivalent
+     * Convert deep link URL to web equivalent
      */
-    private String convertDeepLinkToWebUrl(String url) {
-        String lowerUrl = url.toLowerCase();
-        
-        for (Map.Entry<String, String> entry : DEEP_LINK_TO_WEB.entrySet()) {
-            if (lowerUrl.startsWith(entry.getKey())) {
-                String path = url.substring(entry.getKey().length());
+    private String convertDeepLinkToWebUrl(String deepLink) {
+        try {
+            Uri uri = Uri.parse(deepLink);
+            String scheme = uri.getScheme();
+            
+            if (scheme == null) return null;
+            
+            String baseUrl = DEEP_LINK_TO_WEB.get(scheme.toLowerCase());
+            if (baseUrl != null) {
+                // Try to extract path from deep link
+                String path = uri.getPath();
+                String host = uri.getHost();
                 
-                // Handle YouTube video links
-                if (entry.getKey().contains("youtube")) {
-                    // youtube://video?v=xxx or youtube://watch?v=xxx
-                    if (path.contains("v=")) {
-                        int vStart = path.indexOf("v=") + 2;
-                        int vEnd = path.indexOf("&", vStart);
-                        if (vEnd == -1) vEnd = path.length();
-                        String videoId = path.substring(vStart, vEnd);
-                        return "https://www.youtube.com/watch?v=" + videoId;
-                    }
+                StringBuilder webUrl = new StringBuilder(baseUrl);
+                
+                if (host != null && !host.isEmpty()) {
+                    webUrl.append("/").append(host);
+                }
+                if (path != null && !path.isEmpty()) {
+                    webUrl.append(path);
                 }
                 
-                // Handle Instagram user links
-                if (entry.getKey().equals("instagram://")) {
-                    if (path.contains("username=")) {
-                        int uStart = path.indexOf("username=") + 9;
-                        int uEnd = path.indexOf("&", uStart);
-                        if (uEnd == -1) uEnd = path.length();
-                        String username = path.substring(uStart, uEnd);
-                        return "https://www.instagram.com/" + username;
-                    }
+                String query = uri.getQuery();
+                if (query != null && !query.isEmpty()) {
+                    webUrl.append("?").append(query);
                 }
                 
-                // Handle Twitter/X user links
-                if (entry.getKey().equals("twitter://") || entry.getKey().equals("x://")) {
-                    if (path.contains("screen_name=")) {
-                        int uStart = path.indexOf("screen_name=") + 12;
-                        int uEnd = path.indexOf("&", uStart);
-                        if (uEnd == -1) uEnd = path.length();
-                        String username = path.substring(uStart, uEnd);
-                        return "https://twitter.com/" + username;
-                    }
-                }
-                
-                // Default: append path to web base
-                return entry.getValue() + path;
+                return webUrl.toString();
             }
+        } catch (Exception e) {
+            android.util.Log.e("DesktopWebView", "Error converting deep link: " + e.getMessage());
         }
-        
         return null;
     }
 
     /**
-     * Strip tracking/UTM parameters from a URL
+     * Strip tracking parameters from URL
      */
     private String stripTrackingParams(String url) {
         try {
             Uri uri = Uri.parse(url);
-            Set<String> paramNames = uri.getQueryParameterNames();
+            String query = uri.getQuery();
             
-            // Check if any tracking params exist
-            boolean hasTrackingParams = false;
-            for (String param : paramNames) {
-                if (TRACKING_PARAMS.contains(param.toLowerCase())) {
-                    hasTrackingParams = true;
-                    break;
-                }
-            }
-            
-            if (!hasTrackingParams) {
+            if (query == null || query.isEmpty()) {
                 return url;
             }
+
+            Set<String> paramNames = uri.getQueryParameterNames();
+            StringBuilder cleanQuery = new StringBuilder();
             
-            // Rebuild URL without tracking params
-            Uri.Builder builder = uri.buildUpon().clearQuery();
             for (String param : paramNames) {
                 if (!TRACKING_PARAMS.contains(param.toLowerCase())) {
-                    builder.appendQueryParameter(param, uri.getQueryParameter(param));
+                    if (cleanQuery.length() > 0) {
+                        cleanQuery.append("&");
+                    }
+                    String value = uri.getQueryParameter(param);
+                    cleanQuery.append(param);
+                    if (value != null) {
+                        cleanQuery.append("=").append(Uri.encode(value));
+                    }
                 }
+            }
+
+            Uri.Builder builder = uri.buildUpon().clearQuery();
+            if (cleanQuery.length() > 0) {
+                builder.encodedQuery(cleanQuery.toString());
             }
             
             return builder.build().toString();
         } catch (Exception e) {
+            android.util.Log.e("DesktopWebView", "Error stripping tracking params: " + e.getMessage());
             return url;
         }
     }
 
+    /**
+     * Share the current URL
+     */
+    private void shareCurrentUrl() {
+        if (currentUrl == null || currentUrl.isEmpty()) {
+            return;
+        }
+
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        
+        String shareTitle = titleText.getText().toString();
+        if (shareTitle != null && !shareTitle.isEmpty() && !shareTitle.equals("Loading...")) {
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, shareTitle);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, shareTitle + "\n" + currentUrl);
+        } else {
+            shareIntent.putExtra(Intent.EXTRA_TEXT, currentUrl);
+        }
+        
+        startActivity(Intent.createChooser(shareIntent, "Share link"));
+    }
+
+    /**
+     * Create UI programmatically
+     */
     private void createUI() {
         // Root layout
         FrameLayout root = new FrameLayout(this);
@@ -413,25 +406,45 @@ public class DesktopWebViewActivity extends Activity {
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         titleParams.gravity = android.view.Gravity.CENTER;
         titleParams.leftMargin = (int) (64 * getResources().getDisplayMetrics().density);
-        titleParams.rightMargin = (int) (64 * getResources().getDisplayMetrics().density);
+        titleParams.rightMargin = (int) (100 * getResources().getDisplayMetrics().density); // Increased for two buttons
         titleText.setLayoutParams(titleParams);
         header.addView(titleText);
 
-        // Refresh button (right)
+        // Right side button container
+        LinearLayout rightButtons = new LinearLayout(this);
+        rightButtons.setOrientation(LinearLayout.HORIZONTAL);
+        FrameLayout.LayoutParams rightButtonsParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        rightButtonsParams.gravity = android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL;
+        rightButtons.setLayoutParams(rightButtonsParams);
+
+        // Share button
+        shareButton = new ImageButton(this);
+        shareButton.setImageResource(android.R.drawable.ic_menu_share);
+        shareButton.setBackgroundColor(0x00000000);
+        shareButton.setPadding(24, 16, 24, 16);
+        shareButton.setOnClickListener(v -> shareCurrentUrl());
+        LinearLayout.LayoutParams shareParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT);
+        shareButton.setLayoutParams(shareParams);
+        rightButtons.addView(shareButton);
+
+        // Refresh button
         refreshButton = new ImageButton(this);
         refreshButton.setImageResource(android.R.drawable.ic_menu_rotate);
         refreshButton.setBackgroundColor(0x00000000);
-        refreshButton.setPadding(32, 16, 32, 16);
+        refreshButton.setPadding(24, 16, 32, 16);
         refreshButton.setOnClickListener(v -> {
             if (webView != null) {
                 webView.reload();
             }
         });
-        FrameLayout.LayoutParams refreshParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT);
-        refreshParams.gravity = android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL;
+        LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT);
         refreshButton.setLayoutParams(refreshParams);
-        header.addView(refreshButton);
+        rightButtons.addView(refreshButton);
+
+        header.addView(rightButtons);
 
         root.addView(header);
 
@@ -464,13 +477,16 @@ public class DesktopWebViewActivity extends Activity {
 
         // WebView (inside SwipeRefreshLayout)
         webView = new WebView(this);
-        swipeRefreshLayout.addView(webView);
+        SwipeRefreshLayout.LayoutParams webViewParams = new SwipeRefreshLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        webView.setLayoutParams(webViewParams);
         
-        // Only enable pull-to-refresh when WebView is scrolled to top
+        // Only enable pull-to-refresh when at the top
         webView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
             swipeRefreshLayout.setEnabled(scrollY == 0);
         });
         
+        swipeRefreshLayout.addView(webView);
         root.addView(swipeRefreshLayout);
 
         setContentView(root);
