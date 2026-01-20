@@ -117,9 +117,13 @@ export function BookmarkItem({
       className={cn(
         "w-full flex items-start gap-2 p-4 rounded-xl",
         "bg-card hover:bg-muted/50",
-        "transition-all",
-        "text-left group border border-border/50",
-        isDragging && "opacity-50 shadow-lg scale-[1.02] z-50"
+        "transition-all duration-200",
+        "text-left group border",
+        isDragging && "opacity-50 shadow-lg scale-[1.02] z-50",
+        // Selection mode visual feedback
+        isSelectionMode && link.isShortlisted
+          ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+          : "border-border/50"
       )}
     >
       {/* Drag Handle */}
