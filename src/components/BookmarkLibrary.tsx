@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput } from 'lucide-react';
+import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput, ArrowUpDown, Clock, ArrowDownAZ, Folder } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -62,6 +62,7 @@ import {
 } from '@dnd-kit/sortable';
 
 type ViewMode = 'list' | 'folders';
+type SortMode = 'newest' | 'oldest' | 'alphabetical' | 'folder';
 
 interface BookmarkLibraryProps {
   onCreateShortcut: (url: string) => void;
@@ -76,6 +77,7 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
   
   // Action sheet state
   const [selectedLink, setSelectedLink] = useState<SavedLink | null>(null);
@@ -137,9 +139,9 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
     onSelectionModeChange?.(hasShortlist);
   }, [hasShortlist, onSelectionModeChange]);
 
-  // Filtered links
+  // Filtered and sorted links
   const filteredLinks = useMemo(() => {
-    let result = links;
+    let result = [...links];
     
     if (activeTagFilter) {
       result = result.filter(link => link.tag === activeTagFilter);
@@ -155,8 +157,30 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
       );
     }
     
+    // Apply sorting
+    switch (sortMode) {
+      case 'newest':
+        result.sort((a, b) => b.createdAt - a.createdAt);
+        break;
+      case 'oldest':
+        result.sort((a, b) => a.createdAt - b.createdAt);
+        break;
+      case 'alphabetical':
+        result.sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
+        break;
+      case 'folder':
+        result.sort((a, b) => {
+          const tagA = a.tag || 'zzz'; // Uncategorized at end
+          const tagB = b.tag || 'zzz';
+          const tagCompare = tagA.localeCompare(tagB);
+          if (tagCompare !== 0) return tagCompare;
+          return b.createdAt - a.createdAt; // Within same folder, newest first
+        });
+        break;
+    }
+    
     return result;
-  }, [links, searchQuery, activeTagFilter]);
+  }, [links, searchQuery, activeTagFilter, sortMode]);
 
   // Group links by tag for folder view
   const groupedLinks = useMemo(() => {
@@ -444,33 +468,92 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
           Your saved links
         </h1>
         
-        {/* View Mode Toggle */}
+        {/* View Mode & Sort Controls */}
         {links.length > 0 && (
-          <div className="flex items-center gap-1 mt-3 p-1 bg-muted rounded-lg w-fit">
-            <button
-              onClick={() => setViewMode('list')}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                viewMode === 'list'
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <List className="h-3.5 w-3.5" />
-              List
-            </button>
-            <button
-              onClick={() => setViewMode('folders')}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                viewMode === 'folders'
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Folders
-            </button>
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  viewMode === 'list'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <List className="h-3.5 w-3.5" />
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('folders')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  viewMode === 'folders'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Folders
+              </button>
+            </div>
+            
+            {/* Sort Options */}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <button
+                onClick={() => setSortMode('newest')}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  sortMode === 'newest'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Newest first"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">New</span>
+              </button>
+              <button
+                onClick={() => setSortMode('oldest')}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  sortMode === 'oldest'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Oldest first"
+              >
+                <Clock className="h-3.5 w-3.5 rotate-180" />
+                <span className="hidden sm:inline">Old</span>
+              </button>
+              <button
+                onClick={() => setSortMode('alphabetical')}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  sortMode === 'alphabetical'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Alphabetical"
+              >
+                <ArrowDownAZ className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">A-Z</span>
+              </button>
+              <button
+                onClick={() => setSortMode('folder')}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  sortMode === 'folder'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Group by folder"
+              >
+                <Folder className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Folder</span>
+              </button>
+            </div>
           </div>
         )}
       </header>
