@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput, Clock, SortDesc, ArrowDownAZ, ArrowUpZA, Folder, ArrowDownUp } from 'lucide-react';
+import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput, Clock, SortDesc, ArrowDownAZ, ArrowUpZA, Folder, ArrowDownUp, Edit2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -865,14 +865,27 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
         </button>
         
         {shortlistedLinks.length === 1 && (
-          <button
-            onClick={handleBulkCreateShortcuts}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-            aria-label="Create shortcut"
-          >
-            <Home className="h-4 w-4" />
-            <span className="hidden sm:inline">Shortcut</span>
-          </button>
+          <>
+            <button
+              onClick={() => {
+                setSelectedLink(shortlistedLinks[0]);
+                setShowActionSheet(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+              aria-label="Edit bookmark"
+            >
+              <Edit2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Edit</span>
+            </button>
+            <button
+              onClick={handleBulkCreateShortcuts}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+              aria-label="Create shortcut"
+            >
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Shortcut</span>
+            </button>
+          </>
         )}
         
         <button
