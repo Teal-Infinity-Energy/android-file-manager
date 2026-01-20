@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput, ArrowUpDown, Clock, ArrowDownAZ, Folder } from 'lucide-react';
+import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput, Clock, ArrowDownAZ, Folder, ArrowUpDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -78,6 +78,7 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
   const [showAddForm, setShowAddForm] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const [sortReversed, setSortReversed] = useState(false);
   
   // Action sheet state
   const [selectedLink, setSelectedLink] = useState<SavedLink | null>(null);
@@ -179,8 +180,13 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
         break;
     }
     
+    // Apply reverse if toggled
+    if (sortReversed) {
+      result.reverse();
+    }
+    
     return result;
-  }, [links, searchQuery, activeTagFilter, sortMode]);
+  }, [links, searchQuery, activeTagFilter, sortMode, sortReversed]);
 
   // Group links by tag for folder view
   const groupedLinks = useMemo(() => {
@@ -554,6 +560,23 @@ export function BookmarkLibrary({ onCreateShortcut, onSelectionModeChange, clear
                 <span className="hidden sm:inline">Folder</span>
               </button>
             </div>
+            
+            {/* Reverse Toggle */}
+            <button
+              onClick={() => setSortReversed(!sortReversed)}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all",
+                sortReversed
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              )}
+              title={sortReversed ? "Reversed order" : "Normal order"}
+            >
+              <ArrowUpDown className={cn(
+                "h-3.5 w-3.5 transition-transform",
+                sortReversed && "rotate-180"
+              )} />
+            </button>
           </div>
         )}
       </header>
