@@ -100,10 +100,15 @@ export function BookmarkItem({
 
   const handleClick = useCallback(() => {
     if (!isLongPress.current) {
-      onTap();
+      // In selection mode, tapping anywhere toggles selection
+      if (isSelectionMode) {
+        onToggleShortlist(link.id);
+      } else {
+        onTap();
+      }
     }
     isLongPress.current = false;
-  }, [onTap]);
+  }, [onTap, isSelectionMode, onToggleShortlist, link.id]);
   
   return (
     <div
