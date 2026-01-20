@@ -21,6 +21,7 @@ interface BookmarkFolderSectionProps {
   onFolderUpdated?: () => void;
   isDragDisabled?: boolean;
   isOver?: boolean;
+  isSelectionMode?: boolean;
 }
 
 export function BookmarkFolderSection({
@@ -34,6 +35,7 @@ export function BookmarkFolderSection({
   onDeleteFolder,
   onFolderUpdated,
   isDragDisabled,
+  isSelectionMode = false,
 }: BookmarkFolderSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -168,6 +170,7 @@ export function BookmarkFolderSection({
                   onToggleShortlist={onToggleShortlist}
                   onCreateShortcut={onCreateShortcut}
                   isDragDisabled={isDragDisabled}
+                  isSelectionMode={isSelectionMode}
                 />
               ))}
             </div>

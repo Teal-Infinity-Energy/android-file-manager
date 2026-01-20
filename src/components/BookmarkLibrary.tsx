@@ -569,20 +569,22 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
           </div>
         ) : (
           <>
-            {/* Select All Row */}
-            <div className="flex items-center gap-3 py-2 mb-2 border-b border-border/50">
-              <Checkbox
-                checked={allFilteredShortlisted}
-                className="h-5 w-5"
-                onClick={handleToggleAllShortlist}
-                data-state={someFilteredShortlisted ? "indeterminate" : allFilteredShortlisted ? "checked" : "unchecked"}
-              />
-              <span className="text-sm text-muted-foreground">
-                {allFilteredShortlisted 
-                  ? `Deselect all (${filteredLinks.length})` 
-                  : `Select all (${filteredLinks.length})`}
-              </span>
-            </div>
+            {/* Select All Row - only visible when in selection mode */}
+            {hasShortlist && (
+              <div className="flex items-center gap-3 py-2 mb-2 border-b border-border/50">
+                <Checkbox
+                  checked={allFilteredShortlisted}
+                  className="h-5 w-5"
+                  onClick={handleToggleAllShortlist}
+                  data-state={someFilteredShortlisted ? "indeterminate" : allFilteredShortlisted ? "checked" : "unchecked"}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {allFilteredShortlisted 
+                    ? `Deselect all (${filteredLinks.length})` 
+                    : `Select all (${filteredLinks.length})`}
+                </span>
+              </div>
+            )}
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}
@@ -606,6 +608,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
                       onToggleShortlist={handleToggleShortlist}
                       onCreateShortcut={onCreateShortcut}
                       isDragDisabled={isDragDisabled}
+                      isSelectionMode={hasShortlist}
                     />
                   ))}
                 </div>
@@ -637,6 +640,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
                       setFolderRefreshKey(k => k + 1);
                     }}
                     isDragDisabled={isDragDisabled}
+                    isSelectionMode={hasShortlist}
                   />
                 ))}
                 
@@ -649,6 +653,7 @@ export function BookmarkLibrary({ onCreateShortcut }: BookmarkLibraryProps) {
                   onCreateShortcut={onCreateShortcut}
                   isDragDisabled={isDragDisabled}
                   defaultOpen={groupedLinks.sortedTags.length === 0}
+                  isSelectionMode={hasShortlist}
                 />
               </div>
             )}

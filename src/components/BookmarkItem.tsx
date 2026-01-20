@@ -24,6 +24,7 @@ interface BookmarkItemProps {
   onToggleShortlist: (id: string) => void;
   onCreateShortcut?: (url: string) => void;
   isDragDisabled?: boolean;
+  isSelectionMode?: boolean;
 }
 
 function extractFaviconUrl(url: string): string {
@@ -42,7 +43,8 @@ export function BookmarkItem({
   onTap, 
   onToggleShortlist, 
   onCreateShortcut,
-  isDragDisabled 
+  isDragDisabled,
+  isSelectionMode = false,
 }: BookmarkItemProps) {
   const faviconUrl = extractFaviconUrl(link.url);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -77,11 +79,10 @@ export function BookmarkItem({
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       triggerHaptic('medium');
-      if (onCreateShortcut) {
-        setShowConfirmDialog(true);
-      }
+      // Long press now triggers selection instead of shortcut creation
+      onToggleShortlist(link.id);
     }, LONG_PRESS_DURATION);
-  }, [onCreateShortcut]);
+  }, [link.id, onToggleShortlist]);
 
   const handleLongPressEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -128,16 +129,18 @@ export function BookmarkItem({
         </button>
       )}
       
-      {/* Checkbox for shortlisting */}
-      <div 
-        className="flex items-center justify-center pt-1"
-        onClick={handleCheckboxClick}
-      >
-        <Checkbox 
-          checked={link.isShortlisted || false}
-          className="h-5 w-5"
-        />
-      </div>
+      {/* Checkbox for shortlisting - only visible in selection mode */}
+      {isSelectionMode && (
+        <div 
+          className="flex items-center justify-center pt-1"
+          onClick={handleCheckboxClick}
+        >
+          <Checkbox 
+            checked={link.isShortlisted || false}
+            className="h-5 w-5"
+          />
+        </div>
+      )}
       
       {/* Clickable content area */}
       <button
