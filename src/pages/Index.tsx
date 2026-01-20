@@ -1,14 +1,14 @@
 import { useState, useCallback } from 'react';
 import { BottomNav, TabType } from '@/components/BottomNav';
 import { BookmarkLibrary } from '@/components/BookmarkLibrary';
-import { AccessFlow, AccessStep } from '@/components/AccessFlow';
+import { AccessFlow, AccessStep, ContentSourceType } from '@/components/AccessFlow';
 import { useBackButton } from '@/hooks/useBackButton';
 import { getShortlistedLinks, clearAllShortlist } from '@/lib/savedLinksManager';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<TabType>('access');
   const [accessStep, setAccessStep] = useState<AccessStep>('source');
-  const [contentSourceType, setContentSourceType] = useState<'url' | 'file' | null>(null);
+  const [contentSourceType, setContentSourceType] = useState<ContentSourceType>(null);
   const [isBookmarkSelectionMode, setIsBookmarkSelectionMode] = useState(false);
   const [bookmarkClearSignal, setBookmarkClearSignal] = useState(0);
 
@@ -69,6 +69,10 @@ const Index = () => {
     setAccessStep(step);
   }, []);
 
+  const handleContentSourceTypeChange = useCallback((type: ContentSourceType) => {
+    setContentSourceType(type);
+  }, []);
+
   // Show bottom nav only on main screens (not during sub-flows)
   const showBottomNav = accessStep === 'source';
 
@@ -78,6 +82,7 @@ const Index = () => {
       {activeTab === 'access' && (
         <AccessFlow
           onStepChange={handleAccessStepChange}
+          onContentSourceTypeChange={handleContentSourceTypeChange}
         />
       )}
 

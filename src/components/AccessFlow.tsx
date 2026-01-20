@@ -21,6 +21,7 @@ import { createHomeScreenShortcut } from '@/lib/shortcutManager';
 import type { ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
 
 export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success';
+export type ContentSourceType = 'url' | 'file' | null;
 
 interface ContactData {
   name?: string;
@@ -31,9 +32,11 @@ interface ContactData {
 interface AccessFlowProps {
   /** Called when the step changes (for back button handling) */
   onStepChange?: (step: AccessStep) => void;
+  /** Called when content source type changes (for back navigation) */
+  onContentSourceTypeChange?: (type: ContentSourceType) => void;
 }
 
-export function AccessFlow({ onStepChange }: AccessFlowProps) {
+export function AccessFlow({ onStepChange, onContentSourceTypeChange }: AccessFlowProps) {
   const [step, setStep] = useState<AccessStep>('source');
   const [contentSource, setContentSource] = useState<ContentSource | null>(null);
   const [lastCreatedName, setLastCreatedName] = useState('');
@@ -57,6 +60,12 @@ export function AccessFlow({ onStepChange }: AccessFlowProps) {
   useEffect(() => {
     onStepChange?.(step);
   }, [step, onStepChange]);
+
+  // Notify parent of content source type changes
+  useEffect(() => {
+    const type: ContentSourceType = contentSource?.type === 'url' ? 'url' : contentSource ? 'file' : null;
+    onContentSourceTypeChange?.(type);
+  }, [contentSource, onContentSourceTypeChange]);
 
   const handleClipboardUse = (url: string) => {
     dismissDetection();
