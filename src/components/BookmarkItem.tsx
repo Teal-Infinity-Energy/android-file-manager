@@ -210,13 +210,20 @@ export function BookmarkItem({
               {link.description}
             </p>
           )}
-          {link.tag && (
-            <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {link.tag && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
                 {link.tag}
               </Badge>
-            </div>
-          )}
+            )}
+            <span className="text-[10px] text-muted-foreground/50">
+              {new Date(link.createdAt).toLocaleDateString(undefined, { 
+                month: 'short', 
+                day: 'numeric',
+                year: link.createdAt < Date.now() - 365 * 24 * 60 * 60 * 1000 ? 'numeric' : undefined
+              })}
+            </span>
+          </div>
         </div>
       </button>
 
