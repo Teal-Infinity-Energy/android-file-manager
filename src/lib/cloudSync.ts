@@ -257,8 +257,8 @@ export async function syncBookmarks(): Promise<{ success: boolean; uploaded: num
 
   return {
     success: true,
-    uploaded: uploadResult.uploaded + trashUploadResult.uploaded,
-    downloaded: downloadResult.downloaded + trashDownloadResult.downloaded,
+    uploaded: uploadResult.uploaded,
+    downloaded: downloadResult.downloaded,
   };
 }
 
