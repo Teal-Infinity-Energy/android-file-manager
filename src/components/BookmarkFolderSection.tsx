@@ -53,7 +53,7 @@ export function BookmarkFolderSection({
     },
   });
   
-  const selectedCount = links.filter(l => l.isShortlisted).length;
+  
   const isPreset = PRESET_TAGS.includes(title);
   const isCustomFolder = !isPreset && title !== 'Uncategorized';
   const canDelete = isCustomFolder && onDeleteFolder;
@@ -116,11 +116,6 @@ export function BookmarkFolderSection({
               {links.length}
             </span>
             
-            {selectedCount > 0 && (
-              <span className="text-xs text-primary-foreground px-2 py-0.5 rounded-full bg-primary">
-                {selectedCount} selected
-              </span>
-            )}
             
             {/* Edit button for custom folders */}
             {canEdit && (
