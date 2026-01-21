@@ -1,5 +1,8 @@
 const STORAGE_KEY = 'saved_links';
 const CUSTOM_FOLDERS_KEY = 'custom_folders';
+const TRASH_STORAGE_KEY = 'saved_links_trash';
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const PRESET_TAGS = ['Work', 'Personal', 'Social', 'News', 'Entertainment', 'Shopping'];
 
@@ -165,6 +168,12 @@ export function removeSavedLink(id: string): SavedLink | null {
   const removedLink = links.find(link => link.id === id) || null;
   const filtered = links.filter(link => link.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  
+  // Move to trash
+  if (removedLink) {
+    moveToTrash(removedLink);
+  }
+  
   return removedLink;
 }
 
@@ -178,6 +187,9 @@ export function restoreSavedLink(link: SavedLink): void {
     links.splice(insertIndex, 0, link);
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+  
+  // Also remove from trash if present
+  removeFromTrash(link.id);
 }
 
 export function updateSavedLinkTitle(id: string, title: string): void {
@@ -356,4 +368,132 @@ export function getAllFolders(): string[] {
 
 export function moveToFolder(linkId: string, folderName: string | null): void {
   updateSavedLink(linkId, { tag: folderName });
+}
+
+// ============= TRASH MANAGEMENT =============
+
+export interface TrashedLink extends SavedLink {
+  deletedAt: number;
+}
+
+/**
+ * Get all trashed links (auto-purges expired items)
+ */
+export function getTrashLinks(): TrashedLink[] {
+  purgeExpiredTrash();
+  try {
+    const stored = localStorage.getItem(TRASH_STORAGE_KEY);
+    if (!stored) return [];
+    
+    const links = JSON.parse(stored);
+    if (!Array.isArray(links)) return [];
+    
+    return links;
+  } catch (e) {
+    console.error('[Trash] Failed to read from localStorage:', e);
+    return [];
+  }
+}
+
+/**
+ * Move a link to trash with deletedAt timestamp
+ */
+function moveToTrash(link: SavedLink): void {
+  const trashLinks = getTrashLinks();
+  
+  // Check if already in trash (shouldn't happen but be safe)
+  if (trashLinks.some(t => t.id === link.id)) {
+    return;
+  }
+  
+  const trashedLink: TrashedLink = {
+    ...link,
+    deletedAt: Date.now(),
+  };
+  
+  trashLinks.unshift(trashedLink);
+  localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(trashLinks));
+}
+
+/**
+ * Remove a link from trash (internal helper)
+ */
+function removeFromTrash(id: string): void {
+  const trashLinks = getTrashLinks();
+  const filtered = trashLinks.filter(link => link.id !== id);
+  localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(filtered));
+}
+
+/**
+ * Restore a link from trash back to main storage
+ */
+export function restoreFromTrash(id: string): SavedLink | null {
+  const trashLinks = getTrashLinks();
+  const trashedLink = trashLinks.find(link => link.id === id);
+  
+  if (!trashedLink) return null;
+  
+  // Remove deletedAt before restoring
+  const { deletedAt, ...restoredLink } = trashedLink;
+  
+  // Restore to main storage
+  restoreSavedLink(restoredLink);
+  
+  return restoredLink;
+}
+
+/**
+ * Permanently delete a link from trash
+ */
+export function permanentlyDelete(id: string): void {
+  removeFromTrash(id);
+}
+
+/**
+ * Empty all items from trash
+ */
+export function emptyTrash(): void {
+  localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify([]));
+}
+
+/**
+ * Get the count of items in trash
+ */
+export function getTrashCount(): number {
+  return getTrashLinks().length;
+}
+
+/**
+ * Auto-remove items older than 30 days
+ */
+function purgeExpiredTrash(): void {
+  try {
+    const stored = localStorage.getItem(TRASH_STORAGE_KEY);
+    if (!stored) return;
+    
+    const links: TrashedLink[] = JSON.parse(stored);
+    if (!Array.isArray(links)) return;
+    
+    const now = Date.now();
+    const validLinks = links.filter(link => {
+      const age = now - link.deletedAt;
+      return age < THIRTY_DAYS_MS;
+    });
+    
+    if (validLinks.length !== links.length) {
+      console.log(`[Trash] Purged ${links.length - validLinks.length} expired items`);
+      localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(validLinks));
+    }
+  } catch (e) {
+    console.error('[Trash] Failed to purge expired items:', e);
+  }
+}
+
+/**
+ * Get days remaining before a trashed item is auto-deleted
+ */
+export function getDaysRemaining(deletedAt: number): number {
+  const expiresAt = deletedAt + THIRTY_DAYS_MS;
+  const remaining = expiresAt - Date.now();
+  return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
 }
