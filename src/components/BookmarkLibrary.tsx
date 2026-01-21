@@ -1185,6 +1185,28 @@ export function BookmarkLibrary({
         onOpenChange={setIsTrashOpen} 
         onRestored={refreshLinks} 
       />
+      
+      {/* Floating Action Button for adding bookmarks */}
+      {!showAddForm && !hasShortlist && links.length > 0 && (
+        <button
+          onClick={() => {
+            setShowAddForm(true);
+            triggerHaptic('light');
+          }}
+          className={cn(
+            "fixed bottom-6 right-6 z-40",
+            "h-14 w-14 rounded-full",
+            "bg-primary text-primary-foreground",
+            "shadow-lg hover:shadow-xl hover:scale-105",
+            "flex items-center justify-center",
+            "transition-all duration-200",
+            "active:scale-95"
+          )}
+          aria-label="Add bookmark"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
     </div>
   );
 }
