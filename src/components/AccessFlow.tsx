@@ -10,7 +10,6 @@ import { ContactShortcutCustomizer } from '@/components/ContactShortcutCustomize
 import { SuccessScreen } from '@/components/SuccessScreen';
 import { ClipboardSuggestion } from '@/components/ClipboardSuggestion';
 import { AppMenu } from '@/components/AppMenu';
-import { SettingsSheet } from '@/components/SettingsSheet';
 import { TrashSheet } from '@/components/TrashSheet';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { useSharedContent } from '@/hooks/useSharedContent';
@@ -40,10 +39,6 @@ interface AccessFlowProps {
   initialUrlForShortcut?: string | null;
   /** Called when the initial URL has been consumed */
   onInitialUrlConsumed?: () => void;
-  /** Whether settings sheet is open */
-  isSettingsOpen?: boolean;
-  /** Callback when settings open state changes */
-  onSettingsOpenChange?: (open: boolean) => void;
 }
 
 export function AccessFlow({ 
@@ -51,8 +46,6 @@ export function AccessFlow({
   onContentSourceTypeChange,
   initialUrlForShortcut,
   onInitialUrlConsumed,
-  isSettingsOpen,
-  onSettingsOpenChange,
 }: AccessFlowProps) {
   const [step, setStep] = useState<AccessStep>('source');
   const [contentSource, setContentSource] = useState<ContentSource | null>(null);
@@ -337,10 +330,7 @@ export function AccessFlow({
           <header className="px-5 pt-8 pb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <AppMenu 
-                  onOpenTrash={() => setIsTrashOpen(true)}
-                  onOpenSettings={() => onSettingsOpenChange?.(true)}
-                />
+              <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
                 <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                   <Plus className="h-4 w-4 text-primary-foreground" />
                 </div>
@@ -405,9 +395,6 @@ export function AccessFlow({
         open={isTrashOpen} 
         onOpenChange={setIsTrashOpen} 
       />
-
-      {/* Settings Sheet (controlled from menu) */}
-      <SettingsSheet open={isSettingsOpen} onOpenChange={onSettingsOpenChange} />
     </>
   );
 }
