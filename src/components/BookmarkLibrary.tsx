@@ -980,7 +980,9 @@ export function BookmarkLibrary({
                   />
                 ) : (
                   <>
-                    {groupedLinks.sortedTags.map((tag) => (
+                    {groupedLinks.sortedTags
+                      .filter(tag => groupedLinks.groups[tag].length > 0)
+                      .map((tag) => (
                       <BookmarkFolderSection
                         key={tag}
                         title={tag}
