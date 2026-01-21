@@ -23,7 +23,6 @@ const Index = () => {
   const [isBookmarkSelectionMode, setIsBookmarkSelectionMode] = useState(false);
   const [bookmarkClearSignal, setBookmarkClearSignal] = useState(0);
   const [shortcutUrlFromBookmark, setShortcutUrlFromBookmark] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
 
   // Check if shortlist has items
@@ -43,19 +42,13 @@ const Index = () => {
 
   // Handle Android back button
   // Both access tab (at source step) and bookmarks tab (when not selecting) are "home" screens
-  const isOnHomeScreen = (accessStep === 'source' && activeTab === 'access' && !isSettingsOpen) ||
-    (activeTab === 'bookmarks' && !isBookmarkSelectionMode && !isSettingsOpen);
+  const isOnHomeScreen = (accessStep === 'source' && activeTab === 'access') ||
+    (activeTab === 'bookmarks' && !isBookmarkSelectionMode);
 
   useBackButton({
     isHomeScreen: false, // We handle exit ourselves with confirmation
     onBack: () => {
-      console.log('[Index] Back button triggered, step:', accessStep, 'tab:', activeTab, 'settingsOpen:', isSettingsOpen);
-
-      // If settings is open, close it
-      if (isSettingsOpen) {
-        setIsSettingsOpen(false);
-        return;
-      }
+      console.log('[Index] Back button triggered, step:', accessStep, 'tab:', activeTab);
 
       // If on home screen, show exit confirmation
       if (isOnHomeScreen) {
@@ -121,8 +114,6 @@ const Index = () => {
             onContentSourceTypeChange={handleContentSourceTypeChange}
             initialUrlForShortcut={shortcutUrlFromBookmark}
             onInitialUrlConsumed={handleInitialUrlConsumed}
-            isSettingsOpen={isSettingsOpen}
-            onSettingsOpenChange={setIsSettingsOpen}
           />
         </div>
       )}
@@ -134,8 +125,6 @@ const Index = () => {
             onCreateShortcut={handleCreateShortcutFromBookmark}
             onSelectionModeChange={setIsBookmarkSelectionMode}
             clearSelectionSignal={bookmarkClearSignal}
-            isSettingsOpen={isSettingsOpen}
-            onSettingsOpenChange={setIsSettingsOpen}
           />
         </div>
       )}

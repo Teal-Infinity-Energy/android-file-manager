@@ -45,7 +45,6 @@ import { BookmarkActionSheet } from './BookmarkActionSheet';
 import { AddBookmarkForm } from './AddBookmarkForm';
 import { BulkMoveDialog } from './BulkMoveDialog';
 import { AppMenu } from './AppMenu';
-import { SettingsSheet } from './SettingsSheet';
 import { TrashSheet } from './TrashSheet';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/lib/haptics';
@@ -79,18 +78,12 @@ interface BookmarkLibraryProps {
   onSelectionModeChange?: (isSelectionMode: boolean) => void;
   /** Increment this value to request clearing the current shortlist/selection from a parent (e.g. Android back button). */
   clearSelectionSignal?: number;
-  /** Whether settings sheet is open */
-  isSettingsOpen?: boolean;
-  /** Callback when settings open state changes */
-  onSettingsOpenChange?: (open: boolean) => void;
 }
 
 export function BookmarkLibrary({ 
   onCreateShortcut, 
   onSelectionModeChange, 
   clearSelectionSignal,
-  isSettingsOpen,
-  onSettingsOpenChange,
 }: BookmarkLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [links, setLinks] = useState<SavedLink[]>([]);
@@ -551,10 +544,7 @@ export function BookmarkLibrary({
       <header className="px-5 pt-8 pb-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <AppMenu 
-              onOpenTrash={() => setIsTrashOpen(true)}
-              onOpenSettings={() => onSettingsOpenChange?.(true)}
-            />
+            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <Bookmark className="h-4 w-4 text-primary-foreground" />
             </div>
@@ -1119,9 +1109,6 @@ export function BookmarkLibrary({
         onOpenChange={setIsTrashOpen} 
         onRestored={refreshLinks} 
       />
-
-      {/* Settings Sheet (controlled from menu) */}
-      <SettingsSheet open={isSettingsOpen} onOpenChange={onSettingsOpenChange} />
     </div>
   );
 }
