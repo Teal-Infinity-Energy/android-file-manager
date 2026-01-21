@@ -1,14 +1,26 @@
 import { useState, useEffect } from 'react';
-import { User, Cloud, Upload, Download, RefreshCw, LogOut, HardDrive, Clock } from 'lucide-react';
+import { User, Cloud, Upload, Download, RefreshCw, LogOut, HardDrive, Clock, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { getSavedLinks } from '@/lib/savedLinksManager';
 import { syncBookmarks, uploadBookmarksToCloud, downloadBookmarksFromCloud, getCloudBookmarkCount } from '@/lib/cloudSync';
-import { getSyncStatus, recordSync, formatRelativeTime } from '@/lib/syncStatusManager';
+import { getSyncStatus, recordSync, formatRelativeTime, clearSyncStatus } from '@/lib/syncStatusManager';
 import { getSettings, updateSettings } from '@/lib/settingsManager';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export function ProfilePage() {
@@ -21,8 +33,10 @@ export function ProfilePage() {
   const [cloudCount, setCloudCount] = useState<number | null>(null);
   const [syncStatus, setSyncStatus] = useState(getSyncStatus());
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => getSettings().autoSyncEnabled);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const isOperating = isSyncing || isUploading || isDownloading;
+  const isOperating = isSyncing || isUploading || isDownloading || isDeleting;
 
   // Refresh counts
   const refreshCounts = async () => {
@@ -49,6 +63,47 @@ export function ProfilePage() {
     refreshCounts();
     setSyncStatus(getSyncStatus());
   }, [user]);
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      const response = await supabase.functions.invoke('delete-account', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to delete account');
+      }
+
+      // Clear local sync status
+      clearSyncStatus();
+      
+      // Sign out locally
+      await supabase.auth.signOut();
+
+      toast({
+        title: 'Account deleted',
+        description: 'Your account and all cloud data have been permanently deleted.',
+      });
+    } catch (error) {
+      console.error('[DeleteAccount] Error:', error);
+      toast({
+        title: 'Failed to delete account',
+        description: error instanceof Error ? error.message : 'Please try again later',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
 
   const handleSignIn = async () => {
     await signInWithGoogle();
@@ -330,15 +385,53 @@ export function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Sign Out */}
-      <Button 
-        variant="ghost" 
-        onClick={handleSignOut}
-        className="w-full gap-2 text-muted-foreground"
-      >
-        <LogOut className="w-4 h-4" />
-        Sign Out
-      </Button>
+      {/* Account Actions */}
+      <div className="space-y-2">
+        <Button 
+          variant="ghost" 
+          onClick={handleSignOut}
+          disabled={isOperating}
+          className="w-full gap-2 text-muted-foreground"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </Button>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogTrigger asChild>
+            <Button 
+              variant="ghost" 
+              disabled={isOperating}
+              className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Account
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="max-w-[320px] rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete your account and all cloud bookmarks. 
+                Local bookmarks on this device will not be affected. 
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row gap-2">
+              <AlertDialogCancel className="flex-1 m-0" disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                className="flex-1 m-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
