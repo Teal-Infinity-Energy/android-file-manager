@@ -45,6 +45,7 @@ import { BookmarkActionSheet } from './BookmarkActionSheet';
 import { AddBookmarkForm } from './AddBookmarkForm';
 import { BulkMoveDialog } from './BulkMoveDialog';
 import { SettingsSheet } from './SettingsSheet';
+import { TrashSheet } from './TrashSheet';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/lib/haptics';
 import { openInAppBrowser } from '@/lib/inAppBrowser';
@@ -553,7 +554,10 @@ export function BookmarkLibrary({
             </div>
             <span className="text-sm font-medium text-muted-foreground tracking-wide">Bookmarks</span>
           </div>
-          <SettingsSheet open={isSettingsOpen} onOpenChange={onSettingsOpenChange} />
+          <div className="flex items-center gap-1">
+            <TrashSheet onRestored={refreshLinks} />
+            <SettingsSheet open={isSettingsOpen} onOpenChange={onSettingsOpenChange} />
+          </div>
         </div>
         <h1 className="text-2xl font-semibold text-foreground leading-tight tracking-tight">
           Your saved links
