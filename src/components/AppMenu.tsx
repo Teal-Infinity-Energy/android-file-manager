@@ -8,9 +8,6 @@ import {
   Monitor, 
   Clipboard, 
   AlertTriangle,
-  Download,
-  Upload,
-  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -26,16 +23,6 @@ import { cn } from '@/lib/utils';
 import { getTrashCount, getTrashLinks, getDaysRemaining } from '@/lib/savedLinksManager';
 import { useTheme } from 'next-themes';
 import { useSettings } from '@/hooks/useSettings';
-import { 
-  exportBookmarks, 
-  parseBackupFile, 
-  importBookmarks, 
-  validateBackupData,
-  BackupData,
-  BackupStats,
-} from '@/lib/backupManager';
-import { ImportBackupDialog } from './ImportBackupDialog';
-import { toast } from '@/hooks/use-toast';
 
 type ThemeOption = 'light' | 'dark' | 'system';
 
@@ -58,13 +45,6 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
   const [expiringCount, setExpiringCount] = useState(0);
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings } = useSettings();
-  
-  // Export/Import state
-  const [isExporting, setIsExporting] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [pendingBackup, setPendingBackup] = useState<BackupData | null>(null);
-  const [pendingStats, setPendingStats] = useState<BackupStats | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Swipe gesture tracking
   const touchStartX = useRef<number | null>(null);
@@ -92,87 +72,6 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
     setOpen(false);
     // Small delay to allow sheet close animation
     setTimeout(action, 150);
-  };
-
-  // Export handler
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      const result = await exportBookmarks();
-      if (result.success) {
-        toast({
-          title: 'Backup exported',
-          description: 'Your bookmarks have been saved.',
-        });
-      } else {
-        toast({
-          title: 'Export failed',
-          description: result.error || 'Could not export bookmarks.',
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  // Import file selection handler
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const { data, error } = parseBackupFile(content);
-      
-      if (error || !data) {
-        toast({
-          title: 'Invalid backup file',
-          description: error || 'Could not read backup file.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const validation = validateBackupData(data);
-      if (validation.valid && validation.stats) {
-        setPendingBackup(data);
-        setPendingStats(validation.stats);
-        setImportDialogOpen(true);
-      }
-    };
-    reader.readAsText(file);
-    
-    // Reset input so same file can be selected again
-    event.target.value = '';
-  };
-
-  // Import execution handler
-  const handleImport = (mode: 'merge' | 'replace') => {
-    if (!pendingBackup) return;
-
-    const result = importBookmarks(pendingBackup, mode);
-    setImportDialogOpen(false);
-    setPendingBackup(null);
-    setPendingStats(null);
-
-    if (result.success) {
-      toast({
-        title: 'Import successful',
-        description: mode === 'merge'
-          ? `Added ${result.imported} bookmarks${result.skipped > 0 ? `, skipped ${result.skipped} duplicates` : ''}.`
-          : `Restored ${result.imported} bookmarks.`,
-      });
-      // Trigger page reload to reflect changes
-      window.location.reload();
-    } else {
-      toast({
-        title: 'Import failed',
-        description: result.error || 'Could not import bookmarks.',
-        variant: 'destructive',
-      });
-    }
   };
 
   // Swipe handlers
@@ -250,59 +149,6 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
 
           <Separator className="my-3" />
 
-          {/* Data Management Section */}
-          <p className="text-xs text-muted-foreground px-3 mb-2">Data Management</p>
-
-          {/* Export Bookmarks */}
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-12 px-3"
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            <div className="flex items-center gap-3 flex-1">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 text-primary" />
-                )}
-              </div>
-              <div className="text-left">
-                <span className="font-medium block">Export Bookmarks</span>
-                <span className="text-xs text-muted-foreground">Save to file</span>
-              </div>
-            </div>
-          </Button>
-
-          {/* Import Bookmarks */}
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-12 px-3"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="flex items-center gap-3 flex-1">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Upload className="h-4 w-4 text-primary" />
-              </div>
-              <div className="text-left">
-                <span className="font-medium block">Import Bookmarks</span>
-                <span className="text-xs text-muted-foreground">Restore from file</span>
-              </div>
-            </div>
-          </Button>
-          
-          {/* Hidden file input for import */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-
-          <Separator className="my-3" />
-
           {/* Coming Soon Section */}
           <p className="text-xs text-muted-foreground px-3 mb-2">Coming Soon</p>
 
@@ -367,15 +213,6 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
           
         </div>
       </SheetContent>
-
-      {/* Import Dialog */}
-      <ImportBackupDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        backupData={pendingBackup}
-        stats={pendingStats}
-        onImport={handleImport}
-      />
     </Sheet>
   );
 }
