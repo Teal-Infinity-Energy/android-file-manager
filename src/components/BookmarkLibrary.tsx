@@ -781,21 +781,24 @@ export function BookmarkLibrary({
             ) : (
               /* Folder View */
               <div className="pb-6">
-                {/* Create Folder Button */}
-                <div className="mb-4">
-                  <CreateFolderDialog 
-                    onFolderCreated={() => {
-                      setFolderRefreshKey(k => k + 1);
-                    }} 
-                  />
-                </div>
+                {/* Create Folder Button - hide when filtering by tag */}
+                {!activeTagFilter && (
+                  <div className="mb-4">
+                    <CreateFolderDialog 
+                      onFolderCreated={() => {
+                        setFolderRefreshKey(k => k + 1);
+                      }} 
+                    />
+                  </div>
+                )}
                 
-                {groupedLinks.sortedTags.map((tag) => (
+                {/* When a tag filter is active, only show that specific folder */}
+                {activeTagFilter ? (
                   <BookmarkFolderSection
-                    key={tag}
-                    title={tag}
-                    folderId={tag}
-                    links={groupedLinks.groups[tag]}
+                    key={activeTagFilter}
+                    title={activeTagFilter}
+                    folderId={activeTagFilter}
+                    links={groupedLinks.groups[activeTagFilter] || []}
                     onBookmarkTap={handleBookmarkTap}
                     onToggleShortlist={handleToggleShortlist}
                     onCreateShortcut={onCreateShortcut}
@@ -806,20 +809,42 @@ export function BookmarkLibrary({
                     }}
                     isDragDisabled={isDragDisabled}
                     isSelectionMode={hasShortlist}
+                    defaultOpen
                   />
-                ))}
-                
-                <BookmarkFolderSection
-                  title="Uncategorized"
-                  folderId="uncategorized"
-                  links={groupedLinks.uncategorized}
-                  onBookmarkTap={handleBookmarkTap}
-                  onToggleShortlist={handleToggleShortlist}
-                  onCreateShortcut={onCreateShortcut}
-                  isDragDisabled={isDragDisabled}
-                  defaultOpen={groupedLinks.sortedTags.length === 0}
-                  isSelectionMode={hasShortlist}
-                />
+                ) : (
+                  <>
+                    {groupedLinks.sortedTags.map((tag) => (
+                      <BookmarkFolderSection
+                        key={tag}
+                        title={tag}
+                        folderId={tag}
+                        links={groupedLinks.groups[tag]}
+                        onBookmarkTap={handleBookmarkTap}
+                        onToggleShortlist={handleToggleShortlist}
+                        onCreateShortcut={onCreateShortcut}
+                        onDeleteFolder={handleDeleteFolder}
+                        onFolderUpdated={() => {
+                          refreshLinks();
+                          setFolderRefreshKey(k => k + 1);
+                        }}
+                        isDragDisabled={isDragDisabled}
+                        isSelectionMode={hasShortlist}
+                      />
+                    ))}
+                    
+                    <BookmarkFolderSection
+                      title="Uncategorized"
+                      folderId="uncategorized"
+                      links={groupedLinks.uncategorized}
+                      onBookmarkTap={handleBookmarkTap}
+                      onToggleShortlist={handleToggleShortlist}
+                      onCreateShortcut={onCreateShortcut}
+                      isDragDisabled={isDragDisabled}
+                      defaultOpen={groupedLinks.sortedTags.length === 0}
+                      isSelectionMode={hasShortlist}
+                    />
+                  </>
+                )}
               </div>
             )}
             
