@@ -666,8 +666,8 @@ export function BookmarkLibrary({
       {links.length > 0 && (
         <div className="px-5 mb-4">
           <TooltipProvider delayDuration={0}>
-            <div className="flex items-center gap-2 flex-wrap select-none">
-              <span className="text-xs text-muted-foreground mr-1">Sort:</span>
+            <div className="flex items-center gap-1.5 select-none">
+              <span className="text-xs text-muted-foreground shrink-0">Sort:</span>
               
               {/* Newest First */}
               <Tooltip>
@@ -676,14 +676,14 @@ export function BookmarkLibrary({
                     onClick={() => setSortMode('newest')}
                     onContextMenu={(e) => e.preventDefault()}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors select-none touch-manipulation",
+                      "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors select-none touch-manipulation",
                       sortMode === 'newest'
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:text-foreground"
                     )}
                   >
                     <SortDesc className="h-3.5 w-3.5 pointer-events-none" />
-                    Newest
+                    <span className="hidden xs:inline">Newest</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -698,7 +698,7 @@ export function BookmarkLibrary({
                     onClick={() => setSortMode('alphabetical')}
                     onContextMenu={(e) => e.preventDefault()}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors select-none touch-manipulation",
+                      "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors select-none touch-manipulation",
                       sortMode === 'alphabetical'
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:text-foreground"
@@ -720,14 +720,14 @@ export function BookmarkLibrary({
                     onClick={() => setSortMode('folder')}
                     onContextMenu={(e) => e.preventDefault()}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors select-none touch-manipulation",
+                      "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors select-none touch-manipulation",
                       sortMode === 'folder'
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:text-foreground"
                     )}
                   >
                     <Folder className="h-3.5 w-3.5 pointer-events-none" />
-                    Folder
+                    <span className="hidden xs:inline">Folder</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -735,15 +735,17 @@ export function BookmarkLibrary({
                 </TooltipContent>
               </Tooltip>
               
+              {/* Spacer */}
+              <div className="flex-1" />
+              
               {/* Reverse Toggle */}
-              <div className="h-4 w-px bg-border mx-1" />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setSortReversed(!sortReversed)}
                     onContextMenu={(e) => e.preventDefault()}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all select-none touch-manipulation",
+                      "flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all select-none touch-manipulation",
                       sortReversed
                         ? "bg-primary/15 text-primary border border-primary/30"
                         : "bg-muted text-muted-foreground hover:text-foreground"
@@ -753,7 +755,7 @@ export function BookmarkLibrary({
                       "h-3.5 w-3.5 transition-transform pointer-events-none",
                       sortReversed && "rotate-180"
                     )} />
-                    {sortReversed ? 'Reversed' : 'Reverse'}
+                    <span className="hidden xs:inline">{sortReversed ? 'Reversed' : 'Reverse'}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
