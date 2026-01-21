@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { Image, Video, FileText, Link, Music, FolderOpen, Star, Phone } from 'lucide-react';
+import { Image, Video, FileText, Link, Music, FolderOpen, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FileTypeFilter } from '@/lib/contentResolver';
-import { SavedLinksSheet } from './SavedLinksSheet';
 
 export type ContactMode = 'dial' | 'message';
 
@@ -13,14 +11,7 @@ interface ContentSourcePickerProps {
 }
 
 export function ContentSourcePicker({ onSelectFile, onSelectUrl, onSelectContact }: ContentSourcePickerProps) {
-  const [savedLinksOpen, setSavedLinksOpen] = useState(false);
-
-  const handleSelectSavedLink = (url: string) => {
-    onSelectUrl(url);
-  };
-
   return (
-    <>
     <div className="flex flex-col gap-4 p-5 animate-fade-in">
       {/* Section 1: What Matters (Primary) */}
       <div className="rounded-2xl bg-card elevation-1 p-4">
@@ -110,27 +101,8 @@ export function ContentSourcePicker({ onSelectFile, onSelectUrl, onSelectContact
           <span className="font-medium text-foreground">Link</span>
         </button>
 
-        {/* Saved links button */}
-        <button
-          onClick={() => setSavedLinksOpen(true)}
-          className={cn(
-            "w-full flex items-center gap-3 rounded-xl bg-muted/20 p-3.5 mt-4",
-            "active:scale-[0.98] transition-all duration-150",
-            "focus:outline-none focus:ring-2 focus:ring-ring"
-          )}
-        >
-          <Star className="h-5 w-5 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">Saved links</span>
-        </button>
       </div>
     </div>
-
-    <SavedLinksSheet
-      open={savedLinksOpen}
-      onOpenChange={setSavedLinksOpen}
-      onSelectLink={handleSelectSavedLink}
-    />
-    </>
   );
 }
 
