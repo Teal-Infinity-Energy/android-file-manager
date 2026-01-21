@@ -54,18 +54,15 @@ export function useAutoSync() {
       // Upload bookmarks
       const bookmarkResult = await uploadBookmarksToCloud();
       
-      // Upload trash
-      const trashResult = await uploadTrashToCloud();
+      // Upload trash silently in background
+      await uploadTrashToCloud();
       
-      const totalUploaded = (bookmarkResult.success ? bookmarkResult.uploaded : 0) + 
-                           (trashResult.success ? trashResult.uploaded : 0);
-      
-      if (bookmarkResult.success || trashResult.success) {
+      if (bookmarkResult.success) {
         lastSyncTime.current = Date.now();
-        recordSync(totalUploaded, 0);
-        console.log('[AutoSync] Completed, uploaded bookmarks:', bookmarkResult.uploaded, 'trash:', trashResult.uploaded);
+        recordSync(bookmarkResult.uploaded, 0);
+        console.log('[AutoSync] Completed, uploaded:', bookmarkResult.uploaded);
       } else {
-        console.error('[AutoSync] Failed:', bookmarkResult.error || trashResult.error);
+        console.error('[AutoSync] Failed:', bookmarkResult.error);
       }
     } catch (error) {
       console.error('[AutoSync] Error:', error);
