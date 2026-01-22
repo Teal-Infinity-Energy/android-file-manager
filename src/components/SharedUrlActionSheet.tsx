@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Bookmark, Smartphone, Share2, ChevronLeft, Play, Zap, Pencil } from 'lucide-react';
+import { X, Bookmark, Smartphone, Share2, ChevronLeft, Play, Zap, Pencil, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +11,8 @@ import { useVideoThumbnail } from '@/hooks/useVideoThumbnail';
 import { getAllFolders } from '@/lib/savedLinksManager';
 import { detectPlatform } from '@/lib/platformIcons';
 import { PlatformIcon } from '@/components/PlatformIcon';
+import { triggerHaptic } from '@/lib/haptics';
+
 interface SharedUrlActionSheetProps {
   url: string;
   onSaveToLibrary: (data?: { title?: string; description?: string; tag?: string | null }) => void;
@@ -34,6 +36,7 @@ export function SharedUrlActionSheet({
   onDismiss,
 }: SharedUrlActionSheetProps) {
   const [isExiting, setIsExiting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [viewMode, setViewMode] = useState<'choose' | 'edit'>('choose');
   
   // Edit form state
@@ -64,15 +67,22 @@ export function SharedUrlActionSheet({
   };
 
   const handleQuickSave = () => {
-    // Save immediately with auto-fetched metadata
-    setIsExiting(true);
+    // Show success state first
+    setShowSuccess(true);
+    triggerHaptic('success');
+    
+    // Call save immediately
+    onSaveToLibrary({
+      title: metadata?.title || undefined,
+      description: undefined,
+      tag: null,
+    });
+    
+    // Dismiss after showing success animation
     setTimeout(() => {
-      onSaveToLibrary({
-        title: metadata?.title || undefined,
-        description: undefined,
-        tag: null,
-      });
-    }, 200);
+      setIsExiting(true);
+      setTimeout(onDismiss, 200);
+    }, 800);
   };
 
   const handleConfirmSave = () => {
@@ -104,35 +114,47 @@ export function SharedUrlActionSheet({
           isExiting && "animate-out fade-out slide-out-to-bottom-4 duration-200"
         )}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-2">
-            {viewMode === 'edit' ? (
-              <>
-                <button
-                  onClick={handleCancelEdit}
-                  className="p-1 -ml-1 rounded-full hover:bg-muted transition-colors"
-                  aria-label="Back"
-                >
-                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                </button>
-                <span className="text-sm font-medium text-foreground">Save to Library</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">Link Received</span>
-              </>
-            )}
+        {/* Success State */}
+        {showSuccess ? (
+          <div className="px-4 py-12 flex flex-col items-center justify-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center animate-scale-in">
+              <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                <Check className="h-6 w-6 text-white animate-fade-in" strokeWidth={3} />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-foreground animate-fade-in">Saved to Library</p>
           </div>
-          <button
-            onClick={handleDismiss}
-            className="p-1.5 -mr-1 rounded-full hover:bg-muted transition-colors"
-            aria-label="Dismiss"
-          >
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                {viewMode === 'edit' ? (
+                  <>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="p-1 -ml-1 rounded-full hover:bg-muted transition-colors"
+                      aria-label="Back"
+                    >
+                      <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                    <span className="text-sm font-medium text-foreground">Save to Library</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Link Received</span>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={handleDismiss}
+                className="p-1.5 -mr-1 rounded-full hover:bg-muted transition-colors"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
 
         {/* URL Preview Card */}
         <div className="px-4 py-4 border-b border-border">
@@ -341,7 +363,9 @@ export function SharedUrlActionSheet({
               Save to Library
             </Button>
           </div>
-        )}
+          )}
+        </>
+      )}
       </div>
     </div>
   );
