@@ -1247,7 +1247,7 @@ export function BookmarkLibrary({
         className={cn(
           "fixed left-0 right-0 px-5 pb-3 transition-all duration-300 ease-out z-40",
           "bottom-[calc(3.5rem+env(safe-area-inset-bottom))]",
-          isBottomButtonVisible && !hasShortlist && !showAddForm
+          isBottomButtonVisible && !hasShortlist && !showAddForm && links.length > 0
             ? "translate-y-0 opacity-100"
             : "translate-y-full opacity-0 pointer-events-none"
         )}
