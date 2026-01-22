@@ -1,7 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
-import ShortcutPlugin from '@/plugins/ShortcutPlugin';
-import { useNavigate } from 'react-router-dom';
 import { Plus, WifiOff } from 'lucide-react';
 import { ContentSourcePicker, ContactMode } from '@/components/ContentSourcePicker';
 import { UrlInput } from '@/components/UrlInput';
@@ -9,18 +6,15 @@ import { ShortcutCustomizer } from '@/components/ShortcutCustomizer';
 import { ContactShortcutCustomizer } from '@/components/ContactShortcutCustomizer';
 import { SuccessScreen } from '@/components/SuccessScreen';
 import { ClipboardSuggestion } from '@/components/ClipboardSuggestion';
-import { SharedUrlActionSheet } from '@/components/SharedUrlActionSheet';
 import { AppMenu } from '@/components/AppMenu';
 import { TrashSheet } from '@/components/TrashSheet';
 import { useShortcuts } from '@/hooks/useShortcuts';
-import { useSharedContent } from '@/hooks/useSharedContent';
 import { useClipboardDetection } from '@/hooks/useClipboardDetection';
 import { useSettings } from '@/hooks/useSettings';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useToast } from '@/hooks/use-toast';
 import { pickFile, FileTypeFilter } from '@/lib/contentResolver';
 import { createHomeScreenShortcut } from '@/lib/shortcutManager';
-import { addSavedLink } from '@/lib/savedLinksManager';
 import type { ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
 
 export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success';
@@ -56,14 +50,10 @@ export function AccessFlow({
   const [contactMode, setContactMode] = useState<ContactMode>('dial');
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
   const [isTrashOpen, setIsTrashOpen] = useState(false);
-  const [pendingSharedUrl, setPendingSharedUrl] = useState<string | null>(null);
-  const lastSharedIdRef = useRef<string | null>(null);
   const processedInitialUrlRef = useRef<string | null>(null);
 
-  const navigate = useNavigate();
   const { createShortcut, createContactShortcut } = useShortcuts();
   const { toast } = useToast();
-  const { sharedContent, sharedAction, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
   const { settings } = useSettings();
   const { isOnline } = useNetworkStatus();
 
@@ -106,117 +96,6 @@ export function AccessFlow({
     setStep('url');
   };
 
-  // Handle shared URL action: Save to Library (with optional metadata)
-  const handleSaveSharedToLibrary = (data?: { title?: string; description?: string; tag?: string | null }) => {
-    if (!pendingSharedUrl) return;
-    
-    const result = addSavedLink(
-      pendingSharedUrl,
-      data?.title,
-      data?.description,
-      data?.tag
-    );
-    
-    if (result.status === 'added') {
-      toast({
-        title: 'Saved to Library',
-        description: 'Link has been added to your bookmarks.',
-      });
-    } else if (result.status === 'duplicate') {
-      toast({
-        title: 'Already saved',
-        description: 'This link is already in your library.',
-      });
-    }
-    
-    setPendingSharedUrl(null);
-  };
-
-  // Handle shared URL action: Create Shortcut
-  const handleCreateSharedShortcut = () => {
-    if (!pendingSharedUrl) return;
-    
-    setContentSource({
-      type: 'url',
-      uri: pendingSharedUrl,
-    });
-    setStep('customize');
-    setPendingSharedUrl(null);
-  };
-
-  // Handle dismissing the shared URL action sheet
-  const handleDismissSharedUrl = () => {
-    setPendingSharedUrl(null);
-  };
-
-  // Handle shared content from Android Share Sheet AND internal video fallback
-  useEffect(() => {
-    if (!isLoadingShared && sharedContent) {
-      const isVideoFile =
-        sharedContent.type === 'file' && !!sharedContent.mimeType && sharedContent.mimeType.startsWith('video/');
-
-      const shouldAutoPlayVideo = sharedAction === 'app.onetap.PLAY_VIDEO' || (sharedAction == null && isVideoFile);
-
-      if (shouldAutoPlayVideo && sharedContent.type === 'file') {
-        if (Capacitor.isNativePlatform()) {
-          const mimeType = sharedContent.mimeType || 'video/*';
-          console.log('[AccessFlow] Video open detected, opening native player:', {
-            action: sharedAction,
-            uri: sharedContent.uri,
-            type: mimeType,
-          });
-
-          (async () => {
-            try {
-              await ShortcutPlugin.openNativeVideoPlayer({ uri: sharedContent.uri, mimeType });
-            } catch (e) {
-              console.error('[AccessFlow] Failed to open native player, falling back to web player:', e);
-              const uri = encodeURIComponent(sharedContent.uri);
-              const type = encodeURIComponent(mimeType);
-              const nonce = Date.now();
-              navigate(`/player?uri=${uri}&type=${type}&t=${nonce}`);
-              return;
-            } finally {
-              clearSharedContent();
-            }
-          })();
-
-          return;
-        }
-
-        const uri = encodeURIComponent(sharedContent.uri);
-        const type = encodeURIComponent(sharedContent.mimeType || 'video/*');
-        const nonce = Date.now();
-        console.log('[AccessFlow] Video open detected, navigating to player:', { action: sharedAction, uri: sharedContent.uri, type: sharedContent.mimeType, nonce });
-
-        navigate(`/player?uri=${uri}&type=${type}&t=${nonce}`);
-        return;
-      }
-
-      const shareId = `${sharedContent.uri}-${sharedContent.type}`;
-
-      if (lastSharedIdRef.current === shareId) {
-        console.log('[AccessFlow] Already processed this share, skipping');
-        return;
-      }
-
-      console.log('[AccessFlow] Processing shared content:', sharedContent);
-      lastSharedIdRef.current = shareId;
-
-      // For URLs shared via share sheet, show action picker instead of auto-navigating
-      if (sharedContent.type === 'share' || sharedContent.type === 'url') {
-        console.log('[AccessFlow] URL shared, showing action picker');
-        setPendingSharedUrl(sharedContent.uri);
-        clearSharedContent();
-        return;
-      }
-
-      // For files, proceed directly to customize (files can't be bookmarked)
-      setContentSource(sharedContent);
-      setStep('customize');
-      clearSharedContent();
-    }
-  }, [sharedContent, sharedAction, isLoadingShared, clearSharedContent, navigate]);
 
   const handleSelectFile = async (filter: FileTypeFilter) => {
     const file = await pickFile(filter);
@@ -451,15 +330,6 @@ export function AccessFlow({
         onOpenChange={setIsTrashOpen} 
       />
 
-      {/* Shared URL Action Picker */}
-      {pendingSharedUrl && (
-        <SharedUrlActionSheet
-          url={pendingSharedUrl}
-          onSaveToLibrary={handleSaveSharedToLibrary}
-          onCreateShortcut={handleCreateSharedShortcut}
-          onDismiss={handleDismissSharedUrl}
-        />
-      )}
     </>
   );
 }
