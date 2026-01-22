@@ -1,15 +1,21 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { useNavigate } from 'react-router-dom';
 import { BottomNav, TabType } from '@/components/BottomNav';
 import { BookmarkLibrary } from '@/components/BookmarkLibrary';
 import { AccessFlow, AccessStep, ContentSourceType } from '@/components/AccessFlow';
 import { ProfilePage } from '@/components/ProfilePage';
 import { AuthDebugPanel } from '@/components/AuthDebugPanel';
+import { SharedUrlActionSheet } from '@/components/SharedUrlActionSheet';
 import { useBackButton } from '@/hooks/useBackButton';
 import { useAuth } from '@/hooks/useAuth';
 import { useAutoSync } from '@/hooks/useAutoSync';
 import { useDeepLink } from '@/hooks/useDeepLink';
-import { getShortlistedLinks, clearAllShortlist } from '@/lib/savedLinksManager';
+import { useSharedContent } from '@/hooks/useSharedContent';
+import { useToast } from '@/hooks/use-toast';
+import { getShortlistedLinks, clearAllShortlist, addSavedLink } from '@/lib/savedLinksManager';
+import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,8 +35,12 @@ const Index = () => {
   const [bookmarkClearSignal, setBookmarkClearSignal] = useState(0);
   const [shortcutUrlFromBookmark, setShortcutUrlFromBookmark] = useState<string | null>(null);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [pendingSharedUrl, setPendingSharedUrl] = useState<string | null>(null);
+  const lastSharedIdRef = useRef<string | null>(null);
 
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   
   // Enable auto-sync when user is signed in
   useAutoSync();
@@ -38,8 +48,125 @@ const Index = () => {
   // Handle native OAuth deep links
   useDeepLink();
   
+  // Handle shared content from Android Share Sheet (always active regardless of tab)
+  const { sharedContent, sharedAction, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
+  
   // Check if shortlist has items
   const hasShortlist = getShortlistedLinks().length > 0;
+
+  // Handle shared content from Android Share Sheet
+  useEffect(() => {
+    if (!isLoadingShared && sharedContent) {
+      const isVideoFile =
+        sharedContent.type === 'file' && !!sharedContent.mimeType && sharedContent.mimeType.startsWith('video/');
+
+      const shouldAutoPlayVideo = sharedAction === 'app.onetap.PLAY_VIDEO' || (sharedAction == null && isVideoFile);
+
+      if (shouldAutoPlayVideo && sharedContent.type === 'file') {
+        if (Capacitor.isNativePlatform()) {
+          const mimeType = sharedContent.mimeType || 'video/*';
+          console.log('[Index] Video open detected, opening native player:', {
+            action: sharedAction,
+            uri: sharedContent.uri,
+            type: mimeType,
+          });
+
+          (async () => {
+            try {
+              await ShortcutPlugin.openNativeVideoPlayer({ uri: sharedContent.uri, mimeType });
+            } catch (e) {
+              console.error('[Index] Failed to open native player, falling back to web player:', e);
+              const uri = encodeURIComponent(sharedContent.uri);
+              const type = encodeURIComponent(mimeType);
+              const nonce = Date.now();
+              navigate(`/player?uri=${uri}&type=${type}&t=${nonce}`);
+              return;
+            } finally {
+              clearSharedContent();
+            }
+          })();
+
+          return;
+        }
+
+        const uri = encodeURIComponent(sharedContent.uri);
+        const type = encodeURIComponent(sharedContent.mimeType || 'video/*');
+        const nonce = Date.now();
+        console.log('[Index] Video open detected, navigating to player:', { action: sharedAction, uri: sharedContent.uri, type: sharedContent.mimeType, nonce });
+
+        navigate(`/player?uri=${uri}&type=${type}&t=${nonce}`);
+        clearSharedContent();
+        return;
+      }
+
+      const shareId = `${sharedContent.uri}-${sharedContent.type}`;
+
+      if (lastSharedIdRef.current === shareId) {
+        console.log('[Index] Already processed this share, skipping');
+        return;
+      }
+
+      console.log('[Index] Processing shared content:', sharedContent);
+      lastSharedIdRef.current = shareId;
+
+      // For URLs shared via share sheet, show action picker
+      if (sharedContent.type === 'share' || sharedContent.type === 'url') {
+        console.log('[Index] URL shared, showing action picker');
+        setPendingSharedUrl(sharedContent.uri);
+        clearSharedContent();
+        return;
+      }
+
+      // For files, switch to Access tab and let AccessFlow handle it via initialUrlForShortcut
+      // (File handling is done in AccessFlow since it needs the customize step)
+      if (activeTab !== 'access') {
+        setActiveTab('access');
+      }
+      // Clear the shared content - AccessFlow will pick up any file content on its own
+      clearSharedContent();
+    }
+  }, [sharedContent, sharedAction, isLoadingShared, clearSharedContent, navigate, activeTab]);
+
+  // Handle shared URL action: Save to Library
+  const handleSaveSharedToLibrary = useCallback((data?: { title?: string; description?: string; tag?: string | null }) => {
+    if (!pendingSharedUrl) return;
+    
+    const result = addSavedLink(
+      pendingSharedUrl,
+      data?.title,
+      data?.description,
+      data?.tag
+    );
+    
+    if (result.status === 'added') {
+      toast({
+        title: 'Saved to Library',
+        description: 'Link has been added to your bookmarks.',
+      });
+    } else if (result.status === 'duplicate') {
+      toast({
+        title: 'Already saved',
+        description: 'This link is already in your library.',
+      });
+    }
+    
+    setPendingSharedUrl(null);
+  }, [pendingSharedUrl, toast]);
+
+  // Handle shared URL action: Create Shortcut
+  const handleCreateSharedShortcut = useCallback(() => {
+    if (!pendingSharedUrl) return;
+    
+    // Switch to access tab and set URL for shortcut creation
+    setShortcutUrlFromBookmark(pendingSharedUrl);
+    setActiveTab('access');
+    setPendingSharedUrl(null);
+  }, [pendingSharedUrl]);
+
+  // Handle dismissing the shared URL action sheet
+  const handleDismissSharedUrl = useCallback(() => {
+    setPendingSharedUrl(null);
+  }, []);
 
   // Handle clearing bookmark selection
   const handleClearBookmarkSelection = useCallback(() => {
@@ -180,6 +307,16 @@ const Index = () => {
 
       {/* Dev-only auth debug panel */}
       <AuthDebugPanel />
+
+      {/* Shared URL Action Picker (always available, regardless of active tab) */}
+      {pendingSharedUrl && (
+        <SharedUrlActionSheet
+          url={pendingSharedUrl}
+          onSaveToLibrary={handleSaveSharedToLibrary}
+          onCreateShortcut={handleCreateSharedShortcut}
+          onDismiss={handleDismissSharedUrl}
+        />
+      )}
     </div>
   );
 };
