@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Bookmark, Smartphone, Share2, ChevronLeft, Play } from 'lucide-react';
+import { X, Bookmark, Smartphone, Share2, ChevronLeft, Play, Zap, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -58,9 +58,21 @@ export function SharedUrlActionSheet({
     setTimeout(onDismiss, 200);
   };
 
-  const handleSaveToLibrary = () => {
+  const handleSaveWithEdit = () => {
     // Transition to edit mode
     setViewMode('edit');
+  };
+
+  const handleQuickSave = () => {
+    // Save immediately with auto-fetched metadata
+    setIsExiting(true);
+    setTimeout(() => {
+      onSaveToLibrary({
+        title: metadata?.title || undefined,
+        description: undefined,
+        tag: null,
+      });
+    }, 200);
   };
 
   const handleConfirmSave = () => {
@@ -210,22 +222,36 @@ export function SharedUrlActionSheet({
 
         {viewMode === 'choose' ? (
           /* Action Buttons */
-          <div className="px-4 py-4 flex gap-3">
+          <div className="px-4 py-4 space-y-3">
+            {/* Primary action: Quick Save */}
             <Button
-              variant="outline"
-              className="flex-1 gap-2"
-              onClick={handleSaveToLibrary}
+              className="w-full gap-2"
+              onClick={handleQuickSave}
+              disabled={isLoading}
             >
-              <Bookmark className="h-4 w-4" />
-              Save to Library
+              <Zap className="h-4 w-4" />
+              {isLoading ? 'Loading...' : 'Quick Save'}
             </Button>
-            <Button
-              className="flex-1 gap-2"
-              onClick={handleCreateShortcut}
-            >
-              <Smartphone className="h-4 w-4" />
-              Create Shortcut
-            </Button>
+            
+            {/* Secondary actions row */}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={handleSaveWithEdit}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit & Save
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={handleCreateShortcut}
+              >
+                <Smartphone className="h-4 w-4" />
+                Shortcut
+              </Button>
+            </div>
           </div>
         ) : (
           /* Edit Form */
