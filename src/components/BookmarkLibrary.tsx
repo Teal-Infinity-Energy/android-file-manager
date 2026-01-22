@@ -51,8 +51,6 @@ import { TrashSheet } from './TrashSheet';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/lib/haptics';
 import { openInAppBrowser } from '@/lib/inAppBrowser';
-import { Clipboard as CapClipboard } from '@capacitor/clipboard';
-import { isValidUrl } from '@/lib/contentResolver';
 import {
   DndContext,
   closestCenter,
@@ -105,9 +103,6 @@ export function BookmarkLibrary({
   const [sortReversed, setSortReversed] = useState(() => {
     return localStorage.getItem('bookmark_sort_reversed') === 'true';
   });
-  const [isFabVisible, setIsFabVisible] = useState(true);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const lastScrollTop = useRef(0);
   
   // Persist preferences to localStorage
   useEffect(() => {
@@ -129,21 +124,6 @@ export function BookmarkLibrary({
     }
   }, [sortMode]);
   
-  // Scroll handler for FAB visibility
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    const scrollTop = container.scrollTop;
-    const isScrollingDown = scrollTop > lastScrollTop.current && scrollTop > 50;
-    
-    setIsFabVisible(!isScrollingDown);
-    lastScrollTop.current = scrollTop;
-  }, []);
-  
-  // FAB long-press refs
-  const fabLongPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const fabIsLongPress = useRef(false);
   
   // Helper to toggle sort mode
   const handleSortToggle = (mode: SortMode) => {
@@ -174,78 +154,6 @@ export function BookmarkLibrary({
     setLinks(getSavedLinks());
   }, []);
   
-  // FAB long-press handlers for quick add from clipboard
-  const handleFabLongPressStart = useCallback(() => {
-    fabIsLongPress.current = false;
-    fabLongPressTimer.current = setTimeout(async () => {
-      fabIsLongPress.current = true;
-      triggerHaptic('medium');
-      
-      // Read clipboard and add bookmark
-      try {
-        let clipboardText: string | null = null;
-        
-        try {
-          const { value } = await CapClipboard.read();
-          clipboardText = value;
-        } catch {
-          // Fallback to web clipboard
-          try {
-            clipboardText = await navigator.clipboard.readText();
-          } catch {
-            // Clipboard not available
-          }
-        }
-        
-        if (!clipboardText?.trim()) {
-          toast({ title: "Clipboard is empty", variant: "destructive" });
-          return;
-        }
-        
-        const trimmed = clipboardText.trim();
-        let url = trimmed;
-        
-        // Add https if it looks like a domain
-        if (!url.startsWith('http') && url.includes('.')) {
-          url = `https://${url}`;
-        }
-        
-        if (!isValidUrl(url)) {
-          toast({ title: "No valid URL in clipboard", variant: "destructive" });
-          return;
-        }
-        
-        const result = addSavedLink(url);
-        
-        if (result.status === 'added') {
-          toast({ title: "Bookmark added from clipboard" });
-          refreshLinks();
-        } else if (result.status === 'duplicate') {
-          toast({ title: "Already saved", description: result.link?.title });
-        } else {
-          toast({ title: "Failed to save", variant: "destructive" });
-        }
-      } catch (e) {
-        console.error('[FAB] Failed to read clipboard:', e);
-        toast({ title: "Could not read clipboard", variant: "destructive" });
-      }
-    }, 500);
-  }, [toast, refreshLinks]);
-  
-  const handleFabLongPressEnd = useCallback(() => {
-    if (fabLongPressTimer.current) {
-      clearTimeout(fabLongPressTimer.current);
-      fabLongPressTimer.current = null;
-    }
-  }, []);
-  
-  const handleFabClick = useCallback(() => {
-    if (!fabIsLongPress.current) {
-      setShowAddForm(true);
-      triggerHaptic('light');
-    }
-    fabIsLongPress.current = false;
-  }, []);
 
   useEffect(() => {
     refreshLinks();
@@ -978,8 +886,6 @@ export function BookmarkLibrary({
 
       {/* Bookmarks List */}
       <div 
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-5"
       >
         {filteredLinks.length === 0 ? (
@@ -1290,33 +1196,6 @@ export function BookmarkLibrary({
         onRestored={refreshLinks} 
       />
       
-      {/* Floating Action Button for adding bookmarks */}
-      {!showAddForm && !hasShortlist && links.length > 0 && (
-        <button
-          onClick={handleFabClick}
-          onMouseDown={handleFabLongPressStart}
-          onMouseUp={handleFabLongPressEnd}
-          onMouseLeave={handleFabLongPressEnd}
-          onTouchStart={handleFabLongPressStart}
-          onTouchEnd={handleFabLongPressEnd}
-          onTouchCancel={handleFabLongPressEnd}
-          className={cn(
-            "fixed right-6 z-40",
-            "h-14 w-14 rounded-full",
-            "bg-primary text-primary-foreground",
-            "shadow-lg hover:shadow-xl",
-            "flex items-center justify-center",
-            "transition-all duration-300 ease-out",
-            "active:scale-95",
-            isFabVisible 
-              ? "bottom-6 opacity-100 scale-100" 
-              : "bottom-6 translate-y-20 opacity-0 scale-90 pointer-events-none"
-          )}
-          aria-label="Add bookmark (long-press to paste from clipboard)"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      )}
     </div>
   );
 }
