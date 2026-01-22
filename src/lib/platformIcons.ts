@@ -148,11 +148,58 @@ const PLATFORM_PATTERNS: PlatformPattern[] = [
   },
 ];
 
+// Cache for platform detection results (keyed by hostname)
+const platformCache = new Map<string, PlatformInfo | null>();
+const MAX_CACHE_SIZE = 500;
+
+function getHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 export function detectPlatform(url: string): PlatformInfo | null {
+  const hostname = getHostname(url);
+  
+  // If we can't parse the URL, fall back to uncached detection
+  if (!hostname) {
+    for (const { pattern, info } of PLATFORM_PATTERNS) {
+      if (pattern.test(url)) {
+        return info;
+      }
+    }
+    return null;
+  }
+  
+  // Check cache first
+  if (platformCache.has(hostname)) {
+    return platformCache.get(hostname)!;
+  }
+  
+  // Detect platform
+  let result: PlatformInfo | null = null;
   for (const { pattern, info } of PLATFORM_PATTERNS) {
-    if (pattern.test(url)) {
-      return info;
+    if (pattern.test(hostname)) {
+      result = info;
+      break;
     }
   }
-  return null;
+  
+  // Manage cache size with LRU-like behavior (remove oldest entries)
+  if (platformCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = platformCache.keys().next().value;
+    if (firstKey) platformCache.delete(firstKey);
+  }
+  
+  // Store in cache
+  platformCache.set(hostname, result);
+  
+  return result;
+}
+
+// Export for testing/debugging
+export function clearPlatformCache(): void {
+  platformCache.clear();
 }
