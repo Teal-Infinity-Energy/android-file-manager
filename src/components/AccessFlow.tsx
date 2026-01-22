@@ -106,11 +106,16 @@ export function AccessFlow({
     setStep('url');
   };
 
-  // Handle shared URL action: Save to Library
-  const handleSaveSharedToLibrary = () => {
+  // Handle shared URL action: Save to Library (with optional metadata)
+  const handleSaveSharedToLibrary = (data?: { title?: string; description?: string; tag?: string | null }) => {
     if (!pendingSharedUrl) return;
     
-    const result = addSavedLink(pendingSharedUrl);
+    const result = addSavedLink(
+      pendingSharedUrl,
+      data?.title,
+      data?.description,
+      data?.tag
+    );
     
     if (result.status === 'added') {
       toast({
