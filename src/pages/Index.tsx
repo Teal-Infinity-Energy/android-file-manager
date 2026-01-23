@@ -6,7 +6,6 @@ import { BottomNav, TabType } from '@/components/BottomNav';
 import { BookmarkLibrary } from '@/components/BookmarkLibrary';
 import { AccessFlow, AccessStep, ContentSourceType } from '@/components/AccessFlow';
 import { ProfilePage } from '@/components/ProfilePage';
-import { AuthDebugPanel } from '@/components/AuthDebugPanel';
 import { SharedUrlActionSheet } from '@/components/SharedUrlActionSheet';
 import { useBackButton } from '@/hooks/useBackButton';
 import { useAuth } from '@/hooks/useAuth';
@@ -369,9 +368,6 @@ const Index = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Dev-only auth debug panel */}
-      <AuthDebugPanel />
 
       {/* Shared URL Action Picker (always available, regardless of active tab) */}
       {pendingSharedUrl && (
