@@ -578,7 +578,7 @@ export function BookmarkLibrary({
   };
 
   return (
-    <div className="flex flex-col h-full pb-14">
+    <div className="flex flex-col h-full pb-20">
       {/* Header */}
       <header className="px-5 pt-8 pb-4">
         <div className="flex items-center justify-between mb-4">
