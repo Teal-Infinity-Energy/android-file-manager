@@ -3,11 +3,15 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, FileText, Link, Phone, Check } from 'lucide-react';
+import { ChevronLeft, FileText, Link, Phone, Check, Clipboard, Globe, Bookmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScheduledTimingPicker } from './ScheduledTimingPicker';
 import { useScheduledActions } from '@/hooks/useScheduledActions';
 import { triggerHaptic } from '@/lib/haptics';
+import { pickFile, isValidUrl } from '@/lib/contentResolver';
+import ShortcutPlugin from '@/plugins/ShortcutPlugin';
+import { SavedLinksSheet } from './SavedLinksSheet';
+import { Clipboard as CapClipboard } from '@capacitor/clipboard';
 import type { 
   ScheduledActionDestination, 
   RecurrenceType, 
@@ -16,6 +20,7 @@ import type {
 } from '@/types/scheduledAction';
 
 type CreatorStep = 'destination' | 'timing' | 'confirm';
+type UrlSubStep = 'choose' | 'input' | null;
 
 interface ScheduledActionCreatorProps {
   onComplete: () => void;
@@ -42,6 +47,12 @@ export function ScheduledActionCreator({
   } | null>(null);
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  
+  // URL sub-flow state
+  const [urlSubStep, setUrlSubStep] = useState<UrlSubStep>(null);
+  const [showBookmarkPicker, setShowBookmarkPicker] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlError, setUrlError] = useState('');
 
   // Get suggested name based on destination
   const getSuggestedName = useCallback((dest: ScheduledActionDestination): string => {
@@ -58,7 +69,106 @@ export function ScheduledActionCreator({
   const handleDestinationSelect = (dest: ScheduledActionDestination) => {
     setDestination(dest);
     setName(getSuggestedName(dest));
+    setUrlSubStep(null);
+    setUrlInput('');
+    setUrlError('');
     setStep('timing');
+  };
+
+  // File picker handler
+  const handleFileSelect = async () => {
+    triggerHaptic('light');
+    const file = await pickFile('all');
+    if (file) {
+      handleDestinationSelect({
+        type: 'file',
+        uri: file.uri,
+        name: file.name || 'File',
+        mimeType: file.mimeType,
+      });
+    }
+  };
+
+  // Contact picker handler
+  const handleContactSelect = async () => {
+    triggerHaptic('light');
+    try {
+      const result = await ShortcutPlugin.pickContact();
+      if (result.success && result.phoneNumber) {
+        handleDestinationSelect({
+          type: 'contact',
+          phoneNumber: result.phoneNumber,
+          contactName: result.name || 'Contact',
+        });
+      }
+    } catch (error) {
+      console.warn('Contact picker failed:', error);
+    }
+  };
+
+  // URL flow handlers
+  const handleUrlSubmit = () => {
+    let finalUrl = urlInput.trim();
+    if (!finalUrl) {
+      setUrlError('Please enter a URL');
+      return;
+    }
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+    if (!isValidUrl(finalUrl)) {
+      setUrlError('Please enter a valid URL');
+      return;
+    }
+    try {
+      const hostname = new URL(finalUrl).hostname.replace('www.', '');
+      handleDestinationSelect({
+        type: 'url',
+        uri: finalUrl,
+        name: hostname,
+      });
+    } catch {
+      setUrlError('Please enter a valid URL');
+    }
+  };
+
+  const handleBookmarkSelect = (url: string) => {
+    setShowBookmarkPicker(false);
+    try {
+      const hostname = new URL(url).hostname.replace('www.', '');
+      handleDestinationSelect({
+        type: 'url',
+        uri: url,
+        name: hostname,
+      });
+    } catch {
+      handleDestinationSelect({
+        type: 'url',
+        uri: url,
+        name: 'Link',
+      });
+    }
+  };
+
+  const handlePasteUrl = async () => {
+    triggerHaptic('light');
+    try {
+      const { value } = await CapClipboard.read();
+      if (value) {
+        setUrlInput(value);
+        setUrlError('');
+      }
+    } catch {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          setUrlInput(text);
+          setUrlError('');
+        }
+      } catch {
+        console.warn('Clipboard not available');
+      }
+    }
   };
 
   const handleTimingConfirm = (
@@ -109,6 +219,14 @@ export function ScheduledActionCreator({
   };
 
   const handleBack = () => {
+    // Handle URL sub-step back
+    if (urlSubStep) {
+      setUrlSubStep(null);
+      setUrlInput('');
+      setUrlError('');
+      return;
+    }
+    
     switch (step) {
       case 'destination':
         onBack();
@@ -134,8 +252,107 @@ export function ScheduledActionCreator({
     }
   };
 
-  // Step: Select destination type (placeholder - will integrate with existing pickers)
+  // Step: Select destination type
   if (step === 'destination') {
+    // URL sub-step: Input URL
+    if (urlSubStep === 'input') {
+      return (
+        <div className="flex flex-col h-full animate-fade-in">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+            <button
+              onClick={handleBack}
+              className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-semibold">Enter URL</h2>
+          </div>
+
+          <div className="flex-1 px-5 py-6 space-y-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  value={urlInput}
+                  onChange={(e) => {
+                    setUrlInput(e.target.value);
+                    setUrlError('');
+                  }}
+                  placeholder="example.com"
+                  className="h-12 pl-10 rounded-xl text-base"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePasteUrl}
+                className="h-12 w-12 rounded-xl shrink-0"
+              >
+                <Clipboard className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            {urlError && (
+              <p className="text-sm text-destructive">{urlError}</p>
+            )}
+          </div>
+
+          <div className="p-5 border-t border-border">
+            <Button
+              onClick={handleUrlSubmit}
+              disabled={!urlInput.trim()}
+              className="w-full h-12 rounded-2xl text-base"
+            >
+              Continue
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // URL sub-step: Choose URL source
+    if (urlSubStep === 'choose') {
+      return (
+        <div className="flex flex-col h-full animate-fade-in">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+            <button
+              onClick={handleBack}
+              className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-semibold">Add a link</h2>
+          </div>
+
+          <div className="flex-1 px-5 py-6">
+            <div className="space-y-3">
+              <DestinationOption
+                icon={<Globe className="h-5 w-5" />}
+                label="Enter URL"
+                description="Type or paste a link"
+                onClick={() => setUrlSubStep('input')}
+              />
+              <DestinationOption
+                icon={<Bookmark className="h-5 w-5" />}
+                label="Saved Bookmark"
+                description="Choose from your library"
+                onClick={() => setShowBookmarkPicker(true)}
+              />
+            </div>
+          </div>
+
+          <SavedLinksSheet
+            open={showBookmarkPicker}
+            onOpenChange={setShowBookmarkPicker}
+            onSelectLink={handleBookmarkSelect}
+          />
+        </div>
+      );
+    }
+
+    // Main destination selection
     return (
       <div className="flex flex-col h-full animate-fade-in">
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
@@ -154,47 +371,23 @@ export function ScheduledActionCreator({
           </p>
 
           <div className="space-y-3">
-            {/* Placeholder buttons - in real implementation, these open the respective pickers */}
             <DestinationOption
               icon={<FileText className="h-5 w-5" />}
               label="Local File"
               description="Photo, video, PDF, or document"
-              onClick={() => {
-                // TODO: Open file picker
-                // For now, create a test destination
-                handleDestinationSelect({
-                  type: 'file',
-                  uri: 'content://test',
-                  name: 'Test File.pdf',
-                  mimeType: 'application/pdf',
-                });
-              }}
+              onClick={handleFileSelect}
             />
             <DestinationOption
               icon={<Link className="h-5 w-5" />}
               label="Link"
               description="Website or saved bookmark"
-              onClick={() => {
-                // TODO: Open URL input or bookmark picker
-                handleDestinationSelect({
-                  type: 'url',
-                  uri: 'https://example.com',
-                  name: 'Example Website',
-                });
-              }}
+              onClick={() => setUrlSubStep('choose')}
             />
             <DestinationOption
               icon={<Phone className="h-5 w-5" />}
               label="Contact"
               description="Call someone at a scheduled time"
-              onClick={() => {
-                // TODO: Open contact picker
-                handleDestinationSelect({
-                  type: 'contact',
-                  phoneNumber: '+1234567890',
-                  contactName: 'Test Contact',
-                });
-              }}
+              onClick={handleContactSelect}
             />
           </div>
         </div>
