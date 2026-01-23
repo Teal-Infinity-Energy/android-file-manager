@@ -2202,4 +2202,44 @@ public class ShortcutPlugin extends Plugin {
             call.resolve(result);
         }
     }
+
+    /**
+     * Show a test notification immediately to verify notification system works.
+     * This bypasses the alarm system and directly triggers a notification.
+     */
+    @PluginMethod
+    public void showTestNotification(PluginCall call) {
+        Context context = getContext();
+        if (context == null) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", "Context is null");
+            call.resolve(result);
+            return;
+        }
+
+        try {
+            // Show a test notification with a dummy action
+            String testId = "test_" + System.currentTimeMillis();
+            NotificationHelper.showActionNotification(
+                context,
+                testId,
+                "Test Notification",
+                "url",
+                "{\"uri\": \"https://google.com\"}"
+            );
+
+            android.util.Log.d("ShortcutPlugin", "Test notification shown with id: " + testId);
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error showing test notification: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
 }

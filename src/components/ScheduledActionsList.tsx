@@ -36,10 +36,12 @@ export function ScheduledActionsList({
     checkPermissions,
     requestPermissions,
     openAlarmSettings,
+    showTestNotification,
   } = useScheduledActions();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingAction, setEditingAction] = useState<ScheduledAction | null>(null);
   const [isTestingAlarm, setIsTestingAlarm] = useState(false);
+  const [isTestingNotification, setIsTestingNotification] = useState(false);
   const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>({
     notifications: false,
@@ -154,6 +156,41 @@ export function ScheduledActionsList({
     }
   };
 
+  // Test notification: shows a notification immediately (bypasses alarm)
+  const handleTestNotification = async () => {
+    setIsTestingNotification(true);
+    triggerHaptic('medium');
+    
+    try {
+      console.log('[TestNotification] Showing test notification immediately...');
+      const result = await showTestNotification();
+      
+      if (result.success) {
+        console.log('[TestNotification] Test notification shown successfully');
+        toast({
+          title: 'Test notification sent',
+          description: 'You should see a notification now. Tap it to test one-tap access.',
+        });
+      } else {
+        console.error('[TestNotification] Failed:', result.error);
+        toast({
+          title: 'Test failed',
+          description: result.error || 'Could not show test notification.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('[TestNotification] Error:', error);
+      toast({
+        title: 'Test failed',
+        description: String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTestingNotification(false);
+    }
+  };
+
   // Test alarm: creates a scheduled action that fires in 10 seconds
   const handleTestAlarm = async () => {
     setIsTestingAlarm(true);
@@ -241,12 +278,22 @@ export function ScheduledActionsList({
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={handleTestNotification}
+                disabled={isTestingNotification}
+                className="text-xs gap-1.5 h-8 text-muted-foreground hover:text-foreground"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {isTestingNotification ? 'Testing...' : 'Test Now'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleTestAlarm}
                 disabled={isTestingAlarm}
                 className="text-xs gap-1.5 h-8 text-muted-foreground hover:text-foreground"
               >
                 <Bug className="h-3.5 w-3.5" />
-                {isTestingAlarm ? 'Testing...' : 'Test Alarm'}
+                {isTestingAlarm ? 'Testing...' : 'Test 10s'}
               </Button>
             </div>
           </div>

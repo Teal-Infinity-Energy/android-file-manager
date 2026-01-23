@@ -1,10 +1,12 @@
 package app.onetap.shortcuts;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -14,17 +16,18 @@ import androidx.core.app.NotificationManagerCompat;
 
 /**
  * Helper class for creating and managing scheduled action notifications.
- * Notifications are minimal and calm, with direct action execution on tap.
+ * Notifications provide one-tap access to execute actions directly.
  */
 public class NotificationHelper {
     private static final String TAG = "NotificationHelper";
     
     public static final String CHANNEL_ID = "scheduled_actions";
     public static final String CHANNEL_NAME = "Scheduled Actions";
-    public static final String CHANNEL_DESCRIPTION = "Notifications for scheduled actions";
+    public static final String CHANNEL_DESCRIPTION = "One-tap notifications for scheduled actions";
     
     /**
      * Create the notification channel (required for Android 8.0+)
+     * Configured for high-priority, prominent notifications.
      */
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -35,19 +38,23 @@ public class NotificationHelper {
             );
             channel.setDescription(CHANNEL_DESCRIPTION);
             channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0, 200});
+            channel.setVibrationPattern(new long[]{0, 150, 100, 150});
+            channel.enableLights(true);
+            channel.setLightColor(Color.BLUE);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            channel.setShowBadge(true);
             
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
-                Log.d(TAG, "Notification channel created");
+                Log.d(TAG, "Notification channel created with high importance");
             }
         }
     }
     
     /**
      * Show a notification for a scheduled action.
-     * Tapping the notification will directly execute the action.
+     * Tapping the notification will directly execute the action (one-tap access).
      */
     public static void showActionNotification(
         Context context,
@@ -66,7 +73,7 @@ public class NotificationHelper {
             return;
         }
         
-        // Create pending intent for notification tap
+        // Create pending intent for notification tap - this executes the action directly
         PendingIntent pendingIntent = PendingIntent.getActivity(
             context,
             actionId.hashCode(),
@@ -74,25 +81,27 @@ public class NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         
-        // Get appropriate icon based on destination type
+        // Get appropriate icon - use app icon for consistent branding
         int iconRes = getNotificationIcon(destinationType);
         
-        // Build the notification - minimal and calm
+        // Build the notification - prominent, one-tap access
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(iconRes)
             .setContentTitle(actionName)
             .setContentText(getContentText(destinationType))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX) // Maximum priority for heads-up
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .setVibrate(new long[]{0, 200});
+            .setDefaults(NotificationCompat.DEFAULT_ALL) // Sound + vibration + lights
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Show on lock screen
+            .setFullScreenIntent(pendingIntent, true); // Heads-up notification
         
         // Show the notification
         try {
             NotificationManagerCompat manager = NotificationManagerCompat.from(context);
             manager.notify(actionId.hashCode(), builder.build());
-            Log.d(TAG, "Notification shown for action: " + actionName);
+            Log.d(TAG, "Notification shown for action: " + actionName + " (one-tap access enabled)");
         } catch (SecurityException e) {
             Log.e(TAG, "No notification permission", e);
         }
