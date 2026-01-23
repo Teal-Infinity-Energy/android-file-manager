@@ -160,4 +160,54 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     window.open(options.url, '_blank', 'noopener,noreferrer');
     return { success: true };
   }
+
+  // ========== Scheduled Actions (Web Fallback) ==========
+
+  async scheduleAction(options: {
+    id: string;
+    name: string;
+    destinationType: 'file' | 'url' | 'contact';
+    destinationData: string;
+    triggerTime: number;
+    recurrence: 'once' | 'daily' | 'weekly' | 'yearly';
+  }): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] scheduleAction called (web fallback)', options);
+    // On web, we can use setTimeout for demo purposes (won't persist)
+    const delay = options.triggerTime - Date.now();
+    if (delay > 0) {
+      console.log(`[ShortcutPluginWeb] Would trigger "${options.name}" in ${Math.round(delay / 1000)}s`);
+    }
+    return { success: true };
+  }
+
+  async cancelScheduledAction(options: { 
+    id: string; 
+  }): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] cancelScheduledAction called (web fallback)', options.id);
+    return { success: true };
+  }
+
+  async checkAlarmPermission(): Promise<{ granted: boolean; canRequest: boolean }> {
+    console.log('[ShortcutPluginWeb] checkAlarmPermission called (web fallback)');
+    // Web doesn't have alarm permissions, return true for testing
+    return { granted: true, canRequest: false };
+  }
+
+  async requestNotificationPermission(): Promise<{ granted: boolean }> {
+    console.log('[ShortcutPluginWeb] requestNotificationPermission called (web fallback)');
+    // Use browser Notification API if available
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      return { granted: permission === 'granted' };
+    }
+    return { granted: false };
+  }
+
+  async checkNotificationPermission(): Promise<{ granted: boolean }> {
+    console.log('[ShortcutPluginWeb] checkNotificationPermission called (web fallback)');
+    if ('Notification' in window) {
+      return { granted: Notification.permission === 'granted' };
+    }
+    return { granted: false };
+  }
 }
