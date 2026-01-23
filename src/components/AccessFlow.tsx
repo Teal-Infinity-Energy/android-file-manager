@@ -9,16 +9,19 @@ import { ClipboardSuggestion } from '@/components/ClipboardSuggestion';
 import { AppMenu } from '@/components/AppMenu';
 import { TrashSheet } from '@/components/TrashSheet';
 import { SavedLinksSheet } from '@/components/SavedLinksSheet';
+import { ScheduledActionsList } from '@/components/ScheduledActionsList';
+import { ScheduledActionCreator } from '@/components/ScheduledActionCreator';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { useClipboardDetection } from '@/hooks/useClipboardDetection';
 import { useSettings } from '@/hooks/useSettings';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useScheduledActions } from '@/hooks/useScheduledActions';
 import { useToast } from '@/hooks/use-toast';
 import { pickFile, FileTypeFilter } from '@/lib/contentResolver';
 import { createHomeScreenShortcut } from '@/lib/shortcutManager';
 import type { ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
 
-export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success';
+export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success' | 'scheduled-list' | 'scheduled-create';
 export type ContentSourceType = 'url' | 'file' | null;
 
 interface ContactData {
@@ -60,10 +63,14 @@ export function AccessFlow({
   const { toast } = useToast();
   const { settings } = useSettings();
   const { isOnline } = useNetworkStatus();
+  const { activeCount: scheduledCount } = useScheduledActions();
 
   // Auto-detect clipboard URL (only on source screen and if enabled in settings)
   const clipboardEnabled = step === 'source' && settings.clipboardDetectionEnabled;
   const { detectedUrl, dismissDetection } = useClipboardDetection(clipboardEnabled);
+
+  // Scheduled actions state
+  const [showScheduledList, setShowScheduledList] = useState(false);
 
   // Notify parent of step changes
   useEffect(() => {
@@ -256,9 +263,20 @@ export function AccessFlow({
       case 'success':
         handleReset();
         break;
+      case 'scheduled-create':
+        setStep('source');
+        break;
       default:
         break;
     }
+  };
+
+  // Scheduled action handlers
+  const handleOpenScheduledList = () => setShowScheduledList(true);
+  const handleCreateScheduled = () => setStep('scheduled-create');
+  const handleScheduledComplete = () => {
+    setStep('source');
+    setShowScheduledList(true); // Show the list after creation
   };
 
 

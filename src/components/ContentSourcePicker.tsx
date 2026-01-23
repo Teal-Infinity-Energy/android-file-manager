@@ -1,4 +1,4 @@
-import { Image, Video, FileText, Bookmark, Music, FolderOpen, Phone, Link } from 'lucide-react';
+import { Image, Video, FileText, Bookmark, Music, FolderOpen, Phone, Link, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FileTypeFilter } from '@/lib/contentResolver';
 
@@ -9,9 +9,20 @@ interface ContentSourcePickerProps {
   onSelectContact?: (mode: ContactMode) => void;
   onSelectFromLibrary?: () => void;
   onEnterUrl?: () => void;
+  onOpenScheduled?: () => void;
+  onCreateScheduled?: () => void;
+  scheduledCount?: number;
 }
 
-export function ContentSourcePicker({ onSelectFile, onSelectContact, onSelectFromLibrary, onEnterUrl }: ContentSourcePickerProps) {
+export function ContentSourcePicker({ 
+  onSelectFile, 
+  onSelectContact, 
+  onSelectFromLibrary, 
+  onEnterUrl,
+  onOpenScheduled,
+  onCreateScheduled,
+  scheduledCount = 0,
+}: ContentSourcePickerProps) {
   return (
     <div className="flex flex-col gap-4 p-5 animate-fade-in">
       {/* Section 1: What Matters (Primary) */}
@@ -101,6 +112,46 @@ export function ContentSourcePicker({ onSelectFile, onSelectContact, onSelectFro
                 icon={<Link className="h-5 w-5" />}
                 label="Enter URL"
                 onClick={onEnterUrl}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Section 4: Scheduled Actions */}
+      {(onOpenScheduled || onCreateScheduled) && (
+        <div className="rounded-2xl bg-card elevation-1 p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            Scheduled
+          </h2>
+          
+          <div className="space-y-3">
+            {onOpenScheduled && (
+              <button
+                onClick={onOpenScheduled}
+                className={cn(
+                  "w-full flex items-center gap-3 rounded-xl bg-muted/20 p-3.5",
+                  "active:scale-[0.98] transition-all duration-150",
+                  "focus:outline-none focus:ring-2 focus:ring-ring"
+                )}
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <span className="text-sm font-medium text-foreground">
+                  View scheduled actions
+                  {scheduledCount > 0 && (
+                    <span className="text-muted-foreground ml-1">({scheduledCount} active)</span>
+                  )}
+                </span>
+              </button>
+            )}
+            
+            {onCreateScheduled && (
+              <FileTypeButton
+                icon={<Clock className="h-5 w-5" />}
+                label="Schedule new action"
+                onClick={onCreateScheduled}
               />
             )}
           </div>

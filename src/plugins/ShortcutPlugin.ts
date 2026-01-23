@@ -113,6 +113,39 @@ export interface ShortcutPluginInterface {
     viewMode?: 'desktop' | 'mobile';
     title?: string;
   }): Promise<{ success: boolean; error?: string }>;
+
+  // ========== Scheduled Actions ==========
+
+  // Schedule a new action (creates alarm via AlarmManager)
+  scheduleAction(options: {
+    id: string;
+    name: string;
+    destinationType: 'file' | 'url' | 'contact';
+    destinationData: string;    // JSON stringified destination object
+    triggerTime: number;        // Unix timestamp (ms)
+    recurrence: 'once' | 'daily' | 'weekly' | 'yearly';
+  }): Promise<{ success: boolean; error?: string }>;
+
+  // Cancel a scheduled action
+  cancelScheduledAction(options: { 
+    id: string; 
+  }): Promise<{ success: boolean; error?: string }>;
+
+  // Check if exact alarm permission is granted (Android 12+)
+  checkAlarmPermission(): Promise<{ 
+    granted: boolean; 
+    canRequest: boolean; 
+  }>;
+
+  // Request notification permission (Android 13+)
+  requestNotificationPermission(): Promise<{ 
+    granted: boolean; 
+  }>;
+
+  // Check notification permission status
+  checkNotificationPermission(): Promise<{ 
+    granted: boolean; 
+  }>;
 }
 
 // This plugin bridges to native Android code
