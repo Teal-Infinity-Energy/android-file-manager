@@ -110,7 +110,8 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
     }
     
     /**
-     * Schedule an alarm using AlarmManager.
+     * Schedule a notification trigger using AlarmManager.
+     * Uses setExactAndAllowWhileIdle() for notification-style delivery (no alarm clock icon).
      */
     public static void scheduleAlarm(Context context, String actionId, long triggerTime, Intent intent) {
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -130,10 +131,14 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 // Android 12+: Check if we can schedule exact alarms
                 if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setAlarmClock(
-                        new AlarmManager.AlarmClockInfo(triggerTime, pendingIntent),
+                    // Use setExactAndAllowWhileIdle for notification-style delivery
+                    // This doesn't show alarm clock icon in status bar
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
                         pendingIntent
                     );
+                    Log.d(TAG, "Scheduled exact notification trigger for " + actionId);
                 } else {
                     // Fall back to inexact alarm
                     alarmManager.setAndAllowWhileIdle(
@@ -141,22 +146,24 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
                         triggerTime,
                         pendingIntent
                     );
-                    Log.w(TAG, "Using inexact alarm - exact alarm permission not granted");
+                    Log.w(TAG, "Using inexact trigger - exact alarm permission not granted");
                 }
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Android 6-11: Use setAlarmClock for reliability
-                alarmManager.setAlarmClock(
-                    new AlarmManager.AlarmClockInfo(triggerTime, pendingIntent),
+                // Android 6-11: Use setExactAndAllowWhileIdle for reliable notification delivery
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
                     pendingIntent
                 );
+                Log.d(TAG, "Scheduled exact notification trigger for " + actionId);
             } else {
                 // Older Android: setExact
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent);
             }
             
-            Log.d(TAG, "Alarm scheduled for " + actionId + " at " + triggerTime);
+            Log.d(TAG, "Notification trigger scheduled for " + actionId + " at " + triggerTime);
         } catch (SecurityException e) {
-            Log.e(TAG, "Security exception scheduling alarm", e);
+            Log.e(TAG, "Security exception scheduling notification trigger", e);
         }
     }
     

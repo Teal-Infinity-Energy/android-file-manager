@@ -306,4 +306,15 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     console.log('[ShortcutPluginWeb] openAlarmSettings - not applicable on web');
     return { success: true };
   }
+
+  async showTestNotification(): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] showTestNotification called (web fallback)');
+    await this.showWebNotification(
+      'test_' + Date.now(),
+      'Test Notification',
+      'url',
+      JSON.stringify({ uri: 'https://google.com' })
+    );
+    return { success: true };
+  }
 }

@@ -31,6 +31,9 @@ interface UseScheduledActionsReturn {
   checkPermissions: () => Promise<{ notifications: boolean; alarms: boolean }>;
   requestPermissions: () => Promise<{ notifications: boolean; alarms: boolean }>;
   openAlarmSettings: () => Promise<void>;
+  
+  // Test/debug
+  showTestNotification: () => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useScheduledActions(): UseScheduledActionsReturn {
@@ -234,6 +237,16 @@ export function useScheduledActions(): UseScheduledActionsReturn {
     }
   }, []);
 
+  // Show test notification immediately (bypasses alarm system)
+  const showTestNotification = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      return await ShortcutPlugin.showTestNotification();
+    } catch (error) {
+      console.error('Error showing test notification:', error);
+      return { success: false, error: String(error) };
+    }
+  }, []);
+
   return {
     actions,
     activeCount,
@@ -245,5 +258,6 @@ export function useScheduledActions(): UseScheduledActionsReturn {
     checkPermissions,
     requestPermissions,
     openAlarmSettings,
+    showTestNotification,
   };
 }
