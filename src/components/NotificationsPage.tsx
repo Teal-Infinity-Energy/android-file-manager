@@ -430,16 +430,25 @@ export function NotificationsPage({
             <h1 className="text-xl font-semibold text-foreground">Notifications</h1>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant={allPermissionsGranted ? "outline" : "default"}
-              size="sm"
-              onClick={handleRequestAllPermissions}
-              disabled={isRequestingPermissions}
-              className="text-xs gap-1.5 h-8"
-            >
-              <Shield className="h-3.5 w-3.5" />
-              {isRequestingPermissions ? 'Requesting...' : allPermissionsGranted ? 'OK' : 'Permissions'}
-            </Button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={allPermissionsGranted ? "outline" : "default"}
+                    size="sm"
+                    onClick={handleRequestAllPermissions}
+                    disabled={isRequestingPermissions}
+                    className="text-xs gap-1.5 h-8"
+                  >
+                    <Shield className="h-3.5 w-3.5" />
+                    {isRequestingPermissions ? 'Requesting...' : allPermissionsGranted ? 'OK' : 'Permissions'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {allPermissionsGranted ? 'All permissions granted' : 'Grant notification and alarm permissions'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         
@@ -473,12 +482,19 @@ export function NotificationsPage({
               className="pl-9 pr-9 h-10"
             />
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear search</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </div>
@@ -606,14 +622,21 @@ export function NotificationsPage({
                 {selectedIds.size} selected
               </span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearSelection}
-              className="text-xs"
-            >
-              Clear
-            </Button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearSelection}
+                    className="text-xs"
+                  >
+                    Clear
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear selection and exit selection mode</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}
@@ -657,41 +680,63 @@ export function NotificationsPage({
       {isSelectionMode && selectedIds.size > 0 && (
         <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] left-0 right-0 px-5 z-10">
           <div className="bg-card border rounded-2xl shadow-lg p-3 flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleBulkEnable}
-              className="flex-1 gap-1.5"
-            >
-              <ToggleRight className="h-4 w-4" />
-              Enable
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleBulkDisable}
-              className="flex-1 gap-1.5"
-            >
-              <ToggleLeft className="h-4 w-4" />
-              Disable
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowBulkDeleteConfirm(true)}
-              className="gap-1.5"
-            >
-              <Trash2 className="h-4 w-4" />
-              {selectedIds.size}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClearSelection}
-              className="h-8 w-8"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkEnable}
+                    className="flex-1 gap-1.5"
+                  >
+                    <ToggleRight className="h-4 w-4" />
+                    Enable
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Enable all selected actions</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkDisable}
+                    className="flex-1 gap-1.5"
+                  >
+                    <ToggleLeft className="h-4 w-4" />
+                    Disable
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Disable all selected actions</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowBulkDeleteConfirm(true)}
+                    className="gap-1.5"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {selectedIds.size}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete selected actions</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleClearSelection}
+                    className="h-8 w-8"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear selection</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}
@@ -699,13 +744,20 @@ export function NotificationsPage({
       {/* Floating add button (when not in selection mode) */}
       {!isSelectionMode && actions.length > 0 && !isScrolledDown && (
         <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] left-0 right-0 px-5 z-10">
-          <Button
-            onClick={handleCreateNew}
-            className="w-full h-12 rounded-2xl gap-2 shadow-lg"
-          >
-            <Plus className="h-5 w-5" />
-            Schedule new action
-          </Button>
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleCreateNew}
+                  className="w-full h-12 rounded-2xl gap-2 shadow-lg"
+                >
+                  <Plus className="h-5 w-5" />
+                  Schedule new action
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Create a new scheduled action for a file, URL, or contact</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
 

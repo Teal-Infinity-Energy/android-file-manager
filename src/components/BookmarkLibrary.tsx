@@ -621,32 +621,44 @@ export function BookmarkLibrary({
         {/* View Mode Toggle */}
         {links.length > 0 && (
           <div className="flex items-center gap-2 mt-3">
-            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-              <button
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                  viewMode === 'list'
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <List className="h-3.5 w-3.5" />
-                List
-              </button>
-              <button
-                onClick={() => setViewMode('folders')}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                  viewMode === 'folders'
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                Folders
-              </button>
-            </div>
+            <TooltipProvider delayDuration={0}>
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                        viewMode === 'list'
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <List className="h-3.5 w-3.5" />
+                      List
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>View all bookmarks in a single list</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setViewMode('folders')}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                        viewMode === 'folders'
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      Folders
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Organize bookmarks by folder</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </div>
         )}
       </header>
@@ -662,13 +674,20 @@ export function BookmarkLibrary({
             className="pl-10 pr-10"
           />
           {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors"
-            >
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Clear search</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>
@@ -964,16 +983,23 @@ export function BookmarkLibrary({
                       : `Select all (${filteredLinks.length})`}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
-                    handleClearShortlist();
-                    triggerHaptic('light');
-                  }}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear
-                </button>
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          handleClearShortlist();
+                          triggerHaptic('light');
+                        }}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Clear
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Clear selection and exit selection mode</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             )}
           <DndContext
@@ -1146,58 +1172,87 @@ export function BookmarkLibrary({
         
         <div className="h-5 w-px bg-border" />
         
-        <button
-          onClick={() => setShowBulkMoveDialog(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-          aria-label="Move to folder"
-        >
-          <FolderInput className="h-4 w-4" />
-          <span className="hidden sm:inline">Move</span>
-        </button>
-        
-        {shortlistedLinks.length === 1 && (
-          <>
-            <button
-              onClick={() => {
-                setSelectedLink(shortlistedLinks[0]);
-                setStartInEditMode(true);
-                setShowActionSheet(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-              aria-label="Edit bookmark"
-            >
-              <Edit2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
-            <button
-              onClick={handleBulkCreateShortcuts}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-              aria-label="Create shortcut"
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Shortcut</span>
-            </button>
-          </>
-        )}
-        
-        <button
-          onClick={() => setShowBulkDeleteConfirm(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium"
-          aria-label="Delete selected"
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Delete</span>
-        </button>
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setShowBulkMoveDialog(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+                aria-label="Move to folder"
+              >
+                <FolderInput className="h-4 w-4" />
+                <span className="hidden sm:inline">Move</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Move selected to folder</TooltipContent>
+          </Tooltip>
+          
+          {shortlistedLinks.length === 1 && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      setSelectedLink(shortlistedLinks[0]);
+                      setStartInEditMode(true);
+                      setShowActionSheet(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+                    aria-label="Edit bookmark"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Edit</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Edit bookmark details</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleBulkCreateShortcuts}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+                    aria-label="Create shortcut"
+                  >
+                    <Home className="h-4 w-4" />
+                    <span className="hidden sm:inline">Shortcut</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Add shortcut to home screen</TooltipContent>
+              </Tooltip>
+            </>
+          )}
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium"
+                aria-label="Delete selected"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete selected bookmarks</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         
         <div className="h-5 w-px bg-border" />
         
-        <button
-          onClick={handleClearShortlist}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm text-muted-foreground"
-          aria-label="Clear selection"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleClearShortlist}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm text-muted-foreground"
+                aria-label="Clear selection"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Clear selection</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       
       {/* Bulk Delete Confirmation Dialog */}
