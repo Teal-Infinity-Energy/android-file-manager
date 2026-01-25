@@ -1,6 +1,7 @@
 // Notifications Page - Full-page view for managing scheduled actions
 // With search, filter, sort, selection mode, and bulk actions
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,18 +69,19 @@ interface PermissionStatus {
   checked: boolean;
 }
 
-const RECURRENCE_FILTERS: { value: RecurrenceType | 'all'; label: string; icon: React.ReactNode }[] = [
-  { value: 'all', label: 'All', icon: null },
-  { value: 'once', label: 'Once', icon: <Clock className="h-3 w-3" /> },
-  { value: 'daily', label: 'Daily', icon: <RefreshCw className="h-3 w-3" /> },
-  { value: 'weekly', label: 'Weekly', icon: <CalendarDays className="h-3 w-3" /> },
-  { value: 'yearly', label: 'Yearly', icon: <Calendar className="h-3 w-3" /> },
+const RECURRENCE_FILTERS: { value: RecurrenceType | 'all'; labelKey: string; icon: React.ReactNode }[] = [
+  { value: 'all', labelKey: 'notificationsPage.filterAll', icon: null },
+  { value: 'once', labelKey: 'notificationsPage.filterOnce', icon: <Clock className="h-3 w-3" /> },
+  { value: 'daily', labelKey: 'notificationsPage.filterDaily', icon: <RefreshCw className="h-3 w-3" /> },
+  { value: 'weekly', labelKey: 'notificationsPage.filterWeekly', icon: <CalendarDays className="h-3 w-3" /> },
+  { value: 'yearly', labelKey: 'notificationsPage.filterYearly', icon: <Calendar className="h-3 w-3" /> },
 ];
 
 export function NotificationsPage({ 
   onSelectionModeChange,
   clearSelectionSignal,
 }: NotificationsPageProps) {
+  const { t } = useTranslation();
   const { 
     actions, 
     toggleAction, 
@@ -299,7 +301,7 @@ export function NotificationsPage({
     triggerHaptic('light');
     clearSelection();
     setIsSelectionMode(false);
-    toast({ description: 'Selection cleared' });
+    toast({ description: t('notificationsPage.selectionCleared') });
   };
 
   const handleBulkEnable = async () => {
@@ -313,7 +315,7 @@ export function NotificationsPage({
       await toggleAction(id);
     }
     
-    toast({ description: `Enabled ${idsToEnable.length} action${idsToEnable.length !== 1 ? 's' : ''}` });
+    toast({ description: t('notificationsPage.bulkEnabled', { count: idsToEnable.length }) });
     clearSelection();
     setIsSelectionMode(false);
   };
@@ -329,7 +331,7 @@ export function NotificationsPage({
       await toggleAction(id);
     }
     
-    toast({ description: `Disabled ${idsToDisable.length} action${idsToDisable.length !== 1 ? 's' : ''}` });
+    toast({ description: t('notificationsPage.bulkDisabled', { count: idsToDisable.length }) });
     clearSelection();
     setIsSelectionMode(false);
   };
@@ -342,7 +344,7 @@ export function NotificationsPage({
       await deleteScheduledAction(id);
     }
     
-    toast({ description: `Deleted ${count} action${count !== 1 ? 's' : ''}` });
+    toast({ description: t('notificationsPage.bulkDeleted', { count }) });
     clearSelection();
     setIsSelectionMode(false);
     setShowBulkDeleteConfirm(false);
@@ -376,27 +378,27 @@ export function NotificationsPage({
 
       if (result.notifications && result.alarms) {
         toast({
-          title: 'All permissions granted!',
-          description: 'Scheduled actions will work correctly.',
+          title: t('notificationsPage.permissionsGranted'),
+          description: t('notificationsPage.permissionsGrantedDesc'),
         });
       } else if (!result.alarms) {
         toast({
-          title: 'Please enable exact alarms',
-          description: 'Tap to open settings and enable "Alarms & reminders".',
-          action: <Button size="sm" variant="outline" onClick={() => openAlarmSettings()}>Open Settings</Button>,
+          title: t('notificationsPage.enableAlarms'),
+          description: t('notificationsPage.enableAlarmsDesc'),
+          action: <Button size="sm" variant="outline" onClick={() => openAlarmSettings()}>{t('notificationsPage.openSettings')}</Button>,
           duration: 8000,
         });
       } else if (!result.notifications) {
         toast({
-          title: 'Notification permission denied',
-          description: "You won't receive reminders without notification permission.",
+          title: t('notificationsPage.notificationDenied'),
+          description: t('notificationsPage.notificationDeniedDesc'),
           variant: 'destructive',
         });
       }
     } catch (error) {
       console.error('Permission request error:', error);
       toast({
-        title: 'Failed to request permissions',
+        title: t('notificationsPage.permissionsFailed'),
         description: String(error),
         variant: 'destructive',
       });
@@ -439,7 +441,7 @@ export function NotificationsPage({
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <Bell className="h-4 w-4 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-semibold text-foreground">Notifications</h1>
+            <h1 className="text-xl font-semibold text-foreground">{t('notificationsPage.title')}</h1>
           </div>
           <div className="flex gap-2">
             <TooltipProvider delayDuration={0}>
@@ -453,11 +455,11 @@ export function NotificationsPage({
                     className="text-xs gap-1.5 h-8"
                   >
                     <Shield className="h-3.5 w-3.5" />
-                    {isRequestingPermissions ? 'Requesting...' : allPermissionsGranted ? 'OK' : 'Permissions'}
+                    {isRequestingPermissions ? t('notificationsPage.requesting') : allPermissionsGranted ? t('notificationsPage.ok') : t('notificationsPage.permissions')}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {allPermissionsGranted ? 'All permissions granted' : 'Grant notification and alarm permissions'}
+                  {allPermissionsGranted ? t('notificationsPage.allPermissionsGranted') : t('notificationsPage.grantPermissions')}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -469,12 +471,12 @@ export function NotificationsPage({
           <div className="flex gap-3 mt-2 text-xs">
             <div className={`flex items-center gap-1 ${permissionStatus.notifications ? 'text-green-600' : 'text-destructive'}`}>
               <Bell className="h-3 w-3" />
-              <span>Notifications</span>
+              <span>{t('notificationsPage.notificationsLabel')}</span>
               {permissionStatus.notifications ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
             </div>
             <div className={`flex items-center gap-1 ${permissionStatus.alarms ? 'text-green-600' : 'text-destructive'}`}>
               <Clock className="h-3 w-3" />
-              <span>Alarms</span>
+              <span>{t('notificationsPage.alarmsLabel')}</span>
               {permissionStatus.alarms ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
             </div>
           </div>
@@ -488,7 +490,7 @@ export function NotificationsPage({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search actions..."
+              placeholder={t('notificationsPage.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-9 h-10"
@@ -504,7 +506,7 @@ export function NotificationsPage({
                       <X className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Clear search</TooltipContent>
+                  <TooltipContent>{t('library.clearSearch')}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
@@ -535,7 +537,7 @@ export function NotificationsPage({
                   }`}
                 >
                   {filter.icon}
-                  {filter.label}
+                  {t(filter.labelKey)}
                   {count > 0 && (
                     <Badge variant={isActive ? "secondary" : "outline"} className="h-4 px-1 text-[10px]">
                       {count}
@@ -564,7 +566,7 @@ export function NotificationsPage({
                     <CalendarClock className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Sort by next trigger</TooltipContent>
+                <TooltipContent>{t('notificationsPage.sortByTrigger')}</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -578,7 +580,7 @@ export function NotificationsPage({
                     <ArrowDownAZ className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Sort alphabetically</TooltipContent>
+                <TooltipContent>{t('notificationsPage.sortAlpha')}</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -592,7 +594,7 @@ export function NotificationsPage({
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Group by recurrence</TooltipContent>
+                <TooltipContent>{t('notificationsPage.sortRecurrence')}</TooltipContent>
               </Tooltip>
 
               <div className="flex-1" />
@@ -608,7 +610,7 @@ export function NotificationsPage({
                     {sortReversed ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{sortReversed ? 'Reversed order' : 'Normal order'}</TooltipContent>
+                <TooltipContent>{sortReversed ? t('notificationsPage.reversedOrder') : t('notificationsPage.normalOrder')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -631,7 +633,7 @@ export function NotificationsPage({
                 }}
               />
               <span className="text-sm font-medium">
-                {selectedIds.size} selected
+                {t('notificationsPage.selected', { count: selectedIds.size })}
               </span>
             </div>
             <TooltipProvider delayDuration={0}>
@@ -643,10 +645,10 @@ export function NotificationsPage({
                     onClick={handleClearSelection}
                     className="text-xs"
                   >
-                    Clear
+                    {t('library.clear')}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Clear selection and exit selection mode</TooltipContent>
+                <TooltipContent>{t('library.clearTooltip')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -702,10 +704,10 @@ export function NotificationsPage({
                     className="flex-1 gap-1.5"
                   >
                     <ToggleRight className="h-4 w-4" />
-                    Enable
+                    {t('notificationsPage.enable')}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Enable all selected actions</TooltipContent>
+                <TooltipContent>{t('notificationsPage.enableTooltip')}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -716,10 +718,10 @@ export function NotificationsPage({
                     className="flex-1 gap-1.5"
                   >
                     <ToggleLeft className="h-4 w-4" />
-                    Disable
+                    {t('notificationsPage.disable')}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Disable all selected actions</TooltipContent>
+                <TooltipContent>{t('notificationsPage.disableTooltip')}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -733,7 +735,7 @@ export function NotificationsPage({
                     {selectedIds.size}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Delete selected actions</TooltipContent>
+                <TooltipContent>{t('notificationsPage.deleteTooltip')}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -746,7 +748,7 @@ export function NotificationsPage({
                     <X className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Clear selection</TooltipContent>
+                <TooltipContent>{t('library.clearSelection')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -763,12 +765,12 @@ export function NotificationsPage({
                   onClick={handleCreateNew}
                   className="w-full h-12 rounded-2xl gap-2 shadow-lg"
                 >
-                  <Plus className="h-5 w-5" />
-                  Schedule new action
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Create a new scheduled action for a file, URL, or contact</TooltipContent>
-            </Tooltip>
+                <Plus className="h-5 w-5" />
+                {t('notificationsPage.scheduleNew')}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('notificationsPage.scheduleNewTooltip')}</TooltipContent>
+          </Tooltip>
           </TooltipProvider>
         </div>
       )}
@@ -800,18 +802,18 @@ export function NotificationsPage({
       <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} action{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogTitle>{t('notificationsPage.deleteConfirmTitle', { count: selectedIds.size })}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the selected scheduled actions and cancel any scheduled alarms.
+              {t('notificationsPage.deleteConfirmDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBulkDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -822,6 +824,7 @@ export function NotificationsPage({
 
 // Empty state component with animation
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center relative">
       {/* Animated floating icons */}
@@ -841,13 +844,13 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
         </div>
       </div>
       
-      <h3 className="text-lg font-medium mb-2">No scheduled actions</h3>
+      <h3 className="text-lg font-medium mb-2">{t('notificationsPage.emptyTitle')}</h3>
       <p className="text-sm text-muted-foreground mb-6 max-w-[240px]">
-        Schedule a file, link, or contact to open at a specific time.
+        {t('notificationsPage.emptyDesc')}
       </p>
       <Button onClick={onCreateNew} className="gap-2">
         <Plus className="h-4 w-4" />
-        Schedule your first action
+        {t('notificationsPage.scheduleFirst')}
       </Button>
     </div>
   );
@@ -855,17 +858,18 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 
 // No results state
 function NoResultsState({ onClearFilters }: { onClearFilters: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
       <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-4">
         <Search className="h-6 w-6 text-muted-foreground" />
       </div>
-      <h3 className="text-base font-medium mb-2">No actions match your filter</h3>
+      <h3 className="text-base font-medium mb-2">{t('notificationsPage.noMatchTitle')}</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        Try adjusting your search or filter.
+        {t('notificationsPage.noMatchDesc')}
       </p>
       <Button variant="outline" size="sm" onClick={onClearFilters}>
-        Clear filters
+        {t('notificationsPage.clearFilters')}
       </Button>
     </div>
   );
