@@ -209,10 +209,10 @@ export function BookmarkActionSheet({
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
           </div>
           <SheetHeader className="pb-4">
-            <SheetTitle className="text-left truncate pr-8">
+            <SheetTitle className="text-start truncate pe-8">
               {link.title}
             </SheetTitle>
-            <p className="text-xs text-muted-foreground truncate text-left">
+            <p className="text-xs text-muted-foreground truncate text-start">
               {link.url}
             </p>
           </SheetHeader>
@@ -228,7 +228,7 @@ export function BookmarkActionSheet({
                     onChange={(e) => handleUrlChange(e.target.value)}
                     onBlur={handleUrlBlur}
                     placeholder={t('bookmarkAction.urlPlaceholder')}
-                    className={cn("pr-10", urlError && "border-destructive focus-visible:ring-destructive")}
+                    className={cn("pe-10", urlError && "border-destructive focus-visible:ring-destructive")}
                     type="url"
                   />
                   {editUrl && (
@@ -238,7 +238,7 @@ export function BookmarkActionSheet({
                         setEditUrl('');
                         setUrlError(t('bookmarkAction.urlRequired'));
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50"
+                      className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50"
                     >
                       <X className="h-4 w-4 text-muted-foreground" />
                     </button>
@@ -255,14 +255,14 @@ export function BookmarkActionSheet({
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder={t('bookmarkAction.titlePlaceholder')}
-                  className="pr-10"
+                  className="pe-10"
                   autoFocus
                 />
                 {editTitle && (
                   <button
                     type="button"
                     onClick={() => setEditTitle('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50"
+                    className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50"
                   >
                     <X className="h-4 w-4 text-muted-foreground" />
                   </button>
