@@ -174,10 +174,10 @@ export function SharedUrlActionSheet({
                   <>
                     <button
                       onClick={handleCancelEdit}
-                      className="p-1 -ml-1 rounded-full hover:bg-muted transition-colors"
+                      className="p-1 -ms-1 rounded-full hover:bg-muted transition-colors"
                       aria-label={t('common.back')}
                     >
-                      <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                      <ChevronLeft className="h-4 w-4 text-muted-foreground rtl:rotate-180" />
                     </button>
                     <span className="text-sm font-medium text-foreground">{t('sharedUrl.saveToLibrary')}</span>
                   </>
@@ -190,7 +190,7 @@ export function SharedUrlActionSheet({
               </div>
               <button
                 onClick={handleDismiss}
-                className="p-1.5 -mr-1 rounded-full hover:bg-muted transition-colors"
+                className="p-1.5 -me-1 rounded-full hover:bg-muted transition-colors"
                 aria-label={t('common.close')}
               >
                 <X className="h-4 w-4 text-muted-foreground" />
@@ -221,12 +221,12 @@ export function SharedUrlActionSheet({
                         "w-12 h-12 rounded-full flex items-center justify-center",
                         "bg-black/60 backdrop-blur-sm"
                       )}>
-                        <Play className="h-6 w-6 text-white fill-white ml-0.5" />
+                        <Play className="h-6 w-6 text-white fill-white ms-0.5" />
                       </div>
                     </div>
                     {/* Platform badge */}
                     <div className={cn(
-                      "absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-medium",
+                      "absolute top-2 start-2 px-2 py-0.5 rounded text-xs font-medium",
                       videoPlatform === 'youtube' 
                         ? "bg-red-600 text-white" 
                         : "bg-[#1ab7ea] text-white"
@@ -327,12 +327,12 @@ export function SharedUrlActionSheet({
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder={metadata?.title || domain}
-                  className="pr-8"
+                  className="pe-8"
                 />
                 {editTitle && (
                   <button
                     onClick={() => setEditTitle('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted"
+                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted"
                   >
                     <X className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
@@ -348,12 +348,12 @@ export function SharedUrlActionSheet({
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder={t('sharedUrl.addNote')}
-                  className="min-h-[60px] resize-none pr-8"
+                  className="min-h-[60px] resize-none pe-8"
                 />
                 {editDescription && (
                   <button
                     onClick={() => setEditDescription('')}
-                    className="absolute right-2 top-2 p-1 rounded-full hover:bg-muted"
+                    className="absolute end-2 top-2 p-1 rounded-full hover:bg-muted"
                   >
                     <X className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
