@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Zap, WifiOff } from 'lucide-react';
 import { ContentSourcePicker, ContactMode } from '@/components/ContentSourcePicker';
 import { UrlInput } from '@/components/UrlInput';
@@ -60,6 +61,7 @@ export function AccessFlow({
   const [showBookmarkPicker, setShowBookmarkPicker] = useState(false);
   const processedInitialUrlRef = useRef<string | null>(null);
 
+  const { t } = useTranslation();
   const { createShortcut, createContactShortcut } = useShortcuts();
   const { toast } = useToast();
   const { settings } = useSettings();
@@ -282,7 +284,7 @@ export function AccessFlow({
             <div className="bg-muted/80 border-b border-border px-5 py-2 flex items-center gap-2">
               <WifiOff className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
-                You're offline. Some features may be limited.
+                {t('access.offline')}
               </span>
             </div>
           )}
@@ -291,7 +293,7 @@ export function AccessFlow({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary" />
-                <h1 className="text-xl font-semibold text-foreground">Access</h1>
+                <h1 className="text-xl font-semibold text-foreground">{t('access.title')}</h1>
               </div>
               <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
             </div>

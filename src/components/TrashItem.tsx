@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2, RotateCcw, Clock, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ const SWIPE_THRESHOLD = 80;
 const SWIPE_ACTION_THRESHOLD = 120;
 
 export function TrashItem({ link, onRestore, onDelete }: TrashItemProps) {
+  const { t } = useTranslation();
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isUrlExpanded, setIsUrlExpanded] = useState(false);
@@ -196,10 +198,10 @@ export function TrashItem({ link, onRestore, onDelete }: TrashItemProps) {
             >
               <Clock className="h-3 w-3" />
               {daysRemaining === 0
-                ? 'Expires today'
+                ? t('trash.expiresToday')
                 : daysRemaining === 1
-                ? 'Expires tomorrow'
-                : `${daysRemaining} days left`}
+                ? t('trash.expiresTomorrow')
+                : t('trash.daysLeft', { days: daysRemaining })}
             </span>
           </div>
         </div>

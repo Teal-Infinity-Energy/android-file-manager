@@ -1,5 +1,6 @@
 // Scheduled Timing Picker - select date, time, and recurrence
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Clock, Calendar, CalendarDays, CalendarClock, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -25,9 +26,9 @@ export function ScheduledTimingPicker({
   initialRecurrence,
   initialAnchor,
 }: ScheduledTimingPickerProps) {
+  const { t } = useTranslation();
   const now = new Date();
   
-  // Convert to 12-hour format for display
   const to12Hour = (h24: number) => {
     if (h24 === 0) return 12;
     if (h24 > 12) return h24 - 12;
@@ -104,10 +105,10 @@ export function ScheduledTimingPicker({
   };
 
   const recurrenceOptions: { type: RecurrenceType; label: string; icon: React.ReactNode }[] = [
-    { type: 'once', label: 'Once', icon: <Clock className="h-4 w-4" /> },
-    { type: 'daily', label: 'Daily', icon: <Calendar className="h-4 w-4" /> },
-    { type: 'weekly', label: 'Weekly', icon: <CalendarDays className="h-4 w-4" /> },
-    { type: 'yearly', label: 'Yearly', icon: <CalendarClock className="h-4 w-4" /> },
+    { type: 'once', label: t('scheduledTiming.once'), icon: <Clock className="h-4 w-4" /> },
+    { type: 'daily', label: t('scheduledTiming.daily'), icon: <Calendar className="h-4 w-4" /> },
+    { type: 'weekly', label: t('scheduledTiming.weekly'), icon: <CalendarDays className="h-4 w-4" /> },
+    { type: 'yearly', label: t('scheduledTiming.yearly'), icon: <CalendarClock className="h-4 w-4" /> },
   ];
 
   // Simple date picker (next 14 days)
@@ -127,8 +128,8 @@ export function ScheduledTimingPicker({
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+    if (date.toDateString() === today.toDateString()) return t('scheduledTiming.today');
+    if (date.toDateString() === tomorrow.toDateString()) return t('scheduledTiming.tomorrow');
     return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
@@ -142,14 +143,14 @@ export function ScheduledTimingPicker({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h2 className="text-lg font-semibold">When to trigger</h2>
+        <h2 className="text-lg font-semibold">{t('scheduledTiming.whenToTrigger')}</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8">
         {/* Recurrence selector */}
         <div>
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 block">
-            Repeat
+            {t('scheduledTiming.repeat')}
           </Label>
           <div className="grid grid-cols-4 gap-2">
             {recurrenceOptions.map(({ type, label, icon }) => (
@@ -174,7 +175,7 @@ export function ScheduledTimingPicker({
         {recurrence !== 'daily' && (
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 block">
-              {recurrence === 'once' ? 'Date' : recurrence === 'weekly' ? 'Starting' : 'This year on'}
+              {recurrence === 'once' ? t('scheduledTiming.date') : recurrence === 'weekly' ? t('scheduledTiming.starting') : t('scheduledTiming.thisYearOn')}
             </Label>
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide">
               {dateOptions.map((date) => (
@@ -201,7 +202,7 @@ export function ScheduledTimingPicker({
         {/* Time picker */}
         <div>
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 block">
-            Time
+            {t('scheduledTiming.time')}
           </Label>
           <div className="flex items-center justify-center gap-2">
             {/* Hour */}
@@ -274,7 +275,7 @@ export function ScheduledTimingPicker({
 
         {/* Preview */}
         <div className="rounded-2xl bg-muted/30 p-4 text-center">
-          <p className="text-sm text-muted-foreground mb-1">Will trigger</p>
+          <p className="text-sm text-muted-foreground mb-1">{t('scheduledTiming.willTrigger')}</p>
           <p className="font-medium">
             {new Date(triggerTime).toLocaleString(undefined, {
               weekday: 'short',
@@ -287,7 +288,7 @@ export function ScheduledTimingPicker({
           </p>
           {recurrence !== 'once' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Then repeats {recurrence}
+              {t('scheduledTiming.thenRepeats', { frequency: t(`scheduledTiming.${recurrence}`) })}
             </p>
           )}
         </div>
@@ -299,7 +300,7 @@ export function ScheduledTimingPicker({
           onClick={handleConfirm}
           className="w-full h-12 rounded-2xl text-base"
         >
-          Continue
+          {t('common.continue')}
         </Button>
       </div>
     </div>

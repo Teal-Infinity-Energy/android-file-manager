@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Star, Trash2, Plus, X, Edit2, Tag, Bookmark, ArrowRight, Globe } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ interface SavedLinksSheetProps {
 }
 
 export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookmarks }: SavedLinksSheetProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [links, setLinks] = useState<SavedLink[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -148,7 +150,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
         <SheetHeader className="pb-2">
           <SheetTitle className="flex items-center gap-2">
             <Star className="h-5 w-5 text-primary" />
-            Saved Links
+            {t('savedLinks.title')}
           </SheetTitle>
         </SheetHeader>
 
@@ -158,7 +160,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search saved links..."
+            placeholder={t('savedLinks.searchPlaceholder')}
             className="pl-10 pr-10"
           />
           {searchQuery && (
@@ -166,7 +168,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
               type="button"
               onClick={() => setSearchQuery('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
+              aria-label={t('library.clearSearch')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -185,7 +187,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              All
+              {t('library.all')}
             </button>
             {availableTags.map(tag => (
               <button
@@ -209,7 +211,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
           <div className="mb-4 p-4 rounded-xl bg-muted/50 animate-fade-in">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium">
-                {editingLink ? 'Edit Link' : 'Add New Link'}
+                {editingLink ? t('savedLinks.editLink') : t('savedLinks.addNew')}
               </span>
               <button 
                 onClick={resetForm}
@@ -224,7 +226,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                 <Input
                   value={newUrl}
                   onChange={(e) => setNewUrl(e.target.value)}
-                  placeholder="URL (e.g., youtube.com)"
+                  placeholder={t('savedLinks.urlPlaceholder')}
                   className="pr-10"
                   autoFocus
                 />
@@ -233,7 +235,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                     type="button"
                     onClick={() => setNewUrl('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-                    aria-label="Clear URL"
+                    aria-label={t('common.clearText')}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -245,7 +247,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
               <Input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Title (optional)"
+                placeholder={t('savedLinks.titlePlaceholder')}
                 className="pr-10"
                 autoFocus={!!editingLink}
               />
@@ -254,7 +256,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                   type="button"
                   onClick={() => setNewTitle('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-                  aria-label="Clear title"
+                  aria-label={t('common.clearTitle')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -265,7 +267,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
               <Textarea
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Description (optional)"
+                placeholder={t('savedLinks.descriptionPlaceholder')}
                 className="resize-none pr-10"
                 rows={2}
                 maxLength={200}
@@ -275,7 +277,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                   type="button"
                   onClick={() => setNewDescription('')}
                   className="absolute right-3 top-3 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-                  aria-label="Clear description"
+                  aria-label={t('common.clearText')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -286,7 +288,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
             <div className="mb-3">
               <div className="flex items-center gap-2 mb-2">
                 <Tag className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Tag (optional)</span>
+                <span className="text-xs text-muted-foreground">{t('savedLinks.tagOptional')}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {PRESET_TAGS.map(tag => (
@@ -311,7 +313,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
               disabled={!editingLink && !newUrl.trim()} 
               className="w-full"
             >
-              {editingLink ? 'Update Link' : 'Save Link'}
+              {editingLink ? t('savedLinks.updateLink') : t('savedLinks.saveLink')}
             </Button>
           </div>
         ) : (
@@ -325,7 +327,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
             )}
           >
             <Plus className="h-4 w-4" />
-            <span className="text-sm font-medium">Add New Link</span>
+            <span className="text-sm font-medium">{t('savedLinks.addNew')}</span>
           </button>
         )}
 
@@ -348,9 +350,9 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                 </div>
               </div>
               
-              <h3 className="text-foreground font-medium mb-1">No bookmarks yet</h3>
+              <h3 className="text-foreground font-medium mb-1">{t('savedLinks.noBookmarks')}</h3>
               <p className="text-muted-foreground/70 text-sm text-center max-w-[220px] mb-5">
-                Save links in your Bookmarks library first, then create shortcuts from them here.
+                {t('savedLinks.noBookmarksDesc')}
               </p>
               
               {onGoToBookmarks && (
@@ -361,7 +363,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
                   }}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.98] transition-all"
                 >
-                  Go to Bookmarks
+                  {t('savedLinks.goToBookmarks')}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               )}
@@ -369,7 +371,7 @@ export function SavedLinksSheet({ open, onOpenChange, onSelectLink, onGoToBookma
           ) : filteredLinks.length === 0 ? (
             // No results for current filter/search
             <div className="text-center py-12 text-muted-foreground">
-              <p>No links match your filter</p>
+              <p>{t('savedLinks.noMatch')}</p>
             </div>
           ) : (
             <div className="space-y-2 pb-6">
