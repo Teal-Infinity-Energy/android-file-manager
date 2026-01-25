@@ -8,6 +8,7 @@ import {
   Clipboard, 
   AlertTriangle,
 } from 'lucide-react';
+import { LanguagePicker } from './LanguagePicker';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -44,6 +45,7 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
   const [open, setOpen] = useState(false);
   const [trashCount, setTrashCount] = useState(getTrashCount());
   const [expiringCount, setExpiringCount] = useState(0);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings } = useSettings();
   
@@ -181,6 +183,14 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
                 </Button>
               ))}
             </div>
+          </div>
+
+          {/* Language Selection */}
+          <div className="px-3 mb-2">
+            <LanguagePicker 
+              open={languagePickerOpen} 
+              onOpenChange={setLanguagePickerOpen} 
+            />
           </div>
           
           {/* Clipboard Detection Toggle */}
