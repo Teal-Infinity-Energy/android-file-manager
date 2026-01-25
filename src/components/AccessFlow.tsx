@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, WifiOff } from 'lucide-react';
+import { Zap, WifiOff } from 'lucide-react';
 import { ContentSourcePicker, ContactMode } from '@/components/ContentSourcePicker';
 import { UrlInput } from '@/components/UrlInput';
 import { ShortcutCustomizer } from '@/components/ShortcutCustomizer';
@@ -9,20 +9,17 @@ import { ClipboardSuggestion } from '@/components/ClipboardSuggestion';
 import { AppMenu } from '@/components/AppMenu';
 import { TrashSheet } from '@/components/TrashSheet';
 import { SavedLinksSheet } from '@/components/SavedLinksSheet';
-import { ScheduledActionsList } from '@/components/ScheduledActionsList';
-import { ScheduledActionCreator } from '@/components/ScheduledActionCreator';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { useClipboardDetection } from '@/hooks/useClipboardDetection';
 import { useSettings } from '@/hooks/useSettings';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
-import { useScheduledActions } from '@/hooks/useScheduledActions';
 import { useSheetBackHandler } from '@/hooks/useSheetBackHandler';
 import { useToast } from '@/hooks/use-toast';
 import { pickFile, FileTypeFilter } from '@/lib/contentResolver';
 import { createHomeScreenShortcut } from '@/lib/shortcutManager';
 import type { ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
 
-export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success' | 'scheduled-list' | 'scheduled-create';
+export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success';
 export type ContentSourceType = 'url' | 'file' | null;
 
 interface ContactData {
@@ -67,23 +64,17 @@ export function AccessFlow({
   const { toast } = useToast();
   const { settings } = useSettings();
   const { isOnline } = useNetworkStatus();
-  const { activeCount: scheduledCount } = useScheduledActions();
 
   // Auto-detect clipboard URL (only on source screen and if enabled in settings)
   const clipboardEnabled = step === 'source' && settings.clipboardDetectionEnabled;
   const { detectedUrl, dismissDetection } = useClipboardDetection(clipboardEnabled);
 
-  // Scheduled actions state
-  const [showScheduledList, setShowScheduledList] = useState(false);
-
   // Register sheets with back button handler
   const handleCloseTrash = useCallback(() => setIsTrashOpen(false), []);
   const handleCloseBookmarkPicker = useCallback(() => setShowBookmarkPicker(false), []);
-  const handleCloseScheduledList = useCallback(() => setShowScheduledList(false), []);
   
   useSheetBackHandler('access-trash-sheet', isTrashOpen, handleCloseTrash);
   useSheetBackHandler('access-bookmark-picker', showBookmarkPicker, handleCloseBookmarkPicker);
-  useSheetBackHandler('access-scheduled-list', showScheduledList, handleCloseScheduledList);
 
   // Notify parent of step changes
   useEffect(() => {
@@ -276,23 +267,9 @@ export function AccessFlow({
       case 'success':
         handleReset();
         break;
-      case 'scheduled-create':
-        setStep('source');
-        break;
       default:
         break;
     }
-  };
-
-  // Scheduled action handlers
-  const handleOpenScheduledList = () => setShowScheduledList(true);
-  const handleCreateScheduled = () => {
-    setShowScheduledList(false);
-    setStep('scheduled-create');
-  };
-  const handleScheduledComplete = () => {
-    setStep('source');
-    setShowScheduledList(true); // Show the list after creation
   };
 
 
@@ -310,27 +287,20 @@ export function AccessFlow({
             </div>
           )}
 
-          <header className="px-5 pt-8 pb-6">
-            <div className="flex items-center justify-between mb-4">
+          <header className="px-5 pt-8 pb-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Plus className="h-4 w-4 text-primary-foreground" />
-                </div>
-                <span className="text-sm font-medium text-muted-foreground tracking-wide">OneTap</span>
+                <Zap className="h-5 w-5 text-primary" />
+                <h1 className="text-xl font-semibold text-foreground">Access</h1>
               </div>
               <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
             </div>
-            <h1 className="text-2xl font-semibold text-foreground leading-tight tracking-tight">
-              One tap to what matters
-            </h1>
           </header>
           <ContentSourcePicker
             onSelectFile={handleSelectFile}
             onSelectContact={handleSelectContact}
             onSelectFromLibrary={handleSelectFromLibrary}
             onEnterUrl={handleEnterUrl}
-            onOpenScheduled={handleOpenScheduledList}
-            scheduledCount={scheduledCount}
           />
 
           {/* Clipboard URL auto-detection */}
@@ -375,13 +345,6 @@ export function AccessFlow({
         />
       )}
 
-      {step === 'scheduled-create' && (
-        <ScheduledActionCreator
-          onComplete={handleScheduledComplete}
-          onBack={handleGoBack}
-        />
-      )}
-
       {/* Trash Sheet (controlled from menu) */}
       <TrashSheet 
         open={isTrashOpen} 
@@ -394,14 +357,6 @@ export function AccessFlow({
         onOpenChange={setShowBookmarkPicker}
         onSelectLink={handleBookmarkSelected}
         onGoToBookmarks={onGoToBookmarks}
-      />
-
-      {/* Scheduled Actions List Sheet */}
-      <ScheduledActionsList
-        isOpen={showScheduledList}
-        onClose={() => setShowScheduledList(false)}
-        onCreateNew={handleCreateScheduled}
-        onGoToNotifications={onGoToNotifications}
       />
     </>
   );
