@@ -92,7 +92,9 @@
     "clipboardDescription": "URL कॉपी होने पर सुझाव दिखाएं",
     "language": "भाषा",
     "privacy": "प्राइवेसी पॉलिसी",
-    "about": "के बारे में"
+    "about": "के बारे में",
+    "resetOnboarding": "ऑनबोर्डिंग रीसेट करें",
+    "resetOnboardingDescription": "भाषा चयन और परिचय फिर से अनुभव करें"
   },
   "common": {
     "save": "सेव करें",

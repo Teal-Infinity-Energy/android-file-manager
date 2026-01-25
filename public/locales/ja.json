@@ -92,7 +92,9 @@
     "clipboardDescription": "URLがコピーされたときに提案を表示",
     "language": "言語",
     "privacy": "プライバシーポリシー",
-    "about": "について"
+    "about": "について",
+    "resetOnboarding": "オンボーディングをリセット",
+    "resetOnboardingDescription": "言語選択と紹介を再体験"
   },
   "common": {
     "save": "保存",

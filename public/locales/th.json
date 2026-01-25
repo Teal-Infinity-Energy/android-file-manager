@@ -92,7 +92,9 @@
     "clipboardDescription": "แสดงคำแนะนำเมื่อคัดลอก URL",
     "language": "ภาษา",
     "privacy": "นโยบายความเป็นส่วนตัว",
-    "about": "เกี่ยวกับ"
+    "about": "เกี่ยวกับ",
+    "resetOnboarding": "รีเซ็ตการแนะนำ",
+    "resetOnboardingDescription": "สัมผัสการเลือกภาษาและการแนะนำอีกครั้ง"
   },
   "common": {
     "save": "บันทึก",

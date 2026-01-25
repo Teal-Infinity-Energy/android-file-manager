@@ -92,7 +92,9 @@
     "clipboardDescription": "عرض اقتراحات عند نسخ رابط",
     "language": "اللغة",
     "privacy": "سياسة الخصوصية",
-    "about": "حول"
+    "about": "حول",
+    "resetOnboarding": "إعادة تعيين المقدمة",
+    "resetOnboardingDescription": "أعد تجربة اختيار اللغة والمقدمة"
   },
   "common": {
     "save": "حفظ",

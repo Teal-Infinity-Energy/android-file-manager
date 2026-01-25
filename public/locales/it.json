@@ -92,7 +92,9 @@
     "clipboardDescription": "Mostra suggerimenti quando viene copiato un URL",
     "language": "Lingua",
     "privacy": "Informativa sulla privacy",
-    "about": "Informazioni"
+    "about": "Informazioni",
+    "resetOnboarding": "Reimposta introduzione",
+    "resetOnboardingDescription": "Rivivi la selezione lingua e l'introduzione"
   },
   "common": {
     "save": "Salva",
