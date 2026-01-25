@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import type { ShortcutData, ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
+import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 
 const STORAGE_KEY = 'quicklaunch_shortcuts';
 
@@ -13,10 +15,32 @@ export function useShortcuts() {
     }
   });
 
+  // Sync shortcuts to Android widgets when data changes
+  const syncToWidgets = useCallback(async (data: ShortcutData[]) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await ShortcutPlugin.syncWidgetData({ 
+          shortcuts: JSON.stringify(data) 
+        });
+        console.log('[useShortcuts] Synced shortcuts to widgets');
+      } catch (error) {
+        console.error('[useShortcuts] Failed to sync to widgets:', error);
+      }
+    }
+  }, []);
+
   const saveShortcuts = useCallback((data: ShortcutData[]) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setShortcuts(data);
-  }, []);
+    
+    // Sync to Android widgets
+    syncToWidgets(data);
+  }, [syncToWidgets]);
+
+  // Initial sync on mount
+  useEffect(() => {
+    syncToWidgets(shortcuts);
+  }, []); // Only on mount
 
   const createShortcut = useCallback((
     source: ContentSource,

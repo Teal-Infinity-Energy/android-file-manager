@@ -317,4 +317,27 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     );
     return { success: true };
   }
+
+  // ========== Widget Support (Web Fallback) ==========
+
+  async syncWidgetData(options: { shortcuts: string }): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] syncWidgetData called (web fallback)', 
+      'shortcuts count:', JSON.parse(options.shortcuts || '[]').length);
+    // No-op on web - widgets are Android-only
+    return { success: true };
+  }
+
+  async refreshWidgets(): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] refreshWidgets called (web fallback)');
+    // No-op on web - widgets are Android-only
+    return { success: true };
+  }
+
+  async checkQuickCreateIntent(): Promise<{ quickCreate: boolean }> {
+    console.log('[ShortcutPluginWeb] checkQuickCreateIntent called (web fallback)');
+    // On web, check for URL parameter
+    const url = new URL(window.location.href);
+    const quickCreate = url.searchParams.get('quickCreate') === 'true';
+    return { quickCreate };
+  }
 }

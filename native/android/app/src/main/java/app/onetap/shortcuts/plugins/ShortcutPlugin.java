@@ -58,6 +58,11 @@ import app.onetap.shortcuts.PDFProxyActivity;
 import app.onetap.shortcuts.VideoProxyActivity;
 import app.onetap.shortcuts.ScheduledActionReceiver;
 import app.onetap.shortcuts.NotificationHelper;
+import app.onetap.shortcuts.FavoritesWidget;
+import app.onetap.shortcuts.MainActivity;
+import android.content.SharedPreferences;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 
 @CapacitorPlugin(
     name = "ShortcutPlugin",
@@ -2239,6 +2244,132 @@ public class ShortcutPlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("success", false);
             result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    // ========== Widget Support ==========
+
+    /**
+     * Sync shortcut data to Android widgets.
+     * Stores shortcuts JSON in SharedPreferences for widget access.
+     */
+    @PluginMethod
+    public void syncWidgetData(PluginCall call) {
+        String shortcutsJson = call.getString("shortcuts", "[]");
+        
+        android.util.Log.d("ShortcutPlugin", "syncWidgetData called, data length: " + shortcutsJson.length());
+
+        try {
+            Context context = getContext();
+            if (context == null) {
+                JSObject result = new JSObject();
+                result.put("success", false);
+                result.put("error", "Context is null");
+                call.resolve(result);
+                return;
+            }
+
+            // Store in SharedPreferences for widget access
+            SharedPreferences prefs = context.getSharedPreferences("widget_data", Context.MODE_PRIVATE);
+            prefs.edit().putString("shortcuts", shortcutsJson).apply();
+
+            // Notify widgets of data change
+            FavoritesWidget.refreshAllWidgets(context);
+
+            android.util.Log.d("ShortcutPlugin", "Widget data synced successfully");
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error syncing widget data: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    /**
+     * Refresh all home screen widgets.
+     */
+    @PluginMethod
+    public void refreshWidgets(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "refreshWidgets called");
+
+        try {
+            Context context = getContext();
+            if (context == null) {
+                JSObject result = new JSObject();
+                result.put("success", false);
+                result.put("error", "Context is null");
+                call.resolve(result);
+                return;
+            }
+
+            // Refresh Favorites widgets
+            FavoritesWidget.refreshAllWidgets(context);
+
+            // Refresh Quick Create widgets
+            AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+            ComponentName quickCreateWidget = new ComponentName(context, 
+                context.getPackageName() + ".QuickCreateWidget");
+            int[] quickCreateIds = appWidgetManager.getAppWidgetIds(quickCreateWidget);
+            if (quickCreateIds.length > 0) {
+                Intent updateIntent = new Intent(context, 
+                    Class.forName(context.getPackageName() + ".QuickCreateWidget"));
+                updateIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+                updateIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, quickCreateIds);
+                context.sendBroadcast(updateIntent);
+            }
+
+            android.util.Log.d("ShortcutPlugin", "Widgets refreshed");
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error refreshing widgets: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    /**
+     * Check if the app was launched from the Quick Create widget.
+     */
+    @PluginMethod
+    public void checkQuickCreateIntent(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "checkQuickCreateIntent called");
+
+        try {
+            Activity activity = getActivity();
+            if (activity instanceof MainActivity) {
+                MainActivity mainActivity = (MainActivity) activity;
+                boolean quickCreate = mainActivity.hasPendingQuickCreate();
+                
+                // Clear the flag after checking
+                if (quickCreate) {
+                    mainActivity.clearPendingQuickCreate();
+                }
+                
+                android.util.Log.d("ShortcutPlugin", "Quick create intent: " + quickCreate);
+
+                JSObject result = new JSObject();
+                result.put("quickCreate", quickCreate);
+                call.resolve(result);
+            } else {
+                JSObject result = new JSObject();
+                result.put("quickCreate", false);
+                call.resolve(result);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error checking quick create intent: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("quickCreate", false);
             call.resolve(result);
         }
     }

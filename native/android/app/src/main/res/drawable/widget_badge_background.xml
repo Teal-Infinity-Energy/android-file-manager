@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Badge background for the plus indicator on Quick Create widget -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    
+    <!-- Accent color -->
+    <solid android:color="#8b5cf6" />
+    
+</shape>
