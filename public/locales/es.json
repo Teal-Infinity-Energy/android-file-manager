@@ -3,6 +3,11 @@
     "name": "OneTap",
     "tagline": "Un toque a lo que importa"
   },
+  "menu": {
+    "title": "Menú",
+    "trash": "Papelera",
+    "settings": "Configuración"
+  },
   "onboarding": {
     "skip": "Omitir",
     "next": "Siguiente",
@@ -77,7 +82,7 @@
     "appearance": "Apariencia",
     "light": "Claro",
     "dark": "Oscuro",
-    "system": "Sistema",
+    "system": "Auto",
     "clipboardDetection": "Detección de URL del portapapeles",
     "clipboardDescription": "Mostrar sugerencias cuando se copia una URL",
     "language": "Idioma",

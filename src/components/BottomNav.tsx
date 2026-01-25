@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Zap, Bell, Bookmark, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +13,8 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, hasActiveActions }: BottomNavProps) {
+  const { t } = useTranslation();
+  
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border safe-bottom z-50">
       <div className="flex items-center justify-around h-14">
@@ -28,7 +31,7 @@ export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, ha
             "h-5 w-5 transition-all",
             activeTab === 'access' && "fill-current"
           )} />
-          <span className="text-[10px] font-medium">Access</span>
+          <span className="text-[10px] font-medium">{t('tabs.access')}</span>
         </button>
         
         <button
@@ -49,7 +52,7 @@ export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, ha
               <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
             )}
           </div>
-          <span className="text-[10px] font-medium">Notifications</span>
+          <span className="text-[10px] font-medium">{t('tabs.notifications')}</span>
         </button>
         
         <button
@@ -70,7 +73,7 @@ export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, ha
               <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
             )}
           </div>
-          <span className="text-[10px] font-medium">Bookmarks</span>
+          <span className="text-[10px] font-medium">{t('tabs.bookmarks')}</span>
         </button>
 
         <button
@@ -91,7 +94,7 @@ export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, ha
               <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500" />
             )}
           </div>
-          <span className="text-[10px] font-medium">Profile</span>
+          <span className="text-[10px] font-medium">{t('tabs.profile')}</span>
         </button>
       </div>
     </nav>

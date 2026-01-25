@@ -3,6 +3,11 @@
     "name": "OneTap",
     "tagline": "एक टैप में जो मायने रखता है"
   },
+  "menu": {
+    "title": "मेन्यू",
+    "trash": "ट्रैश",
+    "settings": "सेटिंग्स"
+  },
   "onboarding": {
     "skip": "छोड़ें",
     "next": "आगे",
@@ -77,7 +82,7 @@
     "appearance": "अपीयरेंस",
     "light": "लाइट",
     "dark": "डार्क",
-    "system": "सिस्टम",
+    "system": "ऑटो",
     "clipboardDetection": "क्लिपबोर्ड URL डिटेक्शन",
     "clipboardDescription": "URL कॉपी होने पर सुझाव दिखाएं",
     "language": "भाषा",
