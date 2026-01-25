@@ -1,5 +1,6 @@
 // Scheduled Action Creator - multi-step flow for creating a scheduled action
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,7 @@ export function ScheduledActionCreator({
   onBack,
   initialDestination 
 }: ScheduledActionCreatorProps) {
+  const { t } = useTranslation();
   const { createScheduledAction, requestPermissions } = useScheduledActions();
   const { toast } = useToast();
   const [step, setStep] = useState<CreatorStep>(initialDestination ? 'timing' : 'destination');
@@ -493,7 +495,7 @@ export function ScheduledActionCreator({
                     minute: '2-digit',
                     hour12: true,
                   })}
-                  {timing.recurrence !== 'once' && ` · Repeats ${timing.recurrence}`}
+                  {timing.recurrence !== 'once' && ` · ${t('scheduledActions.repeats', { frequency: timing.recurrence })}`}
                 </p>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Plus, X, Bookmark, Trash2, Home, LayoutGrid, List, FolderInput, Clock, SortDesc, ArrowDownAZ, ArrowUpZA, Folder, ArrowDownUp, Edit2, GripVertical, Link2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -88,6 +89,7 @@ export function BookmarkLibrary({
   onSelectionModeChange, 
   clearSelectionSignal,
 }: BookmarkLibraryProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [links, setLinks] = useState<SavedLink[]>([]);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
@@ -598,7 +600,7 @@ export function BookmarkLibrary({
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <Bookmark className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-sm font-medium text-muted-foreground tracking-wide">Bookmarks</span>
+            <span className="text-sm font-medium text-muted-foreground tracking-wide">{t('library.bookmarks')}</span>
           </div>
           <div className="flex items-center gap-2">
             <TooltipProvider>
@@ -615,11 +617,11 @@ export function BookmarkLibrary({
                     )}
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Add
+                    {t('library.add')}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-[200px] text-center">
-                  <p>You can also add bookmarks by sharing any URL to this app</p>
+                  <p>{t('library.addTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -627,7 +629,7 @@ export function BookmarkLibrary({
           </div>
         </div>
         <h1 className="text-2xl font-semibold text-foreground leading-tight tracking-tight">
-          Your saved links
+          {t('library.yourSavedLinks')}
         </h1>
         
         {/* View Mode Toggle */}
@@ -647,10 +649,10 @@ export function BookmarkLibrary({
                       )}
                     >
                       <List className="h-3.5 w-3.5" />
-                      List
+                      {t('library.list')}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>View all bookmarks in a single list</TooltipContent>
+                  <TooltipContent>{t('library.listTooltip')}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -664,10 +666,10 @@ export function BookmarkLibrary({
                       )}
                     >
                       <LayoutGrid className="h-3.5 w-3.5" />
-                      Folders
+                      {t('library.folders')}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Organize bookmarks by folder</TooltipContent>
+                  <TooltipContent>{t('library.foldersTooltip')}</TooltipContent>
                 </Tooltip>
               </div>
             </TooltipProvider>
@@ -682,7 +684,7 @@ export function BookmarkLibrary({
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search bookmarks..."
+            placeholder={t('library.search')}
             className="pl-10 pr-10"
           />
           {searchQuery && (
@@ -697,7 +699,7 @@ export function BookmarkLibrary({
                     <X className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Clear search</TooltipContent>
+                <TooltipContent>{t('library.clearSearch')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
@@ -715,8 +717,8 @@ export function BookmarkLibrary({
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             )}
-          >
-            All
+            >
+              {t('library.all')}
             <span className={cn(
               "px-1.5 py-0.5 rounded-full text-[10px] font-semibold min-w-[20px] text-center",
               activeTagFilter === null
@@ -760,7 +762,7 @@ export function BookmarkLibrary({
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              Uncategorized
+              {t('library.uncategorized')}
               <span className={cn(
                 "px-1.5 py-0.5 rounded-full text-[10px] font-semibold min-w-[20px] text-center",
                 activeTagFilter === '__uncategorized__'
@@ -814,9 +816,9 @@ export function BookmarkLibrary({
           </div>
           
           {/* Text content */}
-          <h3 className="text-foreground font-medium mb-1">No bookmarks yet</h3>
+          <h3 className="text-foreground font-medium mb-1">{t('library.empty')}</h3>
           <p className="text-muted-foreground/70 text-sm text-center max-w-[240px] mb-6">
-            Save links by sharing them to this app or tap the button below
+            {t('library.emptyDescription')}
           </p>
           
           {/* Add button */}
@@ -828,7 +830,7 @@ export function BookmarkLibrary({
             className="flex items-center justify-center gap-2 w-full max-w-xs py-4 border-2 border-dashed border-muted-foreground/30 rounded-xl text-muted-foreground hover:border-primary/50 hover:text-primary hover:scale-[1.02] transition-all duration-200"
           >
             <Plus className="h-5 w-5" />
-            <span className="text-sm font-medium">Add your first bookmark</span>
+            <span className="text-sm font-medium">{t('library.addFirst')}</span>
           </button>
         </div>
       )}
@@ -839,7 +841,7 @@ export function BookmarkLibrary({
           <TooltipProvider delayDuration={0}>
             <div className="flex items-center gap-1.5 select-none">
               <span className="text-xs text-muted-foreground shrink-0">
-                {sortMode === 'manual' ? 'Manual' : 'Sort:'}
+                {sortMode === 'manual' ? t('library.sortManual') : t('library.sort')}
               </span>
               
               {/* Newest First */}
@@ -856,11 +858,11 @@ export function BookmarkLibrary({
                     )}
                   >
                     <SortDesc className="h-3.5 w-3.5 pointer-events-none" />
-                    <span className="hidden xs:inline">Newest</span>
+                    <span className="hidden xs:inline">{t('library.sortNewest')}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{sortMode === 'newest' ? 'Click to enable manual ordering' : 'Sort by newest first'}</p>
+                  <p>{sortMode === 'newest' ? t('library.clickForManual') : t('library.sortNewestTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
               
@@ -878,11 +880,11 @@ export function BookmarkLibrary({
                     )}
                   >
                     <ArrowDownAZ className="h-3.5 w-3.5 pointer-events-none" />
-                    A-Z
+                    {t('library.sortAZ')}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{sortMode === 'alphabetical' ? 'Click to enable manual ordering' : 'Sort alphabetically by title'}</p>
+                  <p>{sortMode === 'alphabetical' ? t('library.clickForManual') : t('library.sortAZTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
               
@@ -900,11 +902,11 @@ export function BookmarkLibrary({
                     )}
                   >
                     <Folder className="h-3.5 w-3.5 pointer-events-none" />
-                    <span className="hidden xs:inline">Folder</span>
+                    <span className="hidden xs:inline">{t('library.sortFolder')}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{sortMode === 'folder' ? 'Click to enable manual ordering' : 'Group by folder, then by date'}</p>
+                  <p>{sortMode === 'folder' ? t('library.clickForManual') : t('library.sortFolderTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
               
@@ -928,11 +930,11 @@ export function BookmarkLibrary({
                       "h-3.5 w-3.5 transition-transform pointer-events-none",
                       sortReversed && "rotate-180"
                     )} />
-                    <span className="hidden xs:inline">{sortReversed ? 'Reversed' : 'Reverse'}</span>
+                    <span className="hidden xs:inline">{sortReversed ? t('library.reversed') : t('library.reverse')}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{sortReversed ? 'Click to restore normal order' : 'Click to reverse sort order'}</p>
+                  <p>{sortReversed ? t('library.clickToRestore') : t('library.clickToReverse')}</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -946,7 +948,7 @@ export function BookmarkLibrary({
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
             <GripVertical className="h-4 w-4 text-primary/70" />
             <span className="text-xs text-primary font-medium">
-              Manual ordering mode — drag items to reorder
+              {t('library.manualOrderHint')}
             </span>
           </div>
         </div>
@@ -975,7 +977,7 @@ export function BookmarkLibrary({
       >
         {filteredLinks.length === 0 && (searchQuery || activeTagFilter) ? (
           <div className="text-center py-12 text-muted-foreground">
-            <p>No bookmarks match your filter</p>
+            <p>{t('library.noMatch')}</p>
           </div>
         ) : filteredLinks.length > 0 ? (
           <>
@@ -991,8 +993,8 @@ export function BookmarkLibrary({
                   />
                   <span className="text-sm text-muted-foreground">
                     {allFilteredShortlisted 
-                      ? `Deselect all (${filteredLinks.length})` 
-                      : `Select all (${filteredLinks.length})`}
+                      ? `${t('library.deselectAll')} (${filteredLinks.length})` 
+                      : `${t('library.selectAll')} (${filteredLinks.length})`}
                   </span>
                 </div>
                 <TooltipProvider delayDuration={0}>
@@ -1006,10 +1008,10 @@ export function BookmarkLibrary({
                         className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
                       >
                         <X className="h-3.5 w-3.5" />
-                        Clear
+                        {t('library.clear')}
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent>Clear selection and exit selection mode</TooltipContent>
+                    <TooltipContent>{t('library.clearTooltip')}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
@@ -1062,7 +1064,7 @@ export function BookmarkLibrary({
                 {activeTagFilter === '__uncategorized__' ? (
                   <BookmarkFolderSection
                     key="uncategorized"
-                    title="Uncategorized"
+                    title={t('library.uncategorized')}
                     folderId="uncategorized"
                     links={groupedLinks.uncategorized}
                     onBookmarkTap={handleBookmarkTap}
@@ -1120,7 +1122,7 @@ export function BookmarkLibrary({
                     ))}
                     
                     <BookmarkFolderSection
-                      title="Uncategorized"
+                      title={t('library.uncategorized')}
                       folderId="uncategorized"
                       links={groupedLinks.uncategorized}
                       onBookmarkTap={handleBookmarkTap}
@@ -1179,7 +1181,7 @@ export function BookmarkLibrary({
         )}
       >
         <span className="text-sm font-medium text-foreground mr-2">
-          {shortlistedLinks.length} selected
+          {t('library.selected', { count: shortlistedLinks.length })}
         </span>
         
         <div className="h-5 w-px bg-border" />
@@ -1190,13 +1192,13 @@ export function BookmarkLibrary({
               <button
                 onClick={() => setShowBulkMoveDialog(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-                aria-label="Move to folder"
+                aria-label={t('library.moveToFolder')}
               >
                 <FolderInput className="h-4 w-4" />
-                <span className="hidden sm:inline">Move</span>
+                <span className="hidden sm:inline">{t('library.move')}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent>Move selected to folder</TooltipContent>
+            <TooltipContent>{t('library.moveToFolderTooltip')}</TooltipContent>
           </Tooltip>
           
           {shortlistedLinks.length === 1 && (
@@ -1210,26 +1212,26 @@ export function BookmarkLibrary({
                       setShowActionSheet(true);
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-                    aria-label="Edit bookmark"
+                    aria-label={t('common.edit')}
                   >
                     <Edit2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Edit</span>
+                    <span className="hidden sm:inline">{t('common.edit')}</span>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Edit bookmark details</TooltipContent>
+                <TooltipContent>{t('library.editTooltip')}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleBulkCreateShortcuts}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-                    aria-label="Create shortcut"
+                    aria-label={t('library.shortcut')}
                   >
                     <Home className="h-4 w-4" />
-                    <span className="hidden sm:inline">Shortcut</span>
+                    <span className="hidden sm:inline">{t('library.shortcut')}</span>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Add shortcut to home screen</TooltipContent>
+                <TooltipContent>{t('library.shortcutTooltip')}</TooltipContent>
               </Tooltip>
             </>
           )}
@@ -1239,13 +1241,13 @@ export function BookmarkLibrary({
               <button
                 onClick={() => setShowBulkDeleteConfirm(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium"
-                aria-label="Delete selected"
+                aria-label={t('common.delete')}
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Delete</span>
+                <span className="hidden sm:inline">{t('common.delete')}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent>Delete selected bookmarks</TooltipContent>
+            <TooltipContent>{t('library.deleteTooltip')}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         
@@ -1257,12 +1259,12 @@ export function BookmarkLibrary({
               <button
                 onClick={handleClearShortlist}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm text-muted-foreground"
-                aria-label="Clear selection"
+                aria-label={t('library.clearSelection')}
               >
                 <X className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Clear selection</TooltipContent>
+            <TooltipContent>{t('library.clearSelection')}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
@@ -1271,24 +1273,24 @@ export function BookmarkLibrary({
       <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {shortlistedLinks.length} bookmark{shortlistedLinks.length > 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogTitle>{t('library.deleteConfirmTitle', { count: shortlistedLinks.length })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Selected bookmarks will be moved to trash. Items in trash are automatically deleted after {getSettings().trashRetentionDays} days.
+              {t('library.deleteConfirmDesc', { days: getSettings().trashRetentionDays })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => handleBulkDelete(false)}
               className="border border-input bg-background hover:bg-accent hover:text-accent-foreground"
             >
-              Move to Trash
+              {t('library.moveToTrash')}
             </AlertDialogAction>
             <AlertDialogAction 
               onClick={() => handleBulkDelete(true)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete Permanently
+              {t('library.deletePermanently')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1333,11 +1335,11 @@ export function BookmarkLibrary({
                 )}
               >
                 <Plus className="h-5 w-5" />
-                Add New Bookmark
+                {t('library.addBookmark')}
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[220px] text-center">
-              <p>You can also add bookmarks by sharing any URL to this app</p>
+              <p>{t('library.addTooltip')}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
