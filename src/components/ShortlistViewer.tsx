@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Globe, ExternalLink, Loader2, Smartphone, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
@@ -37,6 +38,7 @@ export function ShortlistViewer({
   links,
   startIndex = 0,
 }: ShortlistViewerProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [isLoading, setIsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -155,7 +157,7 @@ export function ShortlistViewer({
         <div className="flex-1 mx-4 text-center">
           <p className="font-medium text-sm truncate">{currentLink.title}</p>
           <p className="text-xs text-muted-foreground">
-            {currentIndex + 1} of {totalLinks}
+            {t('shortlistViewer.indexOf', { current: currentIndex + 1, total: totalLinks })}
           </p>
         </div>
 
@@ -169,7 +171,7 @@ export function ShortlistViewer({
                 ? "bg-primary text-primary-foreground" 
                 : "text-muted-foreground hover:text-foreground"
             )}
-            aria-label="Mobile view"
+            aria-label={t('shortlistViewer.viewMobile')}
           >
             <Smartphone className="h-4 w-4" />
           </button>
@@ -181,7 +183,7 @@ export function ShortlistViewer({
                 ? "bg-primary text-primary-foreground" 
                 : "text-muted-foreground hover:text-foreground"
             )}
-            aria-label="Desktop view"
+            aria-label={t('shortlistViewer.viewDesktop')}
           >
             <Monitor className="h-4 w-4" />
           </button>
@@ -229,20 +231,20 @@ export function ShortlistViewer({
                 {isLoading ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Opening...
+                    {t('shortlistViewer.opening')}
                   </>
                 ) : (
                   <>
                     <ExternalLink className="h-5 w-5" />
-                    View {viewMode === 'desktop' ? 'Desktop' : 'Mobile'} Site
+                    {viewMode === 'desktop' ? t('shortlistViewer.viewDesktop') : t('shortlistViewer.viewMobile')}
                   </>
                 )}
               </button>
               
               <p className="text-xs text-muted-foreground mt-4">
                 {viewMode === 'desktop' 
-                  ? 'Opens in-app browser with desktop layout' 
-                  : 'Opens in-app browser with mobile layout'}
+                  ? t('shortlistViewer.desktopHint')
+                  : t('shortlistViewer.mobileHint')}
               </p>
             </div>
           </div>
@@ -253,7 +255,7 @@ export function ShortlistViewer({
               <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Loading...</p>
+                  <p className="text-sm text-muted-foreground">{t('shortlistViewer.loading')}</p>
                 </div>
               </div>
             )}
@@ -280,7 +282,7 @@ export function ShortlistViewer({
             )}
           >
             <ChevronLeft className="h-5 w-5" />
-            <span className="text-sm font-medium">Previous</span>
+            <span className="text-sm font-medium">{t('common.previous')}</span>
           </button>
 
           <button
@@ -290,7 +292,7 @@ export function ShortlistViewer({
               "bg-muted hover:bg-muted/80"
             )}
           >
-            <span className="text-sm font-medium">Next</span>
+            <span className="text-sm font-medium">{t('common.next')}</span>
             <ChevronRight className="h-5 w-5" />
           </button>
         </footer>

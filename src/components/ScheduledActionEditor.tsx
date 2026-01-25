@@ -1,5 +1,6 @@
 // Scheduled Action Editor - edit an existing scheduled action
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +48,7 @@ export function ScheduledActionEditor({
   onClose, 
   onSaved 
 }: ScheduledActionEditorProps) {
+  const { t } = useTranslation();
   const { updateAction, createScheduledAction, deleteScheduledAction } = useScheduledActions();
   const { toast } = useToast();
   
@@ -98,6 +100,14 @@ export function ScheduledActionEditor({
     }
   };
 
+  const getDestinationTypeLabel = (type: 'file' | 'url' | 'contact'): string => {
+    switch (type) {
+      case 'file': return t('scheduledEditor.file');
+      case 'url': return t('scheduledEditor.link');
+      case 'contact': return t('scheduledEditor.contact');
+    }
+  };
+
   const formatTime = (timestamp: number): string => {
     const date = new Date(timestamp);
     return date.toLocaleString(undefined, {
@@ -112,10 +122,10 @@ export function ScheduledActionEditor({
 
   const formatRecurrenceLabel = (rec: RecurrenceType): string => {
     switch (rec) {
-      case 'once': return 'One time';
-      case 'daily': return 'Every day';
-      case 'weekly': return 'Every week';
-      case 'yearly': return 'Every year';
+      case 'once': return t('scheduledEditor.oneTime');
+      case 'daily': return t('scheduledEditor.everyDay');
+      case 'weekly': return t('scheduledEditor.everyWeek');
+      case 'yearly': return t('scheduledEditor.everyYear');
     }
   };
 
@@ -164,14 +174,14 @@ export function ScheduledActionEditor({
   const handleUrlSubmit = () => {
     let finalUrl = urlInput.trim();
     if (!finalUrl) {
-      setUrlError('Please enter a URL');
+      setUrlError(t('scheduledActions.pleaseEnterUrl'));
       return;
     }
     if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
       finalUrl = 'https://' + finalUrl;
     }
     if (!isValidUrl(finalUrl)) {
-      setUrlError('Please enter a valid URL');
+      setUrlError(t('scheduledActions.pleaseEnterValidUrl'));
       return;
     }
     try {
@@ -182,7 +192,7 @@ export function ScheduledActionEditor({
         name: hostname,
       });
     } catch {
-      setUrlError('Please enter a valid URL');
+      setUrlError(t('scheduledActions.pleaseEnterValidUrl'));
     }
   };
 
@@ -242,8 +252,8 @@ export function ScheduledActionEditor({
   const handleSave = async () => {
     if (!name.trim()) {
       toast({
-        title: 'Name required',
-        description: 'Please enter a name for this action.',
+        title: t('scheduledEditor.nameRequired'),
+        description: t('scheduledEditor.enterName'),
         variant: 'destructive',
       });
       return;
@@ -268,7 +278,7 @@ export function ScheduledActionEditor({
       if (newAction) {
         triggerHaptic('success');
         toast({
-          title: '✓ Action updated',
+          title: t('scheduledEditor.actionUpdated'),
           description: `${name.trim()} — ${formatTime(triggerTime)}`,
         });
         onSaved();
@@ -280,8 +290,8 @@ export function ScheduledActionEditor({
       console.error('Error saving scheduled action:', error);
       triggerHaptic('warning');
       toast({
-        title: 'Could not save',
-        description: 'Please try again.',
+        title: t('scheduledEditor.couldNotSave'),
+        description: t('scheduledActions.tryAgain'),
         variant: 'destructive',
       });
     } finally {
@@ -311,7 +321,7 @@ export function ScheduledActionEditor({
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h2 className="text-lg font-semibold">Enter URL</h2>
+                <h2 className="text-lg font-semibold">{t('scheduledEditor.enterUrl')}</h2>
               </div>
 
               <div className="flex-1 px-5 py-6 space-y-4">
@@ -351,7 +361,7 @@ export function ScheduledActionEditor({
                   disabled={!urlInput.trim()}
                   className="w-full h-12 rounded-2xl text-base"
                 >
-                  Use this URL
+                  {t('scheduledEditor.useThisUrl')}
                 </Button>
               </div>
             </div>
@@ -373,21 +383,21 @@ export function ScheduledActionEditor({
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h2 className="text-lg font-semibold">Change link</h2>
+                <h2 className="text-lg font-semibold">{t('scheduledEditor.changeLink')}</h2>
               </div>
 
               <div className="flex-1 px-5 py-6">
                 <div className="space-y-3">
                   <DestinationOption
                     icon={<Globe className="h-5 w-5" />}
-                    label="Enter URL"
-                    description="Type or paste a link"
+                    label={t('scheduledEditor.enterUrl')}
+                    description={t('scheduledEditor.typeOrPaste')}
                     onClick={() => setUrlSubStep('input')}
                   />
                   <DestinationOption
                     icon={<Bookmark className="h-5 w-5" />}
-                    label="Saved Bookmark"
-                    description="Choose from your library"
+                    label={t('scheduledEditor.savedBookmark')}
+                    description={t('scheduledEditor.chooseFromLibrary')}
                     onClick={() => setShowBookmarkPicker(true)}
                   />
                 </div>
@@ -416,34 +426,34 @@ export function ScheduledActionEditor({
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <h2 className="text-lg font-semibold">Change destination</h2>
-            </div>
+                <h2 className="text-lg font-semibold">{t('scheduledEditor.changeDestination')}</h2>
+              </div>
 
-            <div className="flex-1 px-5 py-6">
-              <p className="text-sm text-muted-foreground mb-6">
-                Select what should open when this action triggers.
+              <div className="flex-1 px-5 py-6">
+                <p className="text-sm text-muted-foreground mb-6">
+                  {t('scheduledEditor.selectDestDesc')}
               </p>
 
-              <div className="space-y-3">
-                <DestinationOption
-                  icon={<FileText className="h-5 w-5" />}
-                  label="Local File"
-                  description="Photo, video, PDF, or document"
-                  onClick={handleFileSelect}
-                />
-                <DestinationOption
-                  icon={<Link className="h-5 w-5" />}
-                  label="Link"
-                  description="Website or saved bookmark"
-                  onClick={() => setUrlSubStep('choose')}
-                />
-                <DestinationOption
-                  icon={<Phone className="h-5 w-5" />}
-                  label="Contact"
-                  description="Call someone at a scheduled time"
-                  onClick={handleContactSelect}
-                />
-              </div>
+                <div className="space-y-3">
+                  <DestinationOption
+                    icon={<FileText className="h-5 w-5" />}
+                    label={t('scheduledEditor.localFile')}
+                    description={t('scheduledEditor.localFileDesc')}
+                    onClick={handleFileSelect}
+                  />
+                  <DestinationOption
+                    icon={<Link className="h-5 w-5" />}
+                    label={t('scheduledEditor.link')}
+                    description={t('scheduledEditor.linkDesc')}
+                    onClick={() => setUrlSubStep('choose')}
+                  />
+                  <DestinationOption
+                    icon={<Phone className="h-5 w-5" />}
+                    label={t('scheduledEditor.contact')}
+                    description={t('scheduledEditor.contactDesc')}
+                    onClick={handleContactSelect}
+                  />
+                </div>
             </div>
           </div>
         </SheetContent>
@@ -479,20 +489,20 @@ export function ScheduledActionEditor({
 
         <div className="flex flex-col h-full">
           <div className="flex items-center gap-3 px-5 pb-4 border-b border-border">
-            <h2 className="text-lg font-semibold">Edit Action</h2>
+            <h2 className="text-lg font-semibold">{t('scheduledEditor.editAction')}</h2>
           </div>
 
           <div className="flex-1 px-5 py-6 space-y-6 overflow-y-auto">
             {/* Name input */}
             <div>
               <Label htmlFor="edit-action-name" className="text-sm font-medium mb-2 block">
-                Name
+                {t('scheduledEditor.name')}
               </Label>
               <Input
                 id="edit-action-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Action name"
+                placeholder={t('scheduledEditor.actionName')}
                 className="h-12 rounded-xl text-base"
               />
             </div>
@@ -500,7 +510,7 @@ export function ScheduledActionEditor({
             {/* Destination */}
             <div>
               <Label className="text-sm font-medium mb-2 block">
-                Destination
+                {t('scheduledEditor.destination')}
               </Label>
               <button
                 onClick={() => setStep('destination')}
@@ -515,7 +525,7 @@ export function ScheduledActionEditor({
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-medium truncate">
-                    {destination.type === 'file' ? 'File' : destination.type === 'url' ? 'Link' : 'Contact'}
+                    {getDestinationTypeLabel(destination.type)}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {getDestinationLabel(destination)}
@@ -528,7 +538,7 @@ export function ScheduledActionEditor({
             {/* Timing */}
             <div>
               <Label className="text-sm font-medium mb-2 block">
-                Schedule
+                {t('scheduledEditor.schedule')}
               </Label>
               <button
                 onClick={() => setStep('timing')}
@@ -558,15 +568,15 @@ export function ScheduledActionEditor({
               disabled={isSaving || !hasChanges}
               className="w-full h-12 rounded-2xl text-base gap-2"
             >
-              {isSaving ? (
-                'Saving...'
-              ) : (
-                <>
-                  <Check className="h-5 w-5" />
-                  Save Changes
-                </>
-              )}
-            </Button>
+            {isSaving ? (
+              t('scheduledEditor.saving')
+            ) : (
+              <>
+                <Check className="h-5 w-5" />
+                {t('scheduledEditor.saveChanges')}
+              </>
+            )}
+          </Button>
           </div>
         </div>
       </SheetContent>

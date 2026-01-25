@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, Video, FileText, Bookmark, Music, Phone, Link, FolderOpen, MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FileTypeFilter } from '@/lib/contentResolver';
@@ -18,6 +19,7 @@ export function ContentSourcePicker({
   onSelectFromLibrary, 
   onEnterUrl,
 }: ContentSourcePickerProps) {
+  const { t } = useTranslation();
   const [showContactPicker, setShowContactPicker] = useState(false);
 
   const handleContactSelect = (mode: ContactMode) => {
@@ -30,35 +32,35 @@ export function ContentSourcePicker({
       {/* Main Card: Create a Shortcut */}
       <div className="rounded-2xl bg-card elevation-1 p-4">
         <h2 className="text-base font-medium text-foreground mb-4">
-          Create a shortcut
+          {t('access.createShortcut')}
         </h2>
         
         {/* Primary Grid: 3x2 layout */}
         <div className="grid grid-cols-3 gap-3">
           <GridButton
             icon={<Image className="h-5 w-5" />}
-            label="Photo"
+            label={t('access.photo')}
             onClick={() => onSelectFile('image')}
           />
           <GridButton
             icon={<Video className="h-5 w-5" />}
-            label="Video"
+            label={t('access.video')}
             onClick={() => onSelectFile('video')}
           />
           <GridButton
             icon={<Music className="h-5 w-5" />}
-            label="Audio"
+            label={t('access.audio')}
             onClick={() => onSelectFile('audio')}
           />
           <GridButton
             icon={<FileText className="h-5 w-5" />}
-            label="Document"
+            label={t('access.document')}
             onClick={() => onSelectFile('document')}
           />
           {onSelectContact && (
             <GridButton
               icon={<Phone className="h-5 w-5" />}
-              label="Contact"
+              label={t('access.contact')}
               onClick={() => setShowContactPicker(true)}
               isActive={showContactPicker}
             />
@@ -66,7 +68,7 @@ export function ContentSourcePicker({
           {onEnterUrl && (
             <GridButton
               icon={<Link className="h-5 w-5" />}
-              label="Link"
+              label={t('access.link')}
               onClick={onEnterUrl}
             />
           )}
@@ -76,7 +78,7 @@ export function ContentSourcePicker({
         {showContactPicker && (
           <div className="mt-3 rounded-xl bg-muted/30 p-3 animate-fade-in">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground">Choose action type</span>
+              <span className="text-xs font-medium text-muted-foreground">{t('access.chooseAction')}</span>
               <button
                 onClick={() => setShowContactPicker(false)}
                 className="p-1 rounded-full hover:bg-muted/50 transition-colors"
@@ -87,14 +89,14 @@ export function ContentSourcePicker({
             <div className="grid grid-cols-2 gap-2">
               <ContactModeButton
                 icon={<Phone className="h-4 w-4" />}
-                label="Call"
-                description="Direct dial"
+                label={t('access.contactCall')}
+                description={t('access.contactCallDesc')}
                 onClick={() => handleContactSelect('dial')}
               />
               <ContactModeButton
                 icon={<MessageCircle className="h-4 w-4" />}
-                label="Message"
-                description="WhatsApp"
+                label={t('access.contactMessage')}
+                description={t('access.contactMessageDesc')}
                 onClick={() => handleContactSelect('message')}
               />
             </div>
@@ -108,13 +110,13 @@ export function ContentSourcePicker({
         <div className="grid grid-cols-2 gap-3">
           <SecondaryButton
             icon={<FolderOpen className="h-4 w-4" />}
-            label="Browse all files"
+            label={t('access.browseFiles')}
             onClick={() => onSelectFile('all')}
           />
           {onSelectFromLibrary && (
             <SecondaryButton
               icon={<Bookmark className="h-4 w-4" />}
-              label="Saved bookmarks"
+              label={t('access.savedBookmarks')}
               onClick={onSelectFromLibrary}
             />
           )}
