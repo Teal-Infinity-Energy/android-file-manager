@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { ShortcutData, ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
+import { usageHistoryManager } from '@/lib/usageHistoryManager';
 
 const STORAGE_KEY = 'quicklaunch_shortcuts';
 
@@ -37,9 +38,11 @@ export function useShortcuts() {
     syncToWidgets(data);
   }, [syncToWidgets]);
 
-  // Initial sync on mount
+  // Initial sync on mount + migrate usage history
   useEffect(() => {
     syncToWidgets(shortcuts);
+    // Migrate existing usage data to history (one-time)
+    usageHistoryManager.migrateExistingUsage(shortcuts);
   }, []); // Only on mount
 
   const createShortcut = useCallback((
@@ -128,6 +131,10 @@ export function useShortcuts() {
 
 
   const incrementUsage = useCallback((id: string) => {
+    // Record the usage event with timestamp for historical tracking
+    usageHistoryManager.recordUsage(id);
+    
+    // Still update usageCount for total tracking
     const updated = shortcuts.map(s => 
       s.id === id ? { ...s, usageCount: s.usageCount + 1 } : s
     );
