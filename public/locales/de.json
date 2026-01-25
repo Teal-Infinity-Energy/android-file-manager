@@ -3,6 +3,11 @@
     "name": "OneTap",
     "tagline": "Ein Tipp zu dem, was zählt"
   },
+  "menu": {
+    "title": "Menü",
+    "trash": "Papierkorb",
+    "settings": "Einstellungen"
+  },
   "onboarding": {
     "skip": "Überspringen",
     "next": "Weiter",
@@ -77,7 +82,7 @@
     "appearance": "Erscheinungsbild",
     "light": "Hell",
     "dark": "Dunkel",
-    "system": "System",
+    "system": "Auto",
     "clipboardDetection": "Zwischenablage-URL-Erkennung",
     "clipboardDescription": "Vorschläge anzeigen, wenn eine URL kopiert wird",
     "language": "Sprache",

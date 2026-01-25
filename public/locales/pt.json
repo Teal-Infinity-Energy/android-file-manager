@@ -3,6 +3,11 @@
     "name": "OneTap",
     "tagline": "Um toque para o que importa"
   },
+  "menu": {
+    "title": "Menu",
+    "trash": "Lixeira",
+    "settings": "Configurações"
+  },
   "onboarding": {
     "skip": "Pular",
     "next": "Próximo",
@@ -77,7 +82,7 @@
     "appearance": "Aparência",
     "light": "Claro",
     "dark": "Escuro",
-    "system": "Sistema",
+    "system": "Auto",
     "clipboardDetection": "Detecção de URL da área de transferência",
     "clipboardDescription": "Mostrar sugestões quando uma URL é copiada",
     "language": "Idioma",

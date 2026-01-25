@@ -16,12 +16,15 @@ i18n
       en: { translation: en },
     },
     fallbackLng: 'en',
+    // Required when mixing bundled (English) with dynamically loaded languages
+    partialBundledLanguages: true,
     interpolation: {
       escapeValue: false,
     },
     detection: {
-      // Prioritize device/browser language, then localStorage for manual override
-      order: ['navigator', 'localStorage'],
+      // Prioritize user's manual choice (localStorage) over browser default
+      order: ['localStorage', 'navigator'],
+      lookupLocalStorage: 'i18nextLng',
       caches: ['localStorage'],
     },
     backend: {
@@ -34,9 +37,9 @@ i18n
     supportedLngs: ['en', 'es', 'pt', 'hi', 'de', 'ja', 'ar'],
     // Don't load translations for languages not in supportedLngs
     nonExplicitSupportedLngs: false,
-    // Enable React Suspense mode for loading states
+    // Disable Suspense to avoid race conditions with language switching
     react: {
-      useSuspense: true,
+      useSuspense: false,
     },
   });
 

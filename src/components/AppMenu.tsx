@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Menu, 
   Trash2, 
@@ -28,13 +29,6 @@ import { useSettings } from '@/hooks/useSettings';
 
 type ThemeOption = 'light' | 'dark' | 'system';
 
-const themeOptions: { value: ThemeOption; label: string; icon: React.ReactNode }[] = [
-  { value: 'light', label: 'Light', icon: <Sun className="h-4 w-4" /> },
-  { value: 'dark', label: 'Dark', icon: <Moon className="h-4 w-4" /> },
-  { value: 'system', label: 'Auto', icon: <Monitor className="h-4 w-4" /> },
-];
-
-
 const SWIPE_THRESHOLD = 50;
 
 interface AppMenuProps {
@@ -42,6 +36,7 @@ interface AppMenuProps {
 }
 
 export function AppMenu({ onOpenTrash }: AppMenuProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [trashCount, setTrashCount] = useState(getTrashCount());
   const [expiringCount, setExpiringCount] = useState(0);
@@ -52,6 +47,13 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
   // Swipe gesture tracking
   const touchStartX = useRef<number | null>(null);
   const touchCurrentX = useRef<number | null>(null);
+
+  // Theme options with translated labels
+  const themeOptions: { value: ThemeOption; label: string; icon: React.ReactNode }[] = [
+    { value: 'light', label: t('settings.light'), icon: <Sun className="h-4 w-4" /> },
+    { value: 'dark', label: t('settings.dark'), icon: <Moon className="h-4 w-4" /> },
+    { value: 'system', label: t('settings.system'), icon: <Monitor className="h-4 w-4" /> },
+  ];
 
   // Register menu sheet with back button handler
   const handleCloseMenu = useCallback(() => setOpen(false), []);
@@ -123,7 +125,7 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
         onTouchEnd={handleTouchEnd}
       >
         <SheetHeader className="pb-4">
-          <SheetTitle className="text-left">Menu</SheetTitle>
+          <SheetTitle className="text-left">{t('menu.title', 'Menu')}</SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-1 flex-1">
@@ -137,7 +139,7 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
               <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center">
                 <Trash2 className="h-4 w-4 text-destructive" />
               </div>
-              <span className="font-medium">Trash</span>
+              <span className="font-medium">{t('menu.trash', 'Trash')}</span>
             </div>
             {trashCount > 0 && (
               <div className="flex items-center gap-1.5">
@@ -161,11 +163,11 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
         {/* Settings Section - at bottom */}
         <div className="mt-auto pt-4">
           <Separator className="mb-4" />
-          <p className="text-xs text-muted-foreground px-3 mb-3">Settings</p>
+          <p className="text-xs text-muted-foreground px-3 mb-3">{t('settings.title')}</p>
           
           {/* Theme Selection */}
           <div className="px-3 mb-4">
-            <p className="text-sm font-medium mb-2">Appearance</p>
+            <p className="text-sm font-medium mb-2">{t('settings.appearance')}</p>
             <div className="flex gap-1">
               {themeOptions.map((option) => (
                 <Button
@@ -198,10 +200,10 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Clipboard className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm">Clipboard detection</span>
+                <span className="text-sm">{t('settings.clipboardDetection')}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 pl-6">
-                Auto-detect URLs from clipboard
+                {t('settings.clipboardDescription')}
               </p>
             </div>
             <Switch
