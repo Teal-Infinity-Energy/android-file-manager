@@ -152,6 +152,17 @@ export interface ShortcutPluginInterface {
 
   // Show a test notification immediately (bypasses alarm system)
   showTestNotification(): Promise<{ success: boolean; error?: string }>;
+
+  // ========== Widget Support ==========
+
+  // Sync shortcut data to Android widgets (stores in SharedPreferences)
+  syncWidgetData(options: { shortcuts: string }): Promise<{ success: boolean; error?: string }>;
+
+  // Refresh all home screen widgets
+  refreshWidgets(): Promise<{ success: boolean; error?: string }>;
+
+  // Check if app was launched from Quick Create widget
+  checkQuickCreateIntent(): Promise<{ quickCreate: boolean }>;
 }
 
 // This plugin bridges to native Android code

@@ -182,6 +182,48 @@
             </intent-filter>
         </receiver>
 
+        <!-- Quick Create Widget (1x1) -->
+        <receiver
+            android:name=".QuickCreateWidget"
+            android:exported="true"
+            android:label="@string/widget_quick_create_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_create_info" />
+        </receiver>
+
+        <!-- Favorites Widget (4x2) -->
+        <receiver
+            android:name=".FavoritesWidget"
+            android:exported="true"
+            android:label="@string/widget_favorites_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="app.onetap.WIDGET_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_favorites_info" />
+        </receiver>
+
+        <!-- Widget Service for Favorites GridView -->
+        <service
+            android:name=".FavoritesWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+        <!-- Widget Click Receiver -->
+        <receiver
+            android:name=".WidgetClickReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.onetap.WIDGET_ITEM_CLICK" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

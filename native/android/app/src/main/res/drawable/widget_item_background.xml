@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background for individual items in the Favorites Widget grid -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- Slightly lighter than widget background -->
+    <solid android:color="#2a2a4e" />
+    
+    <!-- Rounded corners -->
+    <corners android:radius="12dp" />
+    
+</shape>
