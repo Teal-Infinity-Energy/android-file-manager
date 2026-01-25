@@ -92,7 +92,9 @@
     "clipboardDescription": "Показывать предложения при копировании URL",
     "language": "Язык",
     "privacy": "Политика конфиденциальности",
-    "about": "О приложении"
+    "about": "О приложении",
+    "resetOnboarding": "Сбросить введение",
+    "resetOnboardingDescription": "Пройти выбор языка и введение заново"
   },
   "common": {
     "save": "Сохранить",

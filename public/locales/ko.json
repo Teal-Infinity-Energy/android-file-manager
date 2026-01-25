@@ -92,7 +92,9 @@
     "clipboardDescription": "URL 복사 시 제안 표시",
     "language": "언어",
     "privacy": "개인정보 처리방침",
-    "about": "정보"
+    "about": "정보",
+    "resetOnboarding": "온보딩 재설정",
+    "resetOnboardingDescription": "언어 선택 및 소개 다시 경험"
   },
   "common": {
     "save": "저장",

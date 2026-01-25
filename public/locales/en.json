@@ -87,7 +87,9 @@
     "clipboardDescription": "Show suggestions when a URL is copied",
     "language": "Language",
     "privacy": "Privacy Policy",
-    "about": "About"
+    "about": "About",
+    "resetOnboarding": "Reset Onboarding",
+    "resetOnboardingDescription": "Re-experience language selection and intro"
   },
   "common": {
     "save": "Save",

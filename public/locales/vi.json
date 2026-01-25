@@ -92,7 +92,9 @@
     "clipboardDescription": "Hiển thị gợi ý khi sao chép URL",
     "language": "Ngôn ngữ",
     "privacy": "Chính sách bảo mật",
-    "about": "Giới thiệu"
+    "about": "Giới thiệu",
+    "resetOnboarding": "Đặt lại giới thiệu",
+    "resetOnboardingDescription": "Trải nghiệm lại chọn ngôn ngữ và giới thiệu"
   },
   "common": {
     "save": "Lưu",

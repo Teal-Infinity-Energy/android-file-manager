@@ -8,6 +8,7 @@ import {
   Monitor, 
   Clipboard, 
   AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 import { LanguagePicker } from './LanguagePicker';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import { useTheme } from 'next-themes';
 import { useSheetBackHandler } from '@/hooks/useSheetBackHandler';
 import { CloudBackupSection } from './CloudBackupSection';
 import { useSettings } from '@/hooks/useSettings';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 type ThemeOption = 'light' | 'dark' | 'system';
 
@@ -43,6 +45,7 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
   const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings } = useSettings();
+  const { resetOnboarding } = useOnboarding();
   
   // Swipe gesture tracking
   const touchStartX = useRef<number | null>(null);
@@ -211,6 +214,23 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
               onCheckedChange={(checked) => updateSettings({ clipboardDetectionEnabled: checked })}
             />
           </div>
+
+          {/* Reset Onboarding */}
+          <Button
+            variant="ghost"
+            className="w-full justify-start h-auto px-3 py-2"
+            onClick={() => handleMenuItem(resetOnboarding)}
+          >
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm">{t('settings.resetOnboarding')}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5 pl-6">
+                {t('settings.resetOnboardingDescription')}
+              </p>
+            </div>
+          </Button>
           
         </div>
       </SheetContent>

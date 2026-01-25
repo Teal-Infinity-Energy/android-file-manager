@@ -92,7 +92,9 @@
     "clipboardDescription": "复制URL时显示建议",
     "language": "语言",
     "privacy": "隐私政策",
-    "about": "关于"
+    "about": "关于",
+    "resetOnboarding": "重置引导",
+    "resetOnboardingDescription": "重新体验语言选择和介绍流程"
   },
   "common": {
     "save": "保存",
