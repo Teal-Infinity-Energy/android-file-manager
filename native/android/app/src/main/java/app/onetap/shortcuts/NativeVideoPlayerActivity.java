@@ -16,6 +16,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.Cursor;
@@ -145,6 +146,10 @@ public class NativeVideoPlayerActivity extends Activity {
     private AudioManager audioManager;
     private int maxVolume;
 
+    // Auto-rotate orientation lock
+    private int originalOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+    private boolean hasLockedOrientation = false;
+
     // Premium loading indicator
     private FrameLayout loadingOverlay;
     private ValueAnimator loadingAnimator;
@@ -263,12 +268,71 @@ public class NativeVideoPlayerActivity extends Activity {
     private void releasePlayer() {
         hideHandler.removeCallbacks(hideRunnable);
 
+        // Restore original orientation before releasing
+        restoreOriginalOrientation();
+
         if (exoPlayer != null) {
             try {
                 exoPlayer.stop();
                 exoPlayer.release();
             } catch (Exception ignored) {}
             exoPlayer = null;
+        }
+    }
+    
+    /**
+     * Lock screen orientation based on video aspect ratio.
+     * Landscape videos lock to landscape, portrait videos lock to portrait.
+     */
+    private void lockOrientationBasedOnAspectRatio(int width, int height) {
+        if (hasLockedOrientation || isInPipMode) {
+            return; // Already locked or in PiP mode
+        }
+        
+        try {
+            // Store original orientation for restoration
+            originalOrientation = getRequestedOrientation();
+            
+            float aspectRatio = (float) width / height;
+            int targetOrientation;
+            
+            if (aspectRatio > 1.0f) {
+                // Landscape video (wider than tall)
+                targetOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+                logInfo("Locking to landscape orientation (aspect ratio: " + String.format(Locale.US, "%.2f", aspectRatio) + ")");
+            } else if (aspectRatio < 1.0f) {
+                // Portrait video (taller than wide)
+                targetOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+                logInfo("Locking to portrait orientation (aspect ratio: " + String.format(Locale.US, "%.2f", aspectRatio) + ")");
+            } else {
+                // Square video - use sensor to allow any orientation
+                targetOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR;
+                logInfo("Square video - allowing sensor orientation");
+            }
+            
+            setRequestedOrientation(targetOrientation);
+            hasLockedOrientation = true;
+            
+            // Haptic feedback for orientation lock
+            performHapticFeedback();
+            
+        } catch (Exception e) {
+            logWarn("Failed to lock orientation: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Restore the original screen orientation when exiting the player.
+     */
+    private void restoreOriginalOrientation() {
+        if (hasLockedOrientation) {
+            try {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                hasLockedOrientation = false;
+                logInfo("Restored original orientation");
+            } catch (Exception e) {
+                logWarn("Failed to restore orientation: " + e.getMessage());
+            }
         }
     }
 
@@ -1023,6 +1087,9 @@ public class NativeVideoPlayerActivity extends Activity {
                     if (videoSize.width > 0 && videoSize.height > 0) {
                         videoWidth = videoSize.width;
                         videoHeight = videoSize.height;
+                        
+                        // Auto-rotate: lock orientation based on video aspect ratio
+                        lockOrientationBasedOnAspectRatio(videoSize.width, videoSize.height);
                     }
                 }
             });
