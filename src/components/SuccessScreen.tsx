@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Check, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -12,25 +12,18 @@ interface SuccessScreenProps {
 
 export function SuccessScreen({ shortcutName, onDone }: SuccessScreenProps) {
   const { t } = useTranslation();
-  const [countdown, setCountdown] = useState(AUTO_CLOSE_SECONDS);
   
   const handleDone = useCallback(() => {
     onDone();
   }, [onDone]);
 
+  // Silent auto-close after timeout
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleDone();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const timer = setTimeout(() => {
+      handleDone();
+    }, AUTO_CLOSE_SECONDS * 1000);
 
-    return () => clearInterval(timer);
+    return () => clearTimeout(timer);
   }, [handleDone]);
   
   return (
@@ -57,10 +50,6 @@ export function SuccessScreen({ shortcutName, onDone }: SuccessScreenProps) {
       <Button onClick={handleDone} variant="outline" className="w-full max-w-xs h-12">
         {t('success.addAnother')}
       </Button>
-      
-      <p className="text-xs text-muted-foreground mt-4">
-        {t('success.autoClose', { seconds: countdown })}
-      </p>
     </div>
   );
 }
