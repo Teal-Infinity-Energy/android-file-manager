@@ -41,6 +41,7 @@ export interface SavedLink {
 
 /**
  * Normalize URL for consistent duplicate detection
+ * Note: Hash fragments are preserved for duplicate detection
  */
 export function normalizeUrl(url: string): string {
   try {
@@ -55,8 +56,8 @@ export function normalizeUrl(url: string): string {
     // Normalize hostname: lowercase and remove www prefix
     urlObj.hostname = urlObj.hostname.toLowerCase().replace(/^www\./, '');
     
-    // Remove hash fragments
-    urlObj.hash = '';
+    // Keep hash fragments - they are important for duplicate detection
+    // e.g., example.com/page#section1 and example.com/page#section2 are different URLs
     
     // Sort query parameters for consistent comparison
     if (urlObj.search) {
@@ -67,9 +68,11 @@ export function normalizeUrl(url: string): string {
     
     let result = urlObj.href;
     
-    // Remove trailing slash consistently (both root and paths)
-    if (result.endsWith('/')) {
-      result = result.slice(0, -1);
+    // Remove trailing slash from path only (not affecting query or hash)
+    // Only if there's no query string and no hash after the slash
+    if (urlObj.pathname.endsWith('/') && urlObj.pathname.length > 1) {
+      const pathWithoutSlash = urlObj.pathname.slice(0, -1);
+      result = urlObj.origin + pathWithoutSlash + urlObj.search + urlObj.hash;
     }
     
     return result;
@@ -138,16 +141,23 @@ export function addSavedLink(
     const links = getSavedLinks();
     const normalizedNewUrl = normalizeUrl(url);
     
+    // Use normalizeUrl ONLY for duplicate detection
     const existing = links.find(link => normalizeUrl(link.url) === normalizedNewUrl);
     if (existing) {
       console.log('[SavedLinks] Duplicate detected:', url);
       return { link: existing, status: 'duplicate' };
     }
     
+    // Preserve original URL, only add protocol if missing
+    let finalUrl = url.trim();
+    if (!/^https?:\/\//i.test(finalUrl)) {
+      finalUrl = 'https://' + finalUrl;
+    }
+    
     const newLink: SavedLink = {
       id: crypto.randomUUID(),
-      url: normalizedNewUrl,
-      title: title || extractTitleFromUrl(normalizedNewUrl),
+      url: finalUrl, // Original URL preserved (only protocol added if missing)
+      title: title || extractTitleFromUrl(finalUrl),
       description: description || '',
       tag: tag || null,
       createdAt: Date.now(),
@@ -181,7 +191,14 @@ export function updateSavedLink(
     if (updates.title !== undefined) link.title = updates.title;
     if (updates.description !== undefined) link.description = updates.description;
     if (updates.tag !== undefined) link.tag = updates.tag;
-    if (updates.url !== undefined) link.url = normalizeUrl(updates.url);
+    if (updates.url !== undefined) {
+      // Preserve original URL, only add protocol if missing
+      let newUrl = updates.url.trim();
+      if (!/^https?:\/\//i.test(newUrl)) {
+        newUrl = 'https://' + newUrl;
+      }
+      link.url = newUrl;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
     notifyChange();
   }

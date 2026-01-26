@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { getSavedLinks, SavedLink, getTrashLinks, TrashedLink } from './savedLinksManager';
+import { getSavedLinks, SavedLink, getTrashLinks, TrashedLink, normalizeUrl } from './savedLinksManager';
 
 export interface CloudBookmark {
   id: string;
@@ -137,12 +137,12 @@ export async function downloadBookmarksFromCloud(): Promise<{ success: boolean; 
     // Get existing local bookmarks
     const STORAGE_KEY = 'saved_links';
     const existingLinks = getSavedLinks();
-    const existingUrls = new Set(existingLinks.map(l => l.url.toLowerCase()));
+    const existingUrls = new Set(existingLinks.map(l => normalizeUrl(l.url)));
 
     // Convert cloud bookmarks to local format and merge
     const newBookmarks: SavedLink[] = [];
     for (const cloudBookmark of cloudBookmarks) {
-      if (!existingUrls.has(cloudBookmark.url.toLowerCase())) {
+      if (!existingUrls.has(normalizeUrl(cloudBookmark.url))) {
         newBookmarks.push({
           id: cloudBookmark.id,
           url: cloudBookmark.url,
@@ -152,7 +152,7 @@ export async function downloadBookmarksFromCloud(): Promise<{ success: boolean; 
           createdAt: new Date(cloudBookmark.created_at).getTime(),
           isShortlisted: false,
         });
-        existingUrls.add(cloudBookmark.url.toLowerCase());
+        existingUrls.add(normalizeUrl(cloudBookmark.url));
       }
     }
 
@@ -194,12 +194,12 @@ export async function downloadTrashFromCloud(): Promise<{ success: boolean; down
     // Get existing local trash
     const TRASH_STORAGE_KEY = 'saved_links_trash';
     const existingTrash = getTrashLinks();
-    const existingUrls = new Set(existingTrash.map(l => l.url.toLowerCase()));
+    const existingTrashUrls = new Set(existingTrash.map(l => normalizeUrl(l.url)));
 
     // Convert cloud trash to local format and merge
     const newTrashItems: TrashedLink[] = [];
     for (const cloudItem of cloudTrash) {
-      if (!existingUrls.has(cloudItem.url.toLowerCase())) {
+      if (!existingTrashUrls.has(normalizeUrl(cloudItem.url))) {
         newTrashItems.push({
           id: cloudItem.id,
           url: cloudItem.url,
@@ -211,7 +211,7 @@ export async function downloadTrashFromCloud(): Promise<{ success: boolean; down
           deletedAt: new Date(cloudItem.deleted_at).getTime(),
           retentionDays: cloudItem.retention_days,
         });
-        existingUrls.add(cloudItem.url.toLowerCase());
+        existingTrashUrls.add(normalizeUrl(cloudItem.url));
       }
     }
 
