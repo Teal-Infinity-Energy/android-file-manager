@@ -1,110 +1,129 @@
 
-# Add Hover and Pressed State Animations to Inline Picker Cards
+# Fix: Android 15/16 NullPointerException in Video Player
 
-## Overview
-Enhance the visual feedback on all interactive picker cards in the Access tab by adding subtle hover effects and improved pressed state animations.
+## Problem Summary
 
-## Components to Update
+The native video player crashes on **Android 15/16 (API 35-36)** devices, specifically Samsung devices, during `onCreate()`. The crash occurs because the code accesses `DecorView.getWindowInsetsController()` which returns null when the decor view isn't fully initialized.
 
-### 1. ActionModeButton (Shortcut/Reminder cards)
-**Current state:**
-- Has `active:scale-[0.98]` for press
-- No hover effects
+**Error:**
+```
+java.lang.NullPointerException: Attempt to invoke virtual method 
+'android.view.WindowInsetsController com.android.internal.policy.DecorView.getWindowInsetsController()' 
+on a null object reference
+```
 
-**Enhancements:**
-- Add hover background brightness/opacity change
-- Add hover shadow elevation
-- Add smooth transition for all properties
-
-### 2. GridButton (Photo, Video, Audio, Document, Contact, Link)
-**Current state:**
-- Has `active:scale-[0.96]` for press
-- Has `transition-all` but no hover effects
-
-**Enhancements:**
-- Add hover scale-up effect (`hover:scale-[1.02]`)
-- Add hover shadow elevation increase
-- Add hover background brightness change
-
-### 3. SecondaryButton (Browse files, Saved bookmarks)
-**Current state:**
-- Has `active:scale-[0.98]` for press
-- Has `transition-all duration-150`
-
-**Enhancements:**
-- Add hover background opacity change
-- Add hover text color shift
-
-### 4. Contact Mode Toggle Buttons (Call/Message)
-**Current state:**
-- Has `transition-all`
-- Has conditional hover on inactive state
-
-**Enhancements:**
-- Add subtle scale effect on hover
-- Improve transition timing
+**Root Cause:** The current implementation calls `decor.getWindowInsetsController()` on the DecorView, which fails on newer Android versions due to lifecycle timing. The DecorView may not be fully attached to the window yet.
 
 ---
 
-## Technical Implementation
+## Solution
 
-### ActionModeButton Changes
-```text
-Current classes:
-- "active:scale-[0.98] transition-transform"
+Replace the unsafe `DecorView.getWindowInsetsController()` pattern with the Android-15-safe `getWindow().getInsetsController()` approach, which retrieves the controller directly from the Window rather than from the DecorView.
 
-New classes:
-- "hover:bg-card/80 hover:shadow-md hover:border-border"
-- "active:scale-[0.97] active:shadow-sm"
-- "transition-all duration-150"
+---
+
+## Implementation Details
+
+### File to Modify
+`native/android/app/src/main/java/app/onetap/shortcuts/NativeVideoPlayerActivity.java`
+
+### Changes to `applyImmersiveModeSafely()` Method (Lines 278-325)
+
+**Current problematic code:**
+```java
+View decor = null;
+try {
+    decor = getWindow().getDecorView();
+} catch (Throwable ignored) {}
+
+WindowInsetsController controller = null;
+try {
+    if (decor != null) controller = decor.getWindowInsetsController();
+} catch (Throwable ignored) {}
 ```
 
-### GridButton Changes
-```text
-Current classes:
-- "active:scale-[0.96] transition-all"
-
-New classes:
-- "hover:scale-[1.02] hover:shadow-md"
-- "hover:bg-muted/60" (when not active)
-- "active:scale-[0.96] active:shadow-none"
-- "transition-all duration-150"
+**New Android-15-safe code:**
+```java
+WindowInsetsController controller = null;
+try {
+    controller = getWindow().getInsetsController();
+} catch (Throwable ignored) {}
 ```
 
-### SecondaryButton Changes
-```text
-Current classes:
-- "active:scale-[0.98] transition-all duration-150"
+### Complete Rewritten Method
 
-New classes:
-- "hover:bg-muted/40 hover:text-foreground"
-- "active:scale-[0.97]"
-```
+The `applyImmersiveModeSafely()` method will be updated to:
 
-### Contact Mode Toggle Changes
+1. Use `getWindow().getInsetsController()` instead of `decor.getWindowInsetsController()`
+2. Remove direct `DecorView` access for getting the controller
+3. Keep a safe fallback to legacy system UI visibility flags for older devices
+4. Maintain defensive null checks and try-catch blocks
+5. Add a null URI guard in `onCreate()` to gracefully exit if no video URI is provided
+
+---
+
+## Technical Details
+
 ```text
-Add to inactive state:
-- "hover:scale-[1.01]"
-- Ensure smooth transitions
+┌─────────────────────────────────────────────────────────────┐
+│                    applyImmersiveModeSafely()               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Android 11+ (API 30+):                                     │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ 1. setDecorFitsSystemWindows(false)                   │  │
+│  │ 2. getWindow().getInsetsController() ← SAFE METHOD    │  │
+│  │ 3. controller.hide(systemBars())                      │  │
+│  │ 4. controller.setBehavior(TRANSIENT_BARS_BY_SWIPE)    │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           │                                 │
+│                           ▼                                 │
+│                    controller == null?                      │
+│                           │                                 │
+│            ┌──────────────┴──────────────┐                  │
+│            ▼                             ▼                  │
+│       Use legacy                   Apply modern             │
+│    setSystemUiVisibility()          immersive mode          │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Android < 11 (API < 30):                                   │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Use legacy setSystemUiVisibility() flags              │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Files to Modify
+## Optional Safety Add-on
 
-| File | Changes |
-|------|---------|
-| `src/components/ContentSourcePicker.tsx` | Update 4 button components with enhanced hover/pressed states |
+Add a defensive check in `onCreate()` to gracefully exit the activity if the incoming video URI is null, rather than showing the diagnostics screen which may not be fully initialized:
+
+```java
+if (videoUri == null) {
+    logError("No video URI provided - exiting gracefully");
+    Toast.makeText(this, "No video to play", Toast.LENGTH_SHORT).show();
+    finish();
+    return;
+}
+```
 
 ---
 
-## Animation Details
+## Testing
 
-| Component | Hover Effect | Pressed Effect | Transition |
-|-----------|--------------|----------------|------------|
-| ActionModeButton | Lighter bg, shadow, border highlight | Scale down 0.97 | 150ms all |
-| GridButton | Scale up 1.02, shadow, brighter bg | Scale down 0.96 | 150ms all |
-| SecondaryButton | Darker bg, text color shift | Scale down 0.97 | 150ms all |
-| Contact Toggle | Subtle scale 1.01 | Inherits existing | 150ms all |
+After applying the fix:
 
-This provides consistent, subtle feedback across all interactive elements while maintaining the existing Material Design-inspired aesthetic.
+1. Run `npx cap sync android`
+2. Rebuild the app with Android Studio
+3. Test on Android 15/16 devices (especially Samsung)
+4. Verify video shortcuts launch the player successfully
+5. Confirm fullscreen immersive mode works without crashes
+
+---
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `native/android/app/src/main/java/app/onetap/shortcuts/NativeVideoPlayerActivity.java` | Rewrite `applyImmersiveModeSafely()` to use `getWindow().getInsetsController()` instead of `DecorView.getWindowInsetsController()` |
