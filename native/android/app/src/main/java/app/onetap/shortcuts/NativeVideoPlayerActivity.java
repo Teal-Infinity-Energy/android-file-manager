@@ -996,16 +996,6 @@ public class NativeVideoPlayerActivity extends Activity {
         );
         root.addView(topBar, topBarParams);
 
-        // Speed button (premium pill design)
-        speedButton = createSpeedButton();
-        speedButton.setOnClickListener(v -> cyclePlaybackSpeed());
-        
-        LinearLayout.LayoutParams speedParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(36)
-        );
-        speedParams.setMargins(dpToPx(6), 0, dpToPx(6), 0);
-        topBar.addView(speedButton, speedParams);
-
         // PiP button (Picture-in-Picture) - only on Android 8.0+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ImageButton pipButton = createPremiumIconButton(
