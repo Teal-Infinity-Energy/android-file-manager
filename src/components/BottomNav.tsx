@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Zap, Bell, Bookmark, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TabType = 'access' | 'notifications' | 'bookmarks' | 'profile';
+export type TabType = 'access' | 'reminders' | 'bookmarks' | 'profile';
 
 interface BottomNavProps {
   activeTab: TabType;
@@ -35,10 +35,10 @@ export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, ha
         </button>
         
         <button
-          onClick={() => onTabChange('notifications')}
+          onClick={() => onTabChange('reminders')}
           className={cn(
             "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors relative",
-            activeTab === 'notifications'
+            activeTab === 'reminders'
               ? "text-primary"
               : "text-muted-foreground"
           )}
@@ -46,13 +46,13 @@ export function BottomNav({ activeTab, onTabChange, hasShortlist, isSignedIn, ha
           <div className="relative">
             <Bell className={cn(
               "h-5 w-5 transition-all",
-              activeTab === 'notifications' && "fill-current"
+              activeTab === 'reminders' && "fill-current"
             )} />
             {hasActiveActions && (
               <span className="absolute -top-0.5 -end-0.5 h-2 w-2 rounded-full bg-primary" />
             )}
           </div>
-          <span className="text-[10px] font-medium">{t('tabs.notifications')}</span>
+          <span className="text-[10px] font-medium">{t('tabs.reminders')}</span>
         </button>
         
         <button

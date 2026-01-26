@@ -212,7 +212,7 @@ const Index = () => {
   // Handle Android back button
   // All home screens: access tab (at source step), notifications tab (not selecting), bookmarks tab (not selecting), profile tab
   const isOnHomeScreen = (accessStep === 'source' && activeTab === 'access') ||
-    (activeTab === 'notifications' && !isNotificationsSelectionMode) ||
+    (activeTab === 'reminders' && !isNotificationsSelectionMode) ||
     (activeTab === 'bookmarks' && !isBookmarkSelectionMode) ||
     activeTab === 'profile';
 
@@ -234,7 +234,7 @@ const Index = () => {
       }
       
       // Priority 3: If in notifications selection mode, clear selection
-      if (activeTab === 'notifications' && isNotificationsSelectionMode) {
+      if (activeTab === 'reminders' && isNotificationsSelectionMode) {
         handleClearNotificationsSelection();
         return;
       }
@@ -286,10 +286,10 @@ const Index = () => {
   }, []);
 
   // Show bottom nav only on main screens (not during sub-flows)
-  const showBottomNav = accessStep === 'source' || activeTab === 'notifications' || activeTab === 'bookmarks' || activeTab === 'profile';
+  const showBottomNav = accessStep === 'source' || activeTab === 'reminders' || activeTab === 'bookmarks' || activeTab === 'profile';
 
   // Tab order for swipe navigation
-  const tabOrder: TabType[] = useMemo(() => ['access', 'notifications', 'bookmarks', 'profile'], []);
+  const tabOrder: TabType[] = useMemo(() => ['access', 'reminders', 'bookmarks', 'profile'], []);
   
   // Swipe is only enabled on home screens (source step for access, or bookmarks/profile tabs without selection mode)
   const swipeEnabled = showBottomNav && !isBookmarkSelectionMode && !isNotificationsSelectionMode;
@@ -369,15 +369,15 @@ const Index = () => {
             initialUrlForShortcut={shortcutUrlFromBookmark}
             onInitialUrlConsumed={handleInitialUrlConsumed}
             onGoToBookmarks={() => handleTabChange('bookmarks')}
-            onGoToNotifications={() => handleTabChange('notifications')}
+            onGoToNotifications={() => handleTabChange('reminders')}
           />
         </div>
       )}
 
-      {/* Notifications Tab Content */}
-      {activeTab === 'notifications' && (
+      {/* Reminders Tab Content */}
+      {activeTab === 'reminders' && (
         <div 
-          key={`notifications-${slideDirection}`}
+          key={`reminders-${slideDirection}`}
           className={`flex-1 flex flex-col ${getSlideAnimation()}`}
           {...swipeHandlers}
         >
