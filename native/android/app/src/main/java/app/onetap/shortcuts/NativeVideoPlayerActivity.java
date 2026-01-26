@@ -48,6 +48,8 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -350,9 +352,8 @@ public class NativeVideoPlayerActivity extends Activity {
             
             // Schedule initial hide
             scheduleHide();
-        } catch (Exception e) {
-            logError("onCreate error: " + e.getMessage());
-            showErrorAndFinish("Failed to initialize video player");
+        } catch (Throwable t) {
+            handleFatalInitError("onCreate failed", t);
         }
     }
 
@@ -426,12 +427,8 @@ public class NativeVideoPlayerActivity extends Activity {
             
             logInfo("Playback initiated");
             
-        } catch (Exception e) {
-            logError("ExoPlayer init exception: " + e.getClass().getSimpleName() + " - " + e.getMessage());
-            if (e.getCause() != null) {
-                logError("Caused by: " + e.getCause().getMessage());
-            }
-            showExternalPlayerDialog("Failed to initialize video player");
+        } catch (Throwable t) {
+            handleFatalInitError("ExoPlayer init failed", t);
         }
     }
 
@@ -909,9 +906,106 @@ public class NativeVideoPlayerActivity extends Activity {
 
     private void showErrorAndFinish(String message) {
         try {
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
         } catch (Exception ignored) {}
         finish();
+    }
+
+    /**
+     * Handle fatal initialization errors with full diagnostics.
+     * Shows a dialog with options to copy error details or open in external player.
+     */
+    private void handleFatalInitError(String context, Throwable t) {
+        // Always log full stack trace to logcat
+        Log.e(TAG, context + " - Fatal error", t);
+        
+        // Build detailed error info
+        String errorDetails = buildErrorDetails(context, t);
+        
+        // Try to show our debug logs for context
+        try {
+            logError(context + ": " + t.getClass().getSimpleName() + " - " + t.getMessage());
+        } catch (Throwable ignored) {}
+        
+        // Show dialog with options
+        try {
+            runOnUiThread(() -> {
+                try {
+                    String message = t.getClass().getSimpleName() + ":\n" + t.getMessage();
+                    
+                    new AlertDialog.Builder(this)
+                        .setTitle("Video Player Error")
+                        .setMessage(message)
+                        .setPositiveButton("Open with...", (dialog, which) -> {
+                            openInExternalPlayer();
+                        })
+                        .setNeutralButton("Copy Error", (dialog, which) -> {
+                            copyToClipboard("Video Player Error", errorDetails);
+                            Toast.makeText(this, "Error details copied!", Toast.LENGTH_SHORT).show();
+                            finish();
+                        })
+                        .setNegativeButton("Close", (dialog, which) -> {
+                            finish();
+                        })
+                        .setOnCancelListener(dialog -> finish())
+                        .setCancelable(true)
+                        .show();
+                } catch (Throwable dialogError) {
+                    Log.e(TAG, "Failed to show error dialog", dialogError);
+                    showErrorAndFinish("Failed to initialize video player");
+                }
+            });
+        } catch (Throwable uiError) {
+            Log.e(TAG, "Failed to post to UI thread", uiError);
+            showErrorAndFinish("Failed to initialize video player");
+        }
+    }
+
+    private String buildErrorDetails(String context, Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== VIDEO PLAYER ERROR ===\n\n");
+        sb.append("Context: ").append(context).append("\n\n");
+        
+        sb.append("DEVICE:\n");
+        sb.append("  Model: ").append(Build.MODEL).append("\n");
+        sb.append("  Manufacturer: ").append(Build.MANUFACTURER).append("\n");
+        sb.append("  Android: ").append(Build.VERSION.RELEASE).append(" (API ").append(Build.VERSION.SDK_INT).append(")\n\n");
+        
+        sb.append("VIDEO:\n");
+        sb.append("  URI: ").append(videoUri != null ? videoUri.toString() : "null").append("\n");
+        sb.append("  Scheme: ").append(videoUri != null ? videoUri.getScheme() : "null").append("\n");
+        sb.append("  MIME: ").append(videoMimeType).append("\n\n");
+        
+        sb.append("EXCEPTION:\n");
+        sb.append("  Type: ").append(t.getClass().getName()).append("\n");
+        sb.append("  Message: ").append(t.getMessage()).append("\n\n");
+        
+        sb.append("STACK TRACE:\n");
+        sb.append(sw.toString()).append("\n\n");
+        
+        sb.append("DEBUG LOG:\n");
+        for (String log : debugLogs) {
+            sb.append("  ").append(log).append("\n");
+        }
+        
+        return sb.toString();
+    }
+
+    private void copyToClipboard(String label, String text) {
+        try {
+            android.content.ClipboardManager clipboard = 
+                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                ClipData clip = ClipData.newPlainText(label, text);
+                clipboard.setPrimaryClip(clip);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to copy to clipboard", e);
+        }
     }
 
     /**
