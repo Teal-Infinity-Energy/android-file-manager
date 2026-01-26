@@ -1,5 +1,7 @@
 package app.onetap.shortcuts;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
@@ -29,8 +31,10 @@ import android.util.Log;
 import android.util.Rational;
 import android.util.TypedValue;
 import android.view.Display;
+import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -114,6 +118,15 @@ public class NativeVideoPlayerActivity extends Activity {
     private static final String PIP_ACTION_SEEK_FORWARD = "app.onetap.shortcuts.PIP_SEEK_FORWARD";
     private static final long PIP_SEEK_INCREMENT_MS = 10000; // 10 seconds
     private BroadcastReceiver pipActionReceiver;
+
+    // Double-tap seek gesture
+    private GestureDetector gestureDetector;
+    private static final long DOUBLE_TAP_SEEK_MS = 10000; // 10 seconds
+    private TextView seekIndicatorLeft;
+    private TextView seekIndicatorRight;
+    private int cumulativeSeekLeft = 0;
+    private int cumulativeSeekRight = 0;
+    private final Handler seekIndicatorHandler = new Handler(Looper.getMainLooper());
 
     // Debug logging
     private final List<String> debugLogs = new ArrayList<>();
@@ -289,6 +302,192 @@ public class NativeVideoPlayerActivity extends Activity {
     }
 
     /**
+     * Set up double-tap gesture detection for seeking.
+     * Double-tap left side: seek back 10s
+     * Double-tap right side: seek forward 10s
+     */
+    private void setupDoubleTapGesture() {
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                if (exoPlayer == null || isInPipMode) return false;
+                
+                float x = e.getX();
+                float screenWidth = playerView.getWidth();
+                
+                if (screenWidth <= 0) return false;
+                
+                // Determine if tap is on left or right half
+                if (x < screenWidth / 2) {
+                    // Left side - seek back
+                    seekByDoubleTap(-DOUBLE_TAP_SEEK_MS, true);
+                } else {
+                    // Right side - seek forward
+                    seekByDoubleTap(DOUBLE_TAP_SEEK_MS, false);
+                }
+                
+                return true;
+            }
+
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent e) {
+                // Single tap toggles controls
+                toggleTopBar();
+                return true;
+            }
+
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+        });
+
+        // Apply gesture detector to playerView
+        playerView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            // Return false to allow PlayerView to handle its own touch events (controls)
+            return false;
+        });
+    }
+
+    /**
+     * Perform seek by double-tap with cumulative effect and visual feedback.
+     */
+    private void seekByDoubleTap(long seekMs, boolean isLeft) {
+        if (exoPlayer == null) return;
+        
+        long currentPos = exoPlayer.getCurrentPosition();
+        long duration = exoPlayer.getDuration();
+        long newPosition = currentPos + seekMs;
+        
+        // Clamp position
+        if (newPosition < 0) newPosition = 0;
+        if (duration > 0 && newPosition > duration) newPosition = duration;
+        
+        exoPlayer.seekTo(newPosition);
+        
+        // Update cumulative seek counter for visual feedback
+        int seekSeconds = (int) (Math.abs(seekMs) / 1000);
+        
+        if (isLeft) {
+            cumulativeSeekLeft += seekSeconds;
+            showSeekIndicator(true, cumulativeSeekLeft);
+            // Reset cumulative after delay
+            seekIndicatorHandler.removeCallbacksAndMessages("left");
+            seekIndicatorHandler.postDelayed(() -> {
+                cumulativeSeekLeft = 0;
+            }, 1000);
+        } else {
+            cumulativeSeekRight += seekSeconds;
+            showSeekIndicator(false, cumulativeSeekRight);
+            // Reset cumulative after delay
+            seekIndicatorHandler.removeCallbacksAndMessages("right");
+            seekIndicatorHandler.postDelayed(() -> {
+                cumulativeSeekRight = 0;
+            }, 1000);
+        }
+        
+        logInfo("Double-tap seek: " + (seekMs > 0 ? "+" : "") + (seekMs / 1000) + "s");
+    }
+
+    /**
+     * Create the seek indicator overlays (left and right).
+     */
+    private void createSeekIndicators() {
+        // Left indicator (rewind)
+        seekIndicatorLeft = createSeekIndicatorView(true);
+        FrameLayout.LayoutParams leftParams = new FrameLayout.LayoutParams(
+            dpToPx(120), dpToPx(120)
+        );
+        leftParams.gravity = Gravity.CENTER_VERTICAL | Gravity.START;
+        leftParams.leftMargin = dpToPx(48);
+        root.addView(seekIndicatorLeft, leftParams);
+
+        // Right indicator (forward)
+        seekIndicatorRight = createSeekIndicatorView(false);
+        FrameLayout.LayoutParams rightParams = new FrameLayout.LayoutParams(
+            dpToPx(120), dpToPx(120)
+        );
+        rightParams.gravity = Gravity.CENTER_VERTICAL | Gravity.END;
+        rightParams.rightMargin = dpToPx(48);
+        root.addView(seekIndicatorRight, rightParams);
+    }
+
+    /**
+     * Create a single seek indicator view.
+     */
+    private TextView createSeekIndicatorView(boolean isRewind) {
+        TextView indicator = new TextView(this);
+        indicator.setTextColor(Color.WHITE);
+        indicator.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        indicator.setTypeface(Typeface.DEFAULT_BOLD);
+        indicator.setGravity(Gravity.CENTER);
+        indicator.setVisibility(View.GONE);
+        indicator.setAlpha(0f);
+        
+        // Circular semi-transparent background
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(0x80000000);
+        indicator.setBackground(bg);
+        
+        return indicator;
+    }
+
+    /**
+     * Show the seek indicator with animation.
+     */
+    private void showSeekIndicator(boolean isLeft, int totalSeconds) {
+        TextView indicator = isLeft ? seekIndicatorLeft : seekIndicatorRight;
+        if (indicator == null) return;
+        
+        // Set text with icon and seconds
+        String icon = isLeft ? "⏪" : "⏩";
+        indicator.setText(icon + "\n" + totalSeconds + "s");
+        
+        // Cancel any running animation
+        indicator.animate().cancel();
+        
+        // Show with animation
+        indicator.setVisibility(View.VISIBLE);
+        indicator.setScaleX(0.5f);
+        indicator.setScaleY(0.5f);
+        indicator.setAlpha(0f);
+        
+        indicator.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(150)
+            .setListener(null)
+            .start();
+        
+        // Schedule hide
+        seekIndicatorHandler.postDelayed(() -> hideSeekIndicator(isLeft), 800);
+    }
+
+    /**
+     * Hide the seek indicator with fade-out animation.
+     */
+    private void hideSeekIndicator(boolean isLeft) {
+        TextView indicator = isLeft ? seekIndicatorLeft : seekIndicatorRight;
+        if (indicator == null || indicator.getVisibility() != View.VISIBLE) return;
+        
+        indicator.animate()
+            .alpha(0f)
+            .scaleX(0.8f)
+            .scaleY(0.8f)
+            .setDuration(200)
+            .setListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    indicator.setVisibility(View.GONE);
+                }
+            })
+            .start();
+    }
+
+    /**
      * Apply immersive fullscreen safely.
      *
      * On some OEM builds, calling getWindow().getInsetsController() too early can crash
@@ -398,8 +597,11 @@ public class NativeVideoPlayerActivity extends Activity {
             );
             root.addView(playerView, playerParams);
 
-            // Tap to toggle top bar (PlayerView handles its own controls)
-            playerView.setOnClickListener(v -> toggleTopBar());
+            // Set up double-tap gesture detector for seeking
+            setupDoubleTapGesture();
+            
+            // Create seek indicator overlays
+            createSeekIndicators();
 
             // Store intent for diagnostics
             launchIntent = getIntent();
