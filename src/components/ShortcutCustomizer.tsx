@@ -128,6 +128,21 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
       <div className="flex-1 p-4 space-y-8 overflow-auto animate-fade-in">
         {/* Content Preview */}
         <ContentPreview source={source} />
+        
+        {/* File size indicator for videos */}
+        {isVideo && fileSizeMB && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
+            <span className="text-lg">🎬</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                {t('shortcutCustomizer.videoFile')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {fileSizeMB} MB {Number(fileSizeMB) > 50 ? `• ${t('shortcutCustomizer.largeFileWarning')}` : ''}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Name input */}
         <div className="space-y-2">
@@ -226,7 +241,13 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
       <div className="p-4 safe-bottom space-y-3">
         {/* Progress indicator for large files */}
         {isCreating && isLargeFile && (
-          <div className="space-y-2 animate-fade-in">
+          <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/50 animate-fade-in">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-foreground">
+                {isVideo ? t('shortcutCustomizer.processingVideo') : t('shortcutCustomizer.processingFile')}
+              </span>
+              <span className="text-muted-foreground">{Math.round(creationProgress)}%</span>
+            </div>
             <Progress value={creationProgress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
               {isVideo 
