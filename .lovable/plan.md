@@ -1,73 +1,89 @@
 
 
-## Add Translations for File Size Indicator & Progress Bar
+## Disable Swipe Navigation When Forms Are Open
 
-This plan adds the missing translation keys for the new video file size indicator and progress bar across all 14 supported languages, while also making the large file warning more subtle.
-
----
-
-### Changes Overview
-
-#### 1. Update English Locale (Subtle Warning)
-- Change `largeFileWarning` from "May take longer to process" to "Large file" for a more subtle, less alarming tone
-
-#### 2. Add Missing Translation Keys to All Locales
-
-Each locale file will receive 6 new keys under `shortcutCustomizer`:
-
-| Key | English | Purpose |
-|-----|---------|---------|
-| `videoFile` | Video file | Label for video file indicator |
-| `largeFileWarning` | Large file | Subtle warning for files >50MB |
-| `processingVideo` | Processing video | Progress bar title for videos |
-| `processingFile` | Processing file | Progress bar title for other files |
-| `processingLargeVideo` | Copying {{size}} MB video to app storage... | Progress description for videos |
-| `processingLargeFile` | Copying {{size}} MB file to app storage... | Progress description for files |
+This plan implements disabling horizontal swipe navigation between tabs when the "Schedule Action" creator is open in the Reminders tab or when the "Add URL" form is open in the Bookmarks tab.
 
 ---
 
-### Translations by Language
+### Overview
 
-| Language | `videoFile` | `largeFileWarning` |
-|----------|-------------|-------------------|
-| Spanish (es) | Archivo de video | Archivo grande |
-| Portuguese (pt) | Arquivo de vídeo | Arquivo grande |
-| German (de) | Videodatei | Große Datei |
-| French (fr) | Fichier vidéo | Fichier volumineux |
-| Italian (it) | File video | File grande |
-| Japanese (ja) | 動画ファイル | 大きなファイル |
-| Korean (ko) | 동영상 파일 | 대용량 파일 |
-| Hindi (hi) | वीडियो फाइल | बड़ी फाइल |
-| Arabic (ar) | ملف فيديو | ملف كبير |
-| Russian (ru) | Видеофайл | Большой файл |
-| Thai (th) | ไฟล์วิดีโอ | ไฟล์ขนาดใหญ่ |
-| Vietnamese (vi) | Tệp video | Tệp lớn |
-| Chinese (zh) | 视频文件 | 大文件 |
+When users are actively entering data in forms (URL input, action scheduling), accidental horizontal swipes should not switch tabs. This prevents frustrating data loss and improves the user experience.
+
+---
+
+### Technical Approach
+
+The solution follows the existing pattern used for selection modes - child components will notify the parent (`Index.tsx`) when a form/overlay is open, and the parent will incorporate this state into the `swipeEnabled` calculation.
+
+---
+
+### Changes
+
+#### 1. Update `NotificationsPage.tsx`
+
+Add a new callback prop to notify the parent when the creator is open:
+
+- Add prop: `onCreatorOpenChange?: (isOpen: boolean) => void`
+- Call `onCreatorOpenChange?.(true)` when `showCreator` becomes true
+- Call `onCreatorOpenChange?.(false)` when `showCreator` becomes false
+
+#### 2. Update `BookmarkLibrary.tsx`
+
+Add a new callback prop to notify the parent when the add form is open:
+
+- Add prop: `onAddFormOpenChange?: (isOpen: boolean) => void`
+- Call `onAddFormOpenChange?.(true)` when `showAddForm` becomes true
+- Call `onAddFormOpenChange?.(false)` when `showAddForm` becomes false
+
+#### 3. Update `Index.tsx`
+
+Wire up the new state and disable swipe when forms are open:
+
+- Add state: `const [isRemindersCreatorOpen, setIsRemindersCreatorOpen] = useState(false)`
+- Add state: `const [isBookmarkFormOpen, setIsBookmarkFormOpen] = useState(false)`
+- Pass new callbacks to child components
+- Update swipe logic: `const swipeEnabled = showBottomNav && !isBookmarkSelectionMode && !isNotificationsSelectionMode && !isRemindersCreatorOpen && !isBookmarkFormOpen`
 
 ---
 
 ### Files to Modify
 
-1. `public/locales/en.json` - Update warning text to be more subtle
-2. `public/locales/es.json` - Add all 6 keys
-3. `public/locales/pt.json` - Add all 6 keys
-4. `public/locales/de.json` - Add all 6 keys
-5. `public/locales/fr.json` - Add all 6 keys
-6. `public/locales/it.json` - Add all 6 keys
-7. `public/locales/ja.json` - Add all 6 keys
-8. `public/locales/ko.json` - Add all 6 keys
-9. `public/locales/hi.json` - Add all 6 keys
-10. `public/locales/ar.json` - Add all 6 keys
-11. `public/locales/ru.json` - Add all 6 keys
-12. `public/locales/th.json` - Add all 6 keys
-13. `public/locales/vi.json` - Add all 6 keys
-14. `public/locales/zh.json` - Add all 6 keys
+| File | Change |
+|------|--------|
+| `src/pages/Index.tsx` | Add state tracking for form visibility and pass callbacks to children |
+| `src/components/NotificationsPage.tsx` | Add `onCreatorOpenChange` prop and notify parent |
+| `src/components/BookmarkLibrary.tsx` | Add `onAddFormOpenChange` prop and notify parent |
 
 ---
 
-### Technical Details
+### Implementation Details
 
-The translations will be added to the existing `shortcutCustomizer` section in each locale file. For languages that don't have a `shortcutCustomizer` section yet (some use `shortcut` instead), the keys will be added to the appropriate existing section or a new `shortcutCustomizer` section will be created to match the English structure.
+**NotificationsPage.tsx** will use a `useEffect` to watch `showCreator` and call the callback:
 
-The `{{size}}` placeholder in `processingLargeVideo` and `processingLargeFile` is an i18next interpolation variable that will be replaced with the actual file size in MB at runtime.
+```typescript
+useEffect(() => {
+  onCreatorOpenChange?.(showCreator);
+}, [showCreator, onCreatorOpenChange]);
+```
+
+**BookmarkLibrary.tsx** will use the same pattern:
+
+```typescript
+useEffect(() => {
+  onAddFormOpenChange?.(showAddForm);
+}, [showAddForm, onAddFormOpenChange]);
+```
+
+**Index.tsx** swipe enabled calculation becomes:
+
+```typescript
+const swipeEnabled = showBottomNav 
+  && !isBookmarkSelectionMode 
+  && !isNotificationsSelectionMode 
+  && !isRemindersCreatorOpen 
+  && !isBookmarkFormOpen;
+```
+
+This ensures consistent behavior where any focused input or multi-step form prevents accidental tab switches.
 
