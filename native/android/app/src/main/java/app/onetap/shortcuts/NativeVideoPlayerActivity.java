@@ -63,12 +63,14 @@ import java.util.Locale;
 public class NativeVideoPlayerActivity extends Activity {
     private static final String TAG = "NativeVideoPlayer";
     private static final int AUTO_HIDE_DELAY_MS = 4000;
+    private static final float[] PLAYBACK_SPEEDS = {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f};
 
     private FrameLayout root;
     private PlayerView playerView;
     private LinearLayout topBar;
     private LinearLayout debugOverlay;
     private TextView debugTextView;
+    private TextView speedButton;
     private boolean isDebugVisible = false;
 
     private ExoPlayer exoPlayer;
@@ -77,6 +79,7 @@ public class NativeVideoPlayerActivity extends Activity {
     private String videoMimeType;
     private boolean hasTriedExternalFallback = false;
     private boolean isTopBarVisible = true;
+    private int currentSpeedIndex = 2; // Default to 1.0x
 
     // HDR state
     private boolean isHdrContent = false;
@@ -713,6 +716,16 @@ public class NativeVideoPlayerActivity extends Activity {
         );
         root.addView(topBar, topBarParams);
 
+        // Speed button (text button showing current speed)
+        speedButton = createSpeedButton();
+        speedButton.setOnClickListener(v -> cyclePlaybackSpeed());
+        
+        LinearLayout.LayoutParams speedParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40)
+        );
+        speedParams.setMargins(dpToPx(8), 0, dpToPx(8), 0);
+        topBar.addView(speedButton, speedParams);
+
         // Debug button (info icon)
         ImageButton debugButton = createIconButton(
             android.R.drawable.ic_menu_info_details,
@@ -738,6 +751,64 @@ public class NativeVideoPlayerActivity extends Activity {
         );
         buttonParams.setMargins(dpToPx(8), 0, dpToPx(8), 0);
         topBar.addView(openWithButton, buttonParams);
+    }
+
+    private TextView createSpeedButton() {
+        TextView button = new TextView(this);
+        button.setText(getSpeedLabel(PLAYBACK_SPEEDS[currentSpeedIndex]));
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        button.setTypeface(Typeface.DEFAULT_BOLD);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dpToPx(16), dpToPx(8), dpToPx(16), dpToPx(8));
+        button.setContentDescription("Playback speed");
+        
+        // Pill-shaped background
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dpToPx(20));
+        bg.setColor(0x40FFFFFF);
+        button.setBackground(bg);
+        
+        return button;
+    }
+
+    private String getSpeedLabel(float speed) {
+        if (speed == (int) speed) {
+            return String.format(Locale.US, "%dx", (int) speed);
+        } else if (speed * 10 == (int) (speed * 10)) {
+            return String.format(Locale.US, "%.1fx", speed);
+        } else {
+            return String.format(Locale.US, "%.2fx", speed);
+        }
+    }
+
+    private void cyclePlaybackSpeed() {
+        currentSpeedIndex = (currentSpeedIndex + 1) % PLAYBACK_SPEEDS.length;
+        float newSpeed = PLAYBACK_SPEEDS[currentSpeedIndex];
+        
+        if (exoPlayer != null) {
+            exoPlayer.setPlaybackSpeed(newSpeed);
+            logInfo("Playback speed: " + getSpeedLabel(newSpeed));
+        }
+        
+        if (speedButton != null) {
+            speedButton.setText(getSpeedLabel(newSpeed));
+            
+            // Brief scale animation for feedback
+            speedButton.animate()
+                .scaleX(1.2f).scaleY(1.2f)
+                .setDuration(100)
+                .withEndAction(() -> 
+                    speedButton.animate()
+                        .scaleX(1f).scaleY(1f)
+                        .setDuration(100)
+                        .start()
+                )
+                .start();
+        }
+        
+        // Reset auto-hide timer
+        scheduleHide();
     }
 
     private void createDebugOverlay() {
