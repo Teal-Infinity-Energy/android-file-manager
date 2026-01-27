@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import { ArrowLeft, AlertCircle, Loader2, RefreshCw, ExternalLink, Share2 } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Loader2, RefreshCw, ExternalLink, Share2, ChevronDown } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Share } from '@capacitor/share';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 
 /**
@@ -72,6 +73,7 @@ const VideoPlayer = () => {
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [resolvedPath, setResolvedPath] = useState<string | null>(null);
   const [playableUrl, setPlayableUrl] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   const videoUri = searchParams.get('uri');
   const nonce = searchParams.get('t');
@@ -335,10 +337,10 @@ const VideoPlayer = () => {
   if (state === 'loading') {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
-        <Loader2 className="h-12 w-12 text-white animate-spin mb-4" />
-        <p className="text-muted-foreground text-center">Loading video...</p>
+        <Loader2 className="h-14 w-14 text-white animate-spin mb-4" />
+        <p className="text-white/70 text-center animate-pulse">Loading video...</p>
         {debugInfo && (
-          <p className="text-xs text-muted-foreground/50 mt-2 text-center">{debugInfo}</p>
+          <p className="text-xs text-white/40 mt-3 text-center max-w-xs">{debugInfo}</p>
         )}
       </div>
     );
@@ -351,22 +353,36 @@ const VideoPlayer = () => {
         <div className="text-center max-w-md">
           <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Cannot Play Video</h2>
-          <p className="text-muted-foreground mb-4">{errorMessage || 'An unknown error occurred'}</p>
-          {debugInfo && (
-            <pre className="text-xs text-muted-foreground/60 mb-6 font-mono whitespace-pre-wrap text-left bg-white/5 p-3 rounded">
-              {debugInfo}
-            </pre>
-          )}
-          <div className="flex gap-3 justify-center">
-            <Button onClick={handleRetry} variant="outline">
+          <p className="text-muted-foreground mb-6">{errorMessage || 'An unknown error occurred'}</p>
+          
+          <div className="flex gap-3 justify-center mb-4">
+            <Button onClick={handleRetry} variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
               <RefreshCw className="h-4 w-4 me-2" />
               Retry
             </Button>
-            <Button onClick={handleBack} variant="ghost">
+            <Button onClick={handleOpenExternal} variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+              <ExternalLink className="h-4 w-4 me-2" />
+              Open with...
+            </Button>
+            <Button onClick={handleBack} variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10">
               <ArrowLeft className="h-4 w-4 me-2 rtl:rotate-180" />
-              Go Back
+              Back
             </Button>
           </div>
+          
+          {debugInfo && (
+            <Collapsible open={showDebug} onOpenChange={setShowDebug}>
+              <CollapsibleTrigger className="flex items-center gap-2 mx-auto text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                <ChevronDown className={`h-3 w-3 transition-transform ${showDebug ? 'rotate-180' : ''}`} />
+                {showDebug ? 'Hide details' : 'Show details'}
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="text-xs text-muted-foreground/60 mt-3 font-mono whitespace-pre-wrap text-left bg-white/5 p-3 rounded">
+                  {debugInfo}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </div>
       </div>
     );
@@ -375,16 +391,40 @@ const VideoPlayer = () => {
   // Ready/Playing state - show video
   return (
     <div className="min-h-screen bg-black flex flex-col">
-      <header className="absolute top-0 inset-x-0 z-10 p-4 bg-gradient-to-b from-black/80 to-transparent">
+      {/* Premium header with 4-stop gradient matching native player */}
+      <header 
+        className="absolute top-0 inset-x-0 z-10 p-4 pt-safe"
+        style={{ 
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.3) 70%, transparent 100%)' 
+        }}
+      >
         <div className="flex items-center justify-between">
-          <Button onClick={handleBack} variant="ghost" size="icon" className="text-white hover:bg-white/20">
-            <ArrowLeft className="h-6 w-6 rtl:rotate-180" />
+          {/* Premium frosted glass back button */}
+          <Button 
+            onClick={handleBack} 
+            variant="ghost" 
+            size="icon" 
+            className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:scale-105 active:scale-95 transition-all"
+          >
+            <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </Button>
           <div className="flex items-center gap-2">
-            <Button onClick={handleOpenExternal} variant="ghost" size="icon" className="text-white hover:bg-white/20">
+            {/* External player button */}
+            <Button 
+              onClick={handleOpenExternal} 
+              variant="ghost" 
+              size="icon" 
+              className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:scale-105 active:scale-95 transition-all"
+            >
               <ExternalLink className="h-5 w-5" />
             </Button>
-            <Button onClick={handleShare} variant="ghost" size="icon" className="text-white hover:bg-white/20">
+            {/* Share button */}
+            <Button 
+              onClick={handleShare} 
+              variant="ghost" 
+              size="icon" 
+              className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:scale-105 active:scale-95 transition-all"
+            >
               <Share2 className="h-5 w-5" />
             </Button>
           </div>

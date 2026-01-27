@@ -97,6 +97,9 @@ public class NativeVideoPlayerActivity extends Activity {
     private ImageButton closeButton;
     private ImageButton lockButton;
     private ImageButton floatingUnlockButton;
+    private LinearLayout floatingUnlockContainer;
+    private TextView floatingUnlockLabel;
+    private ImageView lockStateIndicator;
     private boolean isTopBarVisible = true;
     private boolean isControlsLocked = false;
 
@@ -1041,17 +1044,17 @@ public class NativeVideoPlayerActivity extends Activity {
                 .start();
         }
         
-        // Show feedback toast
-        Toast.makeText(this, isControlsLocked ? "Controls locked" : "Controls unlocked", Toast.LENGTH_SHORT).show();
-        
         if (isControlsLocked) {
             hideTopBar();
             playerView.setUseController(false);
+            // Show lock state indicator in corner
+            showLockStateIndicator();
             // Show floating unlock button briefly, then hide after delay
             showFloatingUnlockButton();
             hideHandler.postDelayed(this::hideFloatingUnlockButton, AUTO_HIDE_DELAY_MS);
         } else {
-            // Hide floating unlock button
+            // Hide lock state indicator and floating unlock button
+            hideLockStateIndicator();
             hideFloatingUnlockButton();
             showTopBar();
             scheduleHide();
@@ -1060,12 +1063,72 @@ public class NativeVideoPlayerActivity extends Activity {
     }
     
     /**
+     * Create the persistent lock state indicator (small lock icon in corner).
+     */
+    private void createLockStateIndicator() {
+        lockStateIndicator = new ImageView(this);
+        lockStateIndicator.setImageResource(android.R.drawable.ic_lock_lock);
+        lockStateIndicator.setColorFilter(Color.WHITE);
+        lockStateIndicator.setVisibility(View.GONE);
+        lockStateIndicator.setAlpha(0f);
+        
+        // Small pill background
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dpToPx(16));
+        bg.setColor(0x66000000);
+        bg.setStroke(dpToPx(1), 0x33FFFFFF);
+        lockStateIndicator.setBackground(bg);
+        lockStateIndicator.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8));
+        lockStateIndicator.setElevation(dpToPx(4));
+        
+        // Position in top-right corner
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dpToPx(36), dpToPx(36));
+        params.gravity = Gravity.TOP | Gravity.END;
+        params.topMargin = dpToPx(120); // Below top bar area
+        params.rightMargin = dpToPx(16);
+        
+        root.addView(lockStateIndicator, params);
+    }
+    
+    /**
+     * Show the lock state indicator with animation.
+     */
+    private void showLockStateIndicator() {
+        if (lockStateIndicator == null) {
+            createLockStateIndicator();
+        }
+        
+        lockStateIndicator.setVisibility(View.VISIBLE);
+        lockStateIndicator.animate()
+            .alpha(0.8f)
+            .setDuration(300)
+            .start();
+    }
+    
+    /**
+     * Hide the lock state indicator with animation.
+     */
+    private void hideLockStateIndicator() {
+        if (lockStateIndicator == null) return;
+        
+        lockStateIndicator.animate()
+            .alpha(0f)
+            .setDuration(200)
+            .withEndAction(() -> {
+                if (lockStateIndicator != null) {
+                    lockStateIndicator.setVisibility(View.GONE);
+                }
+            })
+            .start();
+    }
+    
+    /**
      * Toggle floating unlock button visibility when screen is tapped while locked.
      */
     private void toggleFloatingUnlockButton() {
-        if (floatingUnlockButton == null) return;
+        if (floatingUnlockContainer == null) return;
         
-        if (floatingUnlockButton.getVisibility() == View.VISIBLE && floatingUnlockButton.getAlpha() > 0) {
+        if (floatingUnlockContainer.getVisibility() == View.VISIBLE && floatingUnlockContainer.getAlpha() > 0) {
             hideFloatingUnlockButton();
         } else {
             showFloatingUnlockButton();
@@ -1076,33 +1139,37 @@ public class NativeVideoPlayerActivity extends Activity {
     }
     
     /**
-     * Show the floating unlock button with animation.
+     * Show the floating unlock button with animation and pulsing effect.
      */
     private void showFloatingUnlockButton() {
-        if (floatingUnlockButton == null) return;
+        if (floatingUnlockContainer == null) return;
         
-        floatingUnlockButton.setVisibility(View.VISIBLE);
-        floatingUnlockButton.animate()
+        floatingUnlockContainer.setVisibility(View.VISIBLE);
+        floatingUnlockContainer.animate()
             .alpha(1f)
-            .scaleX(1f).scaleY(1f)
-            .setDuration(200)
+            .setDuration(250)
             .setInterpolator(new OvershootInterpolator())
             .start();
+        
+        // Start pulsing animation
+        startFloatingUnlockPulse();
     }
     
     /**
      * Hide the floating unlock button with animation.
      */
     private void hideFloatingUnlockButton() {
-        if (floatingUnlockButton == null) return;
+        if (floatingUnlockContainer == null) return;
         
-        floatingUnlockButton.animate()
+        // Stop pulsing animation
+        stopFloatingUnlockPulse();
+        
+        floatingUnlockContainer.animate()
             .alpha(0f)
-            .scaleX(0.8f).scaleY(0.8f)
             .setDuration(200)
             .withEndAction(() -> {
-                if (floatingUnlockButton != null) {
-                    floatingUnlockButton.setVisibility(View.GONE);
+                if (floatingUnlockContainer != null) {
+                    floatingUnlockContainer.setVisibility(View.GONE);
                 }
             })
             .start();
@@ -1584,48 +1651,107 @@ public class NativeVideoPlayerActivity extends Activity {
      * This provides a way to unlock controls even when the top bar is hidden.
      */
     private void createFloatingUnlockButton() {
+        // Create container for button + label
+        floatingUnlockContainer = new LinearLayout(this);
+        floatingUnlockContainer.setOrientation(LinearLayout.VERTICAL);
+        floatingUnlockContainer.setGravity(Gravity.CENTER);
+        floatingUnlockContainer.setVisibility(View.GONE);
+        floatingUnlockContainer.setAlpha(0f);
+        
+        // Unlock button - 72dp for better tapping
         floatingUnlockButton = new ImageButton(this);
-        floatingUnlockButton.setImageResource(android.R.drawable.ic_lock_lock);
+        floatingUnlockButton.setImageResource(android.R.drawable.ic_lock_idle_lock); // Open lock icon
         floatingUnlockButton.setContentDescription("Tap to unlock controls");
         floatingUnlockButton.setColorFilter(Color.WHITE);
-        floatingUnlockButton.setVisibility(View.GONE);
-        floatingUnlockButton.setAlpha(0f);
         
-        // Premium glassmorphism style with larger touch target
+        // Premium glassmorphism style with enhanced visibility
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0x66000000);
-        bg.setStroke(dpToPx(2), 0x44FFFFFF);
+        bg.setColor(0x80000000); // 50% black for better contrast
+        bg.setStroke(dpToPx(2), 0x66FFFFFF); // Stronger border
         floatingUnlockButton.setBackground(bg);
         floatingUnlockButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        floatingUnlockButton.setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16));
-        floatingUnlockButton.setElevation(dpToPx(8));
+        floatingUnlockButton.setPadding(dpToPx(18), dpToPx(18), dpToPx(18), dpToPx(18));
+        floatingUnlockButton.setElevation(dpToPx(12));
         
-        // Position at bottom center
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dpToPx(64), dpToPx(64));
-        params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        params.bottomMargin = dpToPx(80);
+        // 72dp size for reliable tapping
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(dpToPx(72), dpToPx(72));
+        floatingUnlockContainer.addView(floatingUnlockButton, buttonParams);
+        
+        // Label below button
+        floatingUnlockLabel = new TextView(this);
+        floatingUnlockLabel.setText("Tap to unlock");
+        floatingUnlockLabel.setTextColor(0xCCFFFFFF);
+        floatingUnlockLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        floatingUnlockLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        floatingUnlockLabel.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        labelParams.topMargin = dpToPx(8);
+        floatingUnlockContainer.addView(floatingUnlockLabel, labelParams);
+        
+        // Position container at bottom center, higher up to avoid bottom controls
+        FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        containerParams.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        containerParams.bottomMargin = dpToPx(100);
         
         floatingUnlockButton.setOnClickListener(v -> {
             performHapticFeedback();
             toggleControlsLock();
         });
         
-        // Add touch feedback animation
+        // Enhanced touch feedback animation
         floatingUnlockButton.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(80).start();
+                    v.animate().scaleX(0.85f).scaleY(0.85f).setDuration(80).start();
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    v.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(100)
+                        .setInterpolator(new OvershootInterpolator(1.3f)).start();
                     break;
             }
             return false;
         });
         
-        root.addView(floatingUnlockButton, params);
+        root.addView(floatingUnlockContainer, containerParams);
+    }
+    
+    // Pulsing animation for floating unlock button
+    private ValueAnimator floatingUnlockPulseAnimator;
+    
+    private void startFloatingUnlockPulse() {
+        if (floatingUnlockPulseAnimator != null) {
+            floatingUnlockPulseAnimator.cancel();
+        }
+        
+        floatingUnlockPulseAnimator = ValueAnimator.ofFloat(1f, 1.08f, 1f);
+        floatingUnlockPulseAnimator.setDuration(1200);
+        floatingUnlockPulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        floatingUnlockPulseAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        floatingUnlockPulseAnimator.addUpdateListener(animation -> {
+            float scale = (float) animation.getAnimatedValue();
+            if (floatingUnlockButton != null) {
+                floatingUnlockButton.setScaleX(scale);
+                floatingUnlockButton.setScaleY(scale);
+            }
+        });
+        floatingUnlockPulseAnimator.start();
+    }
+    
+    private void stopFloatingUnlockPulse() {
+        if (floatingUnlockPulseAnimator != null) {
+            floatingUnlockPulseAnimator.cancel();
+            floatingUnlockPulseAnimator = null;
+        }
+        if (floatingUnlockButton != null) {
+            floatingUnlockButton.setScaleX(1f);
+            floatingUnlockButton.setScaleY(1f);
+        }
     }
 
     private TextView createSpeedButton() {
@@ -1654,29 +1780,32 @@ public class NativeVideoPlayerActivity extends Activity {
         button.setContentDescription(contentDescription);
         button.setColorFilter(Color.WHITE);
         
-        // Premium glassmorphism circle with subtle glow
+        // Premium glassmorphism circle with enhanced visibility
+        // Larger size (52dp) and stronger border (2dp) for better touch targets
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0x40FFFFFF);
-        bg.setStroke(dpToPx(1), 0x30FFFFFF);
+        bg.setColor(0x4DFFFFFF); // 30% white - slightly more visible
+        bg.setStroke(dpToPx(2), 0x40FFFFFF); // 2dp border, 25% white
         button.setBackground(bg);
         button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        button.setPadding(dpToPx(11), dpToPx(11), dpToPx(11), dpToPx(11));
-        button.setElevation(dpToPx(4));
+        button.setPadding(dpToPx(14), dpToPx(14), dpToPx(14), dpToPx(14)); // Larger padding
+        button.setElevation(dpToPx(6));
         
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dpToPx(46), dpToPx(46));
-        params.setMargins(dpToPx(5), 0, dpToPx(5), 0);
+        // Larger touch targets: 52dp instead of 46dp
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dpToPx(52), dpToPx(52));
+        params.setMargins(dpToPx(4), 0, dpToPx(4), 0);
         button.setLayoutParams(params);
         
-        // Add touch feedback animation
+        // Enhanced touch feedback animation with stronger scale
         button.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(80).start();
+                    v.animate().scaleX(0.85f).scaleY(0.85f).setDuration(80).start();
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    v.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(100)
+                        .setInterpolator(new OvershootInterpolator(1.2f)).start();
                     break;
             }
             return false;
