@@ -1,175 +1,248 @@
 
-# Safe Area Top Padding - System-Wide Fix Plan
+# Premium Scheduled Timing Picker Redesign
 
-## Problem Summary
-Content in various screens is getting too close to or hidden under the Android notification/status bar because:
-1. **Missing CSS utility**: The `safe-top` class is used in `SettingsPage.tsx` and `ProfilePage.tsx` but is NOT defined in the CSS
-2. **Inconsistent application**: Many screens don't apply any top safe area padding at all
-3. **Header padding inconsistency**: Different screens use different top padding values (`pt-6`, `pt-8`, `pt-12`) without accounting for the system status bar
+## Overview
+Transform the notification timing selection screen into a delightful, premium experience that makes choosing when to trigger a reminder feel effortless and intuitive. The current design is functional but utilitarian - the new design will feel polished, modern, and enjoyable to use.
 
-## Affected Screens
+## Current State Analysis
+The existing `ScheduledTimingPicker` has:
+- Basic recurrence selector (4 grid buttons)
+- Horizontal scrolling date picker (14 days)
+- Numeric time picker with up/down arrows
+- AM/PM toggle buttons
+- Simple preview section
 
-### Screens Using Undefined `safe-top` Class (Broken)
-- `SettingsPage.tsx` (line 120)
-- `ProfilePage.tsx` (lines 244, 320)
+**Pain Points:**
+1. Time picker requires many taps to reach desired time
+2. Date selector is small and requires scrolling
+3. Visual hierarchy is flat - everything looks equally important
+4. No smart defaults or quick-select options
+5. Lack of premium visual polish (gradients, shadows, animations)
 
-### Screens Missing Safe Area Padding Entirely
-| Screen | Current Header Padding | Issue |
-|--------|----------------------|-------|
-| `AccessFlow.tsx` (source step) | `pt-8` | No safe area consideration |
-| `BookmarkLibrary.tsx` | `pt-8` | No safe area consideration |
-| `NotificationsPage.tsx` | `pt-8` | No safe area consideration |
-| `UrlInput.tsx` | No padding (border-b header) | Too close to status bar |
-| `ShortcutCustomizer.tsx` | No padding (border-b header) | Too close to status bar |
-| `ContactShortcutCustomizer.tsx` | `pt-6` | Insufficient padding |
-| `OnboardingFlow.tsx` | `p-4` (skip button area) | May overlap status bar |
-| `LanguageSelectionStep.tsx` | `pt-12` | May be okay but inconsistent |
-| `SuccessScreen.tsx` | No specific top handling | Center-aligned, may be fine |
-| `VideoPlayer.tsx` | Uses `pt-safe` (inline style) | Already handled |
+---
 
-## Solution
+## New Design Concept
 
-### Phase 1: Define the Missing `safe-top` CSS Utility
+### Design Philosophy
+- **"One-tap when possible"** - Provide smart shortcuts for common choices
+- **"Progressive disclosure"** - Show simple options first, reveal advanced options on demand
+- **"Delightful feedback"** - Subtle animations and haptic feedback for every interaction
+- **Premium visual language** - Glassmorphism, gradients, smooth shadows
 
-Add the `safe-top` class to `src/index.css` alongside the existing `safe-bottom`:
+---
 
-```css
-/* Safe area for Android status bar */
-.safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
-}
+## Component Structure
 
-/* Combined safe area padding for headers */
-.pt-safe {
-  padding-top: max(env(safe-area-inset-top, 0px), 0.5rem);
-}
+### 1. Quick Time Presets (New Section)
+Large, tappable cards for the most common scenarios:
+- **"In 1 hour"** - Dynamic based on current time
+- **"Tomorrow morning"** - 9:00 AM
+- **"Tomorrow evening"** - 6:00 PM
+- **"This weekend"** - Saturday 10:00 AM
+
+These use a premium card style with gradient backgrounds, icons, and subtle shadows.
+
+### 2. Custom Time Section (Redesigned)
+Collapsible section that expands when user wants precise control:
+
+**Date Selection:**
+- Calendar-style week view showing 7 days at a time
+- Selected date has animated highlight with gradient background
+- Today and Tomorrow have special labels
+- Swipe to see next/previous week
+
+**Time Selection (Wheel/Drum Picker):**
+- iOS-style scrollable wheels for hour, minute, and AM/PM
+- Large touch targets with momentum scrolling
+- Current selection highlighted with gradient bar
+- Haptic feedback on each tick
+
+**Recurrence Toggle:**
+- Pill-style segmented control (Once | Daily | Weekly | Yearly)
+- Selected state uses primary gradient fill
+- Smooth slide animation between states
+
+### 3. Live Preview Card (Enhanced)
+- Floating card at bottom above the confirm button
+- Shows formatted date/time with icon
+- Animates when selection changes
+- Shows recurrence info with subtle badge
+
+---
+
+## Visual Specifications
+
+### Color & Effects
+```
+- Quick preset cards: bg-gradient-to-br from-primary/10 to-primary/5
+- Selected states: bg-primary with white text
+- Time wheel highlight: linear gradient with blur
+- Card shadows: elevation-2 for depth
+- Border radius: rounded-2xl (16px) for cards
 ```
 
-### Phase 2: Apply Safe Area Padding to All Main Screens
+### Typography
+```
+- Section labels: text-xs uppercase tracking-wider text-muted-foreground
+- Quick preset titles: text-base font-semibold
+- Time display: text-4xl font-bold tabular-nums
+- Preview text: text-lg font-medium
+```
 
-#### Main Tab Containers (already in Index.tsx wrapper)
-The main tabs render inside a flex container. Each tab's top-level component needs safe area padding.
+### Animations
+```
+- Card press: scale-[0.98] with 150ms transition
+- Selection change: fade-in-scale animation
+- Section expand: accordion animation
+- Time wheel: smooth momentum with spring physics
+```
 
-#### Files to Update
+---
 
-**1. AccessFlow.tsx (source step header)**
-- Change: `pt-8` -> `pt-safe-header` (combined utility) or add safe-top to container
+## Component Breakdown
 
-**2. BookmarkLibrary.tsx**
-- Change: `pt-8` -> include safe area padding
+### File Changes
 
-**3. NotificationsPage.tsx**
-- Change: `pt-8` -> include safe area padding
+**1. `src/components/ScheduledTimingPicker.tsx`** - Complete redesign:
+- Add `QuickTimePresets` component for one-tap selections
+- Replace numeric stepper with `TimeWheelPicker` component
+- Replace horizontal scroll with `WeekCalendarPicker` component
+- Add `RecurrenceSegmentedControl` component
+- Enhanced `PreviewCard` with animations
+- Add haptic feedback integration
 
-**4. UrlInput.tsx**
-- Add safe area padding to the container or header
+**2. `src/components/ui/time-wheel-picker.tsx`** - New file:
+- Touch-friendly scrollable wheel picker
+- Support for hour (1-12), minute (0-59), period (AM/PM)
+- Momentum scrolling with snap-to-value
+- Visual highlight bar for current selection
 
-**5. ShortcutCustomizer.tsx**
-- Add safe area padding to the container or header
-
-**6. ContactShortcutCustomizer.tsx**
-- Change: `pt-6` -> include safe area padding
-
-**7. OnboardingFlow.tsx**
-- Add safe area padding to the skip button container
-
-**8. LanguageSelectionStep.tsx**
-- Verify and add safe area if needed
-
-**9. ScheduledActionCreator.tsx** (if exists)
-- Check and add safe area padding
-
-**10. ScheduledActionEditor.tsx** (if exists)
-- Check and add safe area padding
-
-### Phase 3: Create Consistent Header Padding Strategy
-
-Create a reusable approach using CSS custom property:
-
-```css
-/* Header-safe utility: combines safe area + visual padding */
-.pt-header-safe {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem); /* safe + 24px visual */
-}
-
-.pt-header-safe-sm {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 1rem); /* safe + 16px visual */
+**3. `src/i18n/locales/en.json`** - New translation keys:
+```json
+{
+  "scheduledTiming": {
+    "quickOptions": "Quick options",
+    "inOneHour": "In 1 hour",
+    "tomorrowMorning": "Tomorrow morning",
+    "tomorrowEvening": "Tomorrow evening",
+    "thisWeekend": "This weekend",
+    "customTime": "Custom time",
+    "selectDate": "Select date",
+    "selectTime": "Select time",
+    "repeatOption": "Repeat",
+    "scheduledFor": "Scheduled for"
+  }
 }
 ```
 
 ---
 
-## Technical Implementation Details
+## Implementation Flow
 
-### CSS Changes (src/index.css)
-
-Add within `@layer base` (after `.safe-bottom`):
-
-```css
-/* Safe area for Android status bar */
-.safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
-}
-
-/* Header-safe utilities: combines safe area + visual padding */
-.pt-header-safe {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
-}
-
-.pt-header-safe-compact {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
-}
+```text
++------------------------------------------+
+|  Header: "When to remind you?"           |
++------------------------------------------+
+|                                          |
+|  QUICK OPTIONS                           |
+|  +----------------+ +----------------+   |
+|  | In 1 hour      | | Tomorrow 9 AM  |   |
+|  | (icon) ~2:30PM | | (sun icon)     |   |
+|  +----------------+ +----------------+   |
+|  +----------------+ +----------------+   |
+|  | Tomorrow 6 PM  | | This weekend   |   |
+|  | (moon icon)    | | Sat 10 AM      |   |
+|  +----------------+ +----------------+   |
+|                                          |
+|  ──────── or choose custom ────────      |
+|                                          |
+|  [Once] [Daily] [Weekly] [Yearly]        |
+|                                          |
+|  DATE                                    |
+|  |Mon|Tue|Wed|Thu|Fri|Sat|Sun|          |
+|  | 27| 28| 29| 30| 31|  1|  2|          |
+|                                          |
+|  TIME                                    |
+|  +------+  +------+  +------+           |
+|  |  09  |  |  00  |  |  AM  |           |
+|  +------+  +------+  +------+           |
+|                                          |
++------------------------------------------+
+|  (preview) Tue, Jan 28 at 9:00 AM       |
+|  [        Confirm        ]               |
++------------------------------------------+
 ```
-
-### Component Updates
-
-| File | Current | Change To |
-|------|---------|-----------|
-| `AccessFlow.tsx` header | `pt-8` | `pt-header-safe` |
-| `BookmarkLibrary.tsx` header | `pt-8` | `pt-header-safe` |
-| `NotificationsPage.tsx` header | `pt-8` | `pt-header-safe` |
-| `SettingsPage.tsx` container | `safe-top` + `pt-6` | `pt-header-safe-compact` on header |
-| `ProfilePage.tsx` container | `p-4 safe-top` | Keep `p-4`, add `pt-header-safe` on header |
-| `UrlInput.tsx` header | `p-4 border-b` | `p-4 pt-header-safe-compact border-b` |
-| `ShortcutCustomizer.tsx` header | `p-4 border-b` | `p-4 pt-header-safe-compact border-b` |
-| `ContactShortcutCustomizer.tsx` header | `pt-6` | `pt-header-safe-compact` |
-| `OnboardingFlow.tsx` skip button | `p-4` | `p-4 pt-header-safe-compact` |
-| `LanguageSelectionStep.tsx` header | `pt-12` | `pt-header-safe` |
-
-### VideoPlayer.tsx
-Already uses inline `pt-safe` class - verify this is properly defined or update to use the new utility.
 
 ---
 
-## Files to Modify
+## Technical Details
 
-1. **src/index.css** - Add `safe-top`, `pt-header-safe`, `pt-header-safe-compact` utilities
-2. **src/components/AccessFlow.tsx** - Update header padding
-3. **src/components/BookmarkLibrary.tsx** - Update header padding
-4. **src/components/NotificationsPage.tsx** - Update header padding
-5. **src/components/SettingsPage.tsx** - Fix safe-top usage, update header
-6. **src/components/ProfilePage.tsx** - Fix safe-top usage, update header
-7. **src/components/UrlInput.tsx** - Add safe area to header
-8. **src/components/ShortcutCustomizer.tsx** - Add safe area to header
-9. **src/components/ContactShortcutCustomizer.tsx** - Update header padding
-10. **src/components/OnboardingFlow.tsx** - Add safe area to skip button area
-11. **src/components/LanguageSelectionStep.tsx** - Verify/update header padding
-12. **src/pages/VideoPlayer.tsx** - Verify `pt-safe` is properly applied
+### Time Wheel Picker Implementation
+- Uses CSS `scroll-snap-type: y mandatory` for smooth snapping
+- Each option is a `div` with `scroll-snap-align: center`
+- Intersection Observer to detect centered item
+- Touch events for momentum handling
+- Haptic feedback via `triggerHaptic('selection')` on value change
+
+### Week Calendar Picker
+- Shows 7 days in a row
+- Left/right arrows to navigate weeks
+- Today is marked with a dot indicator
+- Selected date has gradient background with scale animation
+- Includes month label that updates on scroll
+
+### Quick Preset Logic
+```typescript
+const getQuickPresets = () => {
+  const now = new Date();
+  return [
+    { 
+      label: 'In 1 hour', 
+      time: addHours(now, 1),
+      icon: Clock 
+    },
+    { 
+      label: 'Tomorrow morning', 
+      time: setHours(addDays(now, 1), 9, 0),
+      icon: Sun 
+    },
+    { 
+      label: 'Tomorrow evening', 
+      time: setHours(addDays(now, 1), 18, 0),
+      icon: Moon 
+    },
+    { 
+      label: 'This weekend', 
+      time: getNextSaturday(10, 0),
+      icon: Calendar 
+    },
+  ];
+};
+```
+
+---
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/ScheduledTimingPicker.tsx` | Rewrite | Complete redesign with new UI |
+| `src/components/ui/time-wheel-picker.tsx` | Create | New wheel picker component |
+| `src/i18n/locales/en.json` | Update | Add new translation keys |
 
 ---
 
 ## Expected Outcome
-
-- All screens will respect the Android status bar / notch area
-- Content will no longer be hidden or too close to the notification bar
-- Consistent visual padding across all headers (32px visual + safe area)
-- Proper handling on devices with and without notches/cutouts
+- **Faster selection**: Quick presets allow one-tap scheduling for 80% of use cases
+- **Premium feel**: Smooth animations, gradients, and haptic feedback
+- **Better usability**: Wheel picker is more intuitive than steppers
+- **Visual polish**: Modern design language consistent with the rest of the app
+- **Accessibility**: Large touch targets, clear visual feedback
 
 ---
 
 ## Risk Assessment
-
-- **Low risk**: Changes are CSS utilities and class name updates only
-- **No logic changes**: Pure visual/layout modifications
-- **Backward compatible**: New utilities don't affect existing styles
-- **Easy to test**: Visual verification on device or emulator
+- **Low complexity**: Uses existing Tailwind utilities and Framer Motion
+- **No backend changes**: Pure frontend enhancement
+- **Backward compatible**: Same props interface, just better UX
+- **Easy to test**: Visual changes can be verified immediately
