@@ -44,17 +44,22 @@ function Calendar({
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   
   // Sync internal month when defaultMonth or selected changes (for dialog reopening)
+  // This ensures the calendar opens to the correct month AND year
   useEffect(() => {
     if (!controlledMonth) {
       const targetMonth = defaultMonth || (selected instanceof Date ? selected : null);
       if (targetMonth) {
-        // Only update if the month/year actually differs
-        if (
-          targetMonth.getMonth() !== internalMonth.getMonth() ||
-          targetMonth.getFullYear() !== internalMonth.getFullYear()
-        ) {
-          setInternalMonth(targetMonth);
-        }
+        // Create a new date to compare month and year
+        const targetMonthNum = targetMonth.getMonth();
+        const targetYear = targetMonth.getFullYear();
+        
+        setInternalMonth(current => {
+          // Only update if the month or year actually differs
+          if (current.getMonth() !== targetMonthNum || current.getFullYear() !== targetYear) {
+            return new Date(targetYear, targetMonthNum, 1);
+          }
+          return current;
+        });
       }
     }
   }, [defaultMonth, selected, controlledMonth]);
