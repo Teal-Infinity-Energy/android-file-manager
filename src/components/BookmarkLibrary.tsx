@@ -698,37 +698,39 @@ export function BookmarkLibrary({
         )}
       </header>
 
-      {/* Search */}
-      <div className="ps-5 pe-5 mb-3">
-        <div className="relative">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('library.search')}
-            className="ps-10 pe-10"
-          />
-          {searchQuery && (
-            <TooltipProvider delayDuration={500}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors"
-                    >
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{t('library.clearSearch')}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+      {/* Search - hidden in empty state */}
+      {links.length > 0 && (
+        <div className="ps-5 pe-5 mb-3">
+          <div className="relative">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('library.search')}
+              className="ps-10 pe-10"
+            />
+            {searchQuery && (
+              <TooltipProvider delayDuration={500}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors"
+                      >
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('library.clearSearch')}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Tag Filter Bar */}
-      {availableTags.length > 0 && (
+      {/* Tag Filter Bar - hidden in empty state */}
+      {links.length > 0 && availableTags.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-3 ps-5 pe-5 scrollbar-hide">
           <button
             onClick={() => setActiveTagFilter(null)}
