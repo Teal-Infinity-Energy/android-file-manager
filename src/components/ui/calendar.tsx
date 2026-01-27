@@ -1,15 +1,22 @@
 import * as React from "react";
-import { useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { triggerHaptic } from "@/lib/haptics";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
   enableSwipe?: boolean;
+  showYearPicker?: boolean;
 };
 
 function Calendar({ 
@@ -17,12 +24,14 @@ function Calendar({
   classNames, 
   showOutsideDays = true, 
   enableSwipe = true,
+  showYearPicker = true,
   month: controlledMonth,
   onMonthChange,
   ...props 
 }: CalendarProps) {
   const [internalMonth, setInternalMonth] = useState(controlledMonth || new Date());
   const [direction, setDirection] = useState(0);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
   
   // Swipe gesture handling
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -30,6 +39,25 @@ function Calendar({
   const minSwipeDistance = 50;
 
   const currentMonth = controlledMonth || internalMonth;
+  const currentYear = currentMonth.getFullYear();
+  const thisYear = new Date().getFullYear();
+
+  // Generate year options (5 years back to 10 years forward)
+  const yearOptions = useMemo(() => {
+    const years: number[] = [];
+    for (let y = thisYear; y <= thisYear + 10; y++) {
+      years.push(y);
+    }
+    return years;
+  }, [thisYear]);
+
+  // Generate month options
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => ({
+      value: i,
+      label: new Date(2000, i, 1).toLocaleDateString(undefined, { month: 'long' }),
+    }));
+  }, []);
 
   const handleMonthChange = useCallback((newMonth: Date) => {
     if (onMonthChange) {
@@ -45,6 +73,30 @@ function Calendar({
     const newMonth = new Date(currentMonth);
     newMonth.setMonth(newMonth.getMonth() + delta);
     handleMonthChange(newMonth);
+  }, [currentMonth, handleMonthChange]);
+
+  const jumpToYear = useCallback((year: number) => {
+    triggerHaptic('light');
+    setDirection(year > currentYear ? 1 : -1);
+    const newMonth = new Date(currentMonth);
+    newMonth.setFullYear(year);
+    handleMonthChange(newMonth);
+  }, [currentMonth, currentYear, handleMonthChange]);
+
+  const jumpToMonth = useCallback((monthIndex: number) => {
+    triggerHaptic('light');
+    setDirection(monthIndex > currentMonth.getMonth() ? 1 : -1);
+    const newMonth = new Date(currentMonth);
+    newMonth.setMonth(monthIndex);
+    handleMonthChange(newMonth);
+    setShowMonthPicker(false);
+  }, [currentMonth, handleMonthChange]);
+
+  const jumpToToday = useCallback(() => {
+    triggerHaptic('light');
+    const today = new Date();
+    setDirection(today > currentMonth ? 1 : -1);
+    handleMonthChange(today);
   }, [currentMonth, handleMonthChange]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -86,6 +138,125 @@ function Calendar({
     }),
   };
 
+  // Custom caption component with year/month picker
+  const CustomCaption = () => {
+    const monthLabel = currentMonth.toLocaleDateString(undefined, { month: 'long' });
+    
+    return (
+      <div className="flex items-center justify-between w-full px-1 mb-3">
+        {/* Prev month button */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigateMonth(-1)}
+          className={cn(
+            "h-9 w-9 flex items-center justify-center rounded-xl transition-all",
+            "bg-background/80 hover:bg-background border border-border/40",
+            "shadow-sm hover:shadow-md hover:border-primary/30",
+          )}
+        >
+          <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+        </motion.button>
+        
+        {/* Month & Year pickers */}
+        <div className="flex items-center gap-1">
+          {/* Month dropdown */}
+          <DropdownMenu open={showMonthPicker} onOpenChange={setShowMonthPicker}>
+            <DropdownMenuTrigger asChild>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                className={cn(
+                  "flex items-center gap-1 px-3 py-1.5 rounded-xl transition-all",
+                  "hover:bg-muted/60 font-bold text-sm",
+                )}
+              >
+                {monthLabel}
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </motion.button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              align="center" 
+              className="max-h-64 overflow-y-auto bg-background border border-border shadow-xl rounded-xl z-50"
+            >
+              {monthOptions.map((month) => (
+                <DropdownMenuItem
+                  key={month.value}
+                  onClick={() => jumpToMonth(month.value)}
+                  className={cn(
+                    "cursor-pointer rounded-lg transition-colors",
+                    month.value === currentMonth.getMonth() && "bg-primary/10 text-primary font-semibold"
+                  )}
+                >
+                  {month.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Year dropdown */}
+          {showYearPicker && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  className={cn(
+                    "flex items-center gap-1 px-3 py-1.5 rounded-xl transition-all",
+                    "hover:bg-muted/60 font-bold text-sm",
+                  )}
+                >
+                  {currentYear}
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </motion.button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="center" 
+                className="max-h-64 overflow-y-auto bg-background border border-border shadow-xl rounded-xl z-50"
+              >
+                {yearOptions.map((year) => (
+                  <DropdownMenuItem
+                    key={year}
+                    onClick={() => jumpToYear(year)}
+                    className={cn(
+                      "cursor-pointer rounded-lg transition-colors",
+                      year === currentYear && "bg-primary/10 text-primary font-semibold"
+                    )}
+                  >
+                    {year}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Today button */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={jumpToToday}
+            className={cn(
+              "ml-1 h-7 w-7 flex items-center justify-center rounded-lg transition-all",
+              "bg-primary/10 hover:bg-primary/20 text-primary",
+            )}
+            title="Go to today"
+          >
+            <CalendarIcon className="h-3.5 w-3.5" />
+          </motion.button>
+        </div>
+        
+        {/* Next month button */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigateMonth(1)}
+          className={cn(
+            "h-9 w-9 flex items-center justify-center rounded-xl transition-all",
+            "bg-background/80 hover:bg-background border border-border/40",
+            "shadow-sm hover:shadow-md hover:border-primary/30",
+          )}
+        >
+          <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+        </motion.button>
+      </div>
+    );
+  };
+
   return (
     <div 
       className="relative overflow-hidden"
@@ -93,6 +264,11 @@ function Calendar({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
+      {/* Custom header with month/year pickers */}
+      <div className="px-3 pt-3">
+        <CustomCaption />
+      </div>
+      
       <AnimatePresence mode="wait" custom={direction}>
         <motion.div
           key={currentMonth.toISOString().slice(0, 7)}
@@ -107,20 +283,16 @@ function Calendar({
             showOutsideDays={showOutsideDays}
             month={currentMonth}
             onMonthChange={handleMonthChange}
-            className={cn("p-4 pointer-events-auto", className)}
+            className={cn("px-4 pb-4 pointer-events-auto", className)}
             classNames={{
               months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-              month: "space-y-4",
-              caption: "flex justify-center pt-1 relative items-center mb-2",
-              caption_label: "text-base font-bold tracking-wide",
-              nav: "space-x-1 flex items-center",
-              nav_button: cn(
-                buttonVariants({ variant: "ghost" }),
-                "h-9 w-9 bg-background/80 hover:bg-background p-0 rounded-xl border border-border/40",
-                "shadow-sm hover:shadow-md hover:border-primary/30 transition-all",
-              ),
-              nav_button_previous: "absolute start-0",
-              nav_button_next: "absolute end-0",
+              month: "space-y-2",
+              caption: "hidden", // Hide default caption, using custom
+              caption_label: "hidden",
+              nav: "hidden", // Hide default nav, using custom
+              nav_button: "hidden",
+              nav_button_previous: "hidden",
+              nav_button_next: "hidden",
               table: "w-full border-collapse",
               head_row: "flex mb-2",
               head_cell: "text-muted-foreground rounded-lg w-10 font-semibold text-[0.75rem] uppercase tracking-wider",
