@@ -792,7 +792,7 @@ export function ScheduledTimingPicker({
       </div>
 
       {/* Footer with preview and confirm */}
-      <div className="px-5 pb-5 pt-3 border-t border-border/50 bg-background">
+      <div className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom)+4rem)] pt-3 border-t border-border/50 bg-background">
         {/* Live preview */}
         <motion.div 
           key={triggerTime}
