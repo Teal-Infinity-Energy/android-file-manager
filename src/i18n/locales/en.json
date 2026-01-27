@@ -571,15 +571,6 @@
     "goToBookmarks": "Go to Bookmarks",
     "noMatch": "No links match your filter"
   },
-  "shortlistViewer": {
-    "indexOf": "{{current}} of {{total}}",
-    "opening": "Opening...",
-    "loading": "Loading...",
-    "viewDesktop": "View Desktop Site",
-    "viewMobile": "View Mobile Site",
-    "desktopHint": "Opens in-app browser with desktop layout",
-    "mobileHint": "Opens in-app browser with mobile layout"
-  },
   "scheduledTiming": {
     "whenToTrigger": "When to trigger",
     "repeat": "Repeat",
