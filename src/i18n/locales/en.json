@@ -599,7 +599,8 @@
     "orCustom": "or choose custom",
     "selectDate": "Select date",
     "selectTime": "Select time",
-    "scheduledFor": "Scheduled for"
+    "scheduledFor": "Scheduled for",
+    "pickDate": "Pick date"
   },
   "scheduledEditor": {
     "editAction": "Edit Action",

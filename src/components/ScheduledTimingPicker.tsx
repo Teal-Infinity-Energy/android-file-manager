@@ -3,6 +3,8 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Clock, 
   Sun, 
@@ -12,6 +14,7 @@ import {
   ChevronRight,
   Sparkles,
   Repeat,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
@@ -72,9 +75,10 @@ function QuickPreset({ icon, label, sublabel, onClick, selected }: QuickPresetPr
 interface WeekCalendarProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
+  onOpenFullCalendar: () => void;
 }
 
-function WeekCalendar({ selectedDate, onDateSelect }: WeekCalendarProps) {
+function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCalendarProps) {
   const { t } = useTranslation();
   const [weekOffset, setWeekOffset] = useState(0);
   
@@ -232,23 +236,38 @@ function WeekCalendar({ selectedDate, onDateSelect }: WeekCalendarProps) {
         </AnimatePresence>
       </div>
       
-      {/* Week navigation hint */}
-      <div className="flex items-center justify-center gap-1.5 pt-1">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <button
-            key={i}
-            onClick={() => {
-              triggerHaptic('light');
-              setWeekOffset(i);
-            }}
-            className={cn(
-              "w-1.5 h-1.5 rounded-full transition-all",
-              weekOffset === i 
-                ? "bg-primary w-4" 
-                : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
-            )}
-          />
-        ))}
+      {/* Footer: dots + pick specific date */}
+      <div className="flex items-center justify-between pt-1">
+        {/* Week navigation dots */}
+        <div className="flex items-center gap-1.5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <button
+              key={i}
+              onClick={() => {
+                triggerHaptic('light');
+                setWeekOffset(i);
+              }}
+              className={cn(
+                "w-1.5 h-1.5 rounded-full transition-all",
+                weekOffset === i 
+                  ? "bg-primary w-4" 
+                  : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+              )}
+            />
+          ))}
+        </div>
+        
+        {/* Pick specific date button */}
+        <button
+          onClick={() => {
+            triggerHaptic('light');
+            onOpenFullCalendar();
+          }}
+          className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          <span>{t('scheduledTiming.pickDate')}</span>
+        </button>
       </div>
     </div>
   );
@@ -347,6 +366,7 @@ export function ScheduledTimingPicker({
   const [recurrence, setRecurrence] = useState<RecurrenceType>(defaults.recurrence);
   const [showCustom, setShowCustom] = useState(!!initialTime);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
 
   // Convert 12-hour to 24-hour
   const get24Hour = (h: number, p: 'AM' | 'PM') => {
@@ -555,7 +575,8 @@ export function ScheduledTimingPicker({
                       </div>
                       <WeekCalendar 
                         selectedDate={selectedDate} 
-                        onDateSelect={setSelectedDate} 
+                        onDateSelect={setSelectedDate}
+                        onOpenFullCalendar={() => setShowFullCalendar(true)}
                       />
                     </motion.div>
                   )}
@@ -620,6 +641,32 @@ export function ScheduledTimingPicker({
           {t('common.continue')}
         </Button>
       </div>
+
+      {/* Full Calendar Dialog */}
+      <Dialog open={showFullCalendar} onOpenChange={setShowFullCalendar}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center">{t('scheduledTiming.pickDate')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center py-2">
+            <CalendarComponent
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => {
+                if (date) {
+                  triggerHaptic('light');
+                  setSelectedDate(date);
+                  setSelectedPreset(null);
+                  setShowFullCalendar(false);
+                }
+              }}
+              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+              className="rounded-xl border-0 pointer-events-auto"
+              initialFocus
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
