@@ -80,36 +80,61 @@ interface WeekCalendarProps {
 
 function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCalendarProps) {
   const { t } = useTranslation();
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [direction, setDirection] = useState(0); // -1 = left, 1 = right
   
-  // Sync weekOffset when selectedDate changes from full calendar
-  // Calculate which week the selected date falls into
+  // Base date for week calculation - can be recentered for distant dates
+  const [baseDate, setBaseDate] = useState<Date>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  });
+  const [weekOffset, setWeekOffset] = useState(0); // Start at today's week
+  const [direction, setDirection] = useState(0);
+  
+  // Check if we need to recenter the week range when selectedDate changes
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const selected = new Date(selectedDate);
     selected.setHours(0, 0, 0, 0);
     
-    // Calculate days difference from today
-    const daysDiff = Math.floor((selected.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    // Calculate days from base date
+    const daysFromBase = Math.floor((selected.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
     
-    // Calculate which week offset this date would be in
-    // Week 0 = today to today+6, Week 1 = today+7 to today+13, etc.
-    const targetWeekOffset = Math.max(0, Math.min(4, Math.floor(daysDiff / 7)));
+    // Current visible range: weeks -2 to +2 from base (weekOffset 0-4)
+    const rangeStart = -14; // 2 weeks before base
+    const rangeEnd = 34;    // ~5 weeks after base
     
-    // Only update if the selected date is outside the current visible week range
-    const currentWeekStart = weekOffset * 7;
+    // Check if selected date is within current 5-week range
+    const currentWeekStart = (weekOffset - 2) * 7;
     const currentWeekEnd = currentWeekStart + 6;
     
-    if (daysDiff < currentWeekStart || daysDiff > currentWeekEnd) {
-      // Date is outside current week view, adjust offset
-      if (daysDiff >= 0 && daysDiff <= 34) {
-        // Within 5-week range, navigate to that week
+    if (daysFromBase >= rangeStart && daysFromBase <= rangeEnd) {
+      // Within 5-week range, just navigate to correct week
+      const targetWeekOffset = Math.max(0, Math.min(4, Math.floor((daysFromBase + 14) / 7)));
+      
+      if (daysFromBase < currentWeekStart || daysFromBase > currentWeekEnd) {
         setDirection(targetWeekOffset > weekOffset ? 1 : -1);
         setWeekOffset(targetWeekOffset);
       }
-      // If beyond 5 weeks, keep current view (user used full calendar for distant date)
+    } else {
+      // Outside range - recenter the base date around selected date
+      // New base = selected date, with selected in the middle week (offset 2)
+      const newBase = new Date(selected);
+      newBase.setDate(newBase.getDate() - 14); // 2 weeks before selected
+      newBase.setHours(0, 0, 0, 0);
+      
+      // Don't go before today
+      if (newBase.getTime() < today.getTime()) {
+        setBaseDate(today);
+        // Calculate offset so selected date is visible
+        const daysFromToday = Math.floor((selected.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const newOffset = Math.max(0, Math.min(4, Math.floor(daysFromToday / 7)));
+        setWeekOffset(newOffset);
+      } else {
+        setBaseDate(newBase);
+        setWeekOffset(2); // Middle week shows selected date
+      }
+      setDirection(1);
     }
   }, [selectedDate]);
   
@@ -144,11 +169,11 @@ function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCa
     }
   };
   
+  // Calculate week dates based on base date and offset
   const weekDates = useMemo(() => {
     const dates: Date[] = [];
-    const today = new Date();
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() + weekOffset * 7);
+    const startOfWeek = new Date(baseDate);
+    startOfWeek.setDate(baseDate.getDate() + weekOffset * 7);
     
     for (let i = 0; i < 7; i++) {
       const d = new Date(startOfWeek);
@@ -156,7 +181,7 @@ function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCa
       dates.push(d);
     }
     return dates;
-  }, [weekOffset]);
+  }, [baseDate, weekOffset]);
 
   const monthLabel = useMemo(() => {
     const firstDay = weekDates[0];
