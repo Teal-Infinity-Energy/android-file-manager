@@ -10,6 +10,7 @@ import { ClipboardSuggestion } from '@/components/ClipboardSuggestion';
 import { AppMenu } from '@/components/AppMenu';
 import { TrashSheet } from '@/components/TrashSheet';
 import { SavedLinksSheet } from '@/components/SavedLinksSheet';
+import { SettingsPage } from '@/components/SettingsPage';
 import { TutorialCoachMarks } from '@/components/TutorialCoachMarks';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { useClipboardDetection } from '@/hooks/useClipboardDetection';
@@ -68,6 +69,7 @@ export function AccessFlow({
   const [contactMode, setContactMode] = useState<ContactMode>('dial');
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [showBookmarkPicker, setShowBookmarkPicker] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [pendingActionMode, setPendingActionMode] = useState<ActionMode>('shortcut');
   const processedInitialUrlRef = useRef<string | null>(null);
 
@@ -85,9 +87,11 @@ export function AccessFlow({
   // Register sheets with back button handler
   const handleCloseTrash = useCallback(() => setIsTrashOpen(false), []);
   const handleCloseBookmarkPicker = useCallback(() => setShowBookmarkPicker(false), []);
+  const handleCloseSettings = useCallback(() => setShowSettings(false), []);
   
   useSheetBackHandler('access-trash-sheet', isTrashOpen, handleCloseTrash);
   useSheetBackHandler('access-bookmark-picker', showBookmarkPicker, handleCloseBookmarkPicker);
+  useSheetBackHandler('access-settings-page', showSettings, handleCloseSettings);
 
   // Notify parent of step changes
   useEffect(() => {
@@ -355,6 +359,10 @@ export function AccessFlow({
     }
   };
 
+  // Show settings page
+  if (showSettings) {
+    return <SettingsPage onBack={() => setShowSettings(false)} />;
+  }
 
   return (
     <>
@@ -376,7 +384,7 @@ export function AccessFlow({
                 <Zap className="h-5 w-5 text-primary" />
                 <h1 className="text-xl font-semibold text-foreground">{t('access.title')}</h1>
               </div>
-              <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
+              <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
             </div>
           </header>
           <ContentSourcePicker

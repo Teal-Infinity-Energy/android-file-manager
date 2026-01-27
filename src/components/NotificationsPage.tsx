@@ -38,6 +38,7 @@ import { ScheduledActionActionSheet } from './ScheduledActionActionSheet';
 import { ScheduledActionCreator } from './ScheduledActionCreator';
 import { AppMenu } from './AppMenu';
 import { TrashSheet } from './TrashSheet';
+import { SettingsPage } from './SettingsPage';
 import { EmptyStateWithValueProp } from './EmptyStateWithValueProp';
 import { TutorialCoachMarks } from './TutorialCoachMarks';
 import { BatteryOptimizationHelp } from './BatteryOptimizationHelp';
@@ -142,6 +143,9 @@ export function NotificationsPage({
   // Trash state
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   
+  // Settings state
+  const [showSettings, setShowSettings] = useState(false);
+  
   // Battery help state
   const [isBatteryHelpOpen, setIsBatteryHelpOpen] = useState(false);
   
@@ -158,12 +162,14 @@ export function NotificationsPage({
   const handleCloseBulkDeleteConfirm = useCallback(() => setShowBulkDeleteConfirm(false), []);
   const handleCloseCreator = useCallback(() => setShowCreator(false), []);
   const handleCloseTrash = useCallback(() => setIsTrashOpen(false), []);
+  const handleCloseSettings = useCallback(() => setShowSettings(false), []);
   
   useSheetBackHandler('notifications-action-sheet', !!actionSheetAction, handleCloseActionSheet);
   useSheetBackHandler('notifications-editor', !!editingAction, handleCloseEditor);
   useSheetBackHandler('notifications-bulk-delete-confirm', showBulkDeleteConfirm, handleCloseBulkDeleteConfirm, 10);
   useSheetBackHandler('notifications-creator', showCreator, handleCloseCreator);
   useSheetBackHandler('notifications-trash-sheet', isTrashOpen, handleCloseTrash);
+  useSheetBackHandler('notifications-settings-page', showSettings, handleCloseSettings);
 
   // Load selection state and subscribe to changes
   useEffect(() => {
@@ -489,6 +495,10 @@ export function NotificationsPage({
       />
     );
   }
+  // Show settings page
+  if (showSettings) {
+    return <SettingsPage onBack={() => setShowSettings(false)} />;
+  }
 
   return (
     <div className="flex-1 flex flex-col pb-20">
@@ -536,7 +546,7 @@ export function NotificationsPage({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
+            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
           </div>
         </div>
         

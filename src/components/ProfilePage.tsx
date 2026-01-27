@@ -260,7 +260,7 @@ export function ProfilePage() {
             >
               <Settings className="h-5 w-5" />
             </Button>
-            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
+            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
           </div>
         </header>
 
@@ -346,8 +346,8 @@ export function ProfilePage() {
           >
             <Settings className="h-5 w-5" />
           </Button>
-          <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
-        </div>
+            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
+          </div>
       </header>
 
       {/* User Info Card */}
