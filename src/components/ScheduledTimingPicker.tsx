@@ -1,5 +1,5 @@
 // Premium Scheduled Timing Picker - redesigned with quick presets, wheel picker, and premium visuals
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -82,6 +82,36 @@ function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCa
   const { t } = useTranslation();
   const [weekOffset, setWeekOffset] = useState(0);
   const [direction, setDirection] = useState(0); // -1 = left, 1 = right
+  
+  // Sync weekOffset when selectedDate changes from full calendar
+  // Calculate which week the selected date falls into
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+    
+    // Calculate days difference from today
+    const daysDiff = Math.floor((selected.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Calculate which week offset this date would be in
+    // Week 0 = today to today+6, Week 1 = today+7 to today+13, etc.
+    const targetWeekOffset = Math.max(0, Math.min(4, Math.floor(daysDiff / 7)));
+    
+    // Only update if the selected date is outside the current visible week range
+    const currentWeekStart = weekOffset * 7;
+    const currentWeekEnd = currentWeekStart + 6;
+    
+    if (daysDiff < currentWeekStart || daysDiff > currentWeekEnd) {
+      // Date is outside current week view, adjust offset
+      if (daysDiff >= 0 && daysDiff <= 34) {
+        // Within 5-week range, navigate to that week
+        setDirection(targetWeekOffset > weekOffset ? 1 : -1);
+        setWeekOffset(targetWeekOffset);
+      }
+      // If beyond 5 weeks, keep current view (user used full calendar for distant date)
+    }
+  }, [selectedDate]);
   
   // Swipe gesture handling
   const [touchStart, setTouchStart] = useState<number | null>(null);
