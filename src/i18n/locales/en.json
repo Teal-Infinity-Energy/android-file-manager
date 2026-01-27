@@ -576,7 +576,7 @@
     "noMatch": "No links match your filter"
   },
   "scheduledTiming": {
-    "whenToTrigger": "When to trigger",
+    "whenToTrigger": "When to remind you?",
     "repeat": "Repeat",
     "date": "Date",
     "time": "Time",
@@ -589,7 +589,17 @@
     "weekly": "Weekly",
     "yearly": "Yearly",
     "willTrigger": "Will trigger",
-    "thenRepeats": "Then repeats {{frequency}}"
+    "thenRepeats": "Then repeats {{frequency}}",
+    "quickOptions": "Quick options",
+    "inOneHour": "In 1 hour",
+    "tomorrowMorning": "Tomorrow morning",
+    "tomorrowEvening": "Tomorrow evening",
+    "thisWeekend": "This weekend",
+    "customTime": "Custom time",
+    "orCustom": "or choose custom",
+    "selectDate": "Select date",
+    "selectTime": "Select time",
+    "scheduledFor": "Scheduled for"
   },
   "scheduledEditor": {
     "editAction": "Edit Action",
