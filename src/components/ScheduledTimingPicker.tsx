@@ -774,28 +774,58 @@ export function ScheduledTimingPicker({
         </Button>
       </div>
 
-      {/* Full Calendar Dialog */}
+      {/* Full Calendar Dialog - Premium styling */}
       <Dialog open={showFullCalendar} onOpenChange={setShowFullCalendar}>
-        <DialogContent className="max-w-sm mx-auto">
-          <DialogHeader>
-            <DialogTitle className="text-center">{t('scheduledTiming.pickDate')}</DialogTitle>
-          </DialogHeader>
-          <div className="flex justify-center py-2">
-            <CalendarComponent
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => {
-                if (date) {
-                  triggerHaptic('light');
-                  setSelectedDate(date);
-                  setSelectedPreset(null);
-                  setShowFullCalendar(false);
-                }
-              }}
-              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-              className="rounded-xl border-0 pointer-events-auto"
-              initialFocus
-            />
+        <DialogContent className="max-w-sm mx-auto p-0 overflow-hidden rounded-3xl border-0">
+          {/* Glassmorphism header */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-primary/5" />
+            <DialogHeader className="relative px-6 pt-6 pb-4">
+              <DialogTitle className="text-center text-lg font-bold">
+                {t('scheduledTiming.pickDate')}
+              </DialogTitle>
+              <p className="text-center text-xs text-muted-foreground mt-1">
+                {t('scheduledTiming.swipeToNavigate')}
+              </p>
+            </DialogHeader>
+          </div>
+          
+          {/* Calendar with premium container */}
+          <div className="px-4 pb-6">
+            <div className="rounded-2xl bg-gradient-to-br from-muted/30 to-muted/10 border border-border/50 p-2 shadow-inner">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  if (date) {
+                    triggerHaptic('light');
+                    setSelectedDate(date);
+                    setSelectedPreset(null);
+                    setShowFullCalendar(false);
+                  }
+                }}
+                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                enableSwipe={true}
+                initialFocus
+              />
+            </div>
+            
+            {/* Selected date preview */}
+            <motion.div 
+              key={selectedDate.toISOString()}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 text-center"
+            >
+              <p className="text-sm text-muted-foreground">Selected</p>
+              <p className="text-lg font-semibold text-foreground">
+                {selectedDate.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
+            </motion.div>
           </div>
         </DialogContent>
       </Dialog>
