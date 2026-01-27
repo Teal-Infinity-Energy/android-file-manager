@@ -17,8 +17,8 @@ export function WheelPicker({
   selectedValue,
   onChange,
   className,
-  itemHeight = 44,
-  visibleItems = 5,
+  itemHeight = 36,
+  visibleItems = 3,
 }: WheelPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -101,10 +101,10 @@ export function WheelPicker({
       
       {/* Gradient fades */}
       <div 
-        className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-background to-transparent pointer-events-none z-20"
+        className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background to-transparent pointer-events-none z-20"
       />
       <div 
-        className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent pointer-events-none z-20"
+        className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none z-20"
       />
       
       {/* Scrollable area */}
@@ -149,7 +149,7 @@ export function WheelPicker({
                 }
               }}
             >
-              <span className="text-2xl tabular-nums">
+              <span className="text-lg tabular-nums">
                 {typeof value === 'number' ? value.toString().padStart(2, '0') : value}
               </span>
             </div>
@@ -186,24 +186,24 @@ export function TimeWheelPicker({
   const periods: ('AM' | 'PM')[] = ['AM', 'PM'];
 
   return (
-    <div className="flex items-center justify-center gap-1">
+    <div className="flex items-center justify-center gap-0.5">
       {/* Hour wheel */}
       <WheelPicker
         values={hours}
         selectedValue={hour}
         onChange={(v) => onHourChange(v as number)}
-        className="w-16"
+        className="w-12"
       />
       
       {/* Separator */}
-      <span className="text-2xl font-semibold text-muted-foreground mx-1">:</span>
+      <span className="text-lg font-semibold text-muted-foreground">:</span>
       
       {/* Minute wheel */}
       <WheelPicker
         values={minutes}
         selectedValue={minute}
         onChange={(v) => onMinuteChange(v as number)}
-        className="w-16"
+        className="w-12"
       />
       
       {/* Period wheel */}
@@ -211,8 +211,7 @@ export function TimeWheelPicker({
         values={periods}
         selectedValue={period}
         onChange={(v) => onPeriodChange(v as 'AM' | 'PM')}
-        className="w-16 ml-2"
-        visibleItems={3}
+        className="w-12 ml-1"
       />
     </div>
   );
