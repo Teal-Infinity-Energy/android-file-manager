@@ -7,6 +7,8 @@ import {
   Moon, 
   Monitor, 
   AlertTriangle,
+  Settings,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,9 +32,10 @@ const SWIPE_THRESHOLD = 50;
 
 interface AppMenuProps {
   onOpenTrash: () => void;
+  onOpenSettings: () => void;
 }
 
-export function AppMenu({ onOpenTrash }: AppMenuProps) {
+export function AppMenu({ onOpenTrash, onOpenSettings }: AppMenuProps) {
   const { t } = useTranslation();
   const { menuSide, shouldCloseOnSwipe } = useRTL();
   const [open, setOpen] = useState(false);
@@ -150,6 +153,21 @@ export function AppMenu({ onOpenTrash }: AppMenuProps) {
                 </span>
               </div>
             )}
+          </Button>
+
+          {/* Settings */}
+          <Button
+            variant="ghost"
+            className="w-full justify-start h-12 ps-3 pe-3"
+            onClick={() => handleMenuItem(onOpenSettings)}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <span className="font-medium">{t('settings.title')}</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground rtl:rotate-180" />
           </Button>
 
           {/* Cloud Backup Section */}

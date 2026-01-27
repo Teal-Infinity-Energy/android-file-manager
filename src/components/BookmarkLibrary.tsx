@@ -49,6 +49,7 @@ import { AddBookmarkForm } from './AddBookmarkForm';
 import { BulkMoveDialog } from './BulkMoveDialog';
 import { AppMenu } from './AppMenu';
 import { TrashSheet } from './TrashSheet';
+import { SettingsPage } from './SettingsPage';
 import { EmptyStateWithValueProp } from './EmptyStateWithValueProp';
 import { TutorialCoachMarks } from './TutorialCoachMarks';
 import { useToast } from '@/hooks/use-toast';
@@ -101,6 +102,7 @@ export function BookmarkLibrary({
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem('bookmark_view_mode');
     return (saved === 'list' || saved === 'folders') ? saved : 'list';
@@ -169,11 +171,13 @@ export function BookmarkLibrary({
   const handleCloseBulkMoveDialog = useCallback(() => setShowBulkMoveDialog(false), []);
   const handleCloseBulkDeleteConfirm = useCallback(() => setShowBulkDeleteConfirm(false), []);
   const handleCloseTrash = useCallback(() => setIsTrashOpen(false), []);
+  const handleCloseSettings = useCallback(() => setShowSettings(false), []);
   
   useSheetBackHandler('bookmark-action-sheet', showActionSheet, handleCloseActionSheet);
   useSheetBackHandler('bookmark-bulk-move-dialog', showBulkMoveDialog, handleCloseBulkMoveDialog, 10);
   useSheetBackHandler('bookmark-bulk-delete-confirm', showBulkDeleteConfirm, handleCloseBulkDeleteConfirm, 10);
   useSheetBackHandler('bookmark-trash-sheet', isTrashOpen, handleCloseTrash);
+  useSheetBackHandler('bookmark-settings-page', showSettings, handleCloseSettings);
 
   // Load links
   const refreshLinks = useCallback(() => {
@@ -602,6 +606,10 @@ export function BookmarkLibrary({
     });
     triggerHaptic('success');
   };
+  // Show settings page
+  if (showSettings) {
+    return <SettingsPage onBack={() => setShowSettings(false)} />;
+  }
 
   return (
     <div className="flex flex-col h-full pb-20">
@@ -638,7 +646,7 @@ export function BookmarkLibrary({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} />
+            <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
           </div>
         </div>
         <h1 className="text-2xl font-semibold text-foreground leading-tight tracking-tight">
