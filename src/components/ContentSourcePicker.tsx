@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, Video, FileText, Bookmark, Music, Phone, Link, FolderOpen, MessageCircle, X, Home, Bell } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { FileTypeFilter } from '@/lib/contentResolver';
 
@@ -161,22 +162,28 @@ export function ContentSourcePicker({
         </div>
 
         {/* Inline Action Picker - for non-contact items */}
-        {activePicker && activePicker !== 'contact' && (
-          <ActionModePicker
-            onSelectAction={(action) => handleActionSelect(activePicker, action)}
-            onClose={closePicker}
-          />
-        )}
+        <AnimatePresence>
+          {activePicker && activePicker !== 'contact' && (
+            <ActionModePicker
+              key="action-picker"
+              onSelectAction={(action) => handleActionSelect(activePicker, action)}
+              onClose={closePicker}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Contact Mode + Action Picker */}
-        {activePicker === 'contact' && (
-          <ContactActionPicker
-            contactMode={contactMode}
-            onSelectContactMode={handleContactModeSelect}
-            onSelectAction={(action) => handleActionSelect('contact', action)}
-            onClose={closePicker}
-          />
-        )}
+        <AnimatePresence>
+          {activePicker === 'contact' && (
+            <ContactActionPicker
+              key="contact-picker"
+              contactMode={contactMode}
+              onSelectContactMode={handleContactModeSelect}
+              onSelectAction={(action) => handleActionSelect('contact', action)}
+              onClose={closePicker}
+            />
+          )}
+        </AnimatePresence>
         
         {/* Divider */}
         <div className="h-px bg-border my-4" />
@@ -206,12 +213,15 @@ export function ContentSourcePicker({
         </div>
 
         {/* Secondary Action Picker */}
-        {activeSecondaryPicker && (
-          <ActionModePicker
-            onSelectAction={(action) => handleSecondaryAction(activeSecondaryPicker, action)}
-            onClose={closePicker}
-          />
-        )}
+        <AnimatePresence>
+          {activeSecondaryPicker && (
+            <ActionModePicker
+              key="secondary-picker"
+              onSelectAction={(action) => handleSecondaryAction(activeSecondaryPicker, action)}
+              onClose={closePicker}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -227,7 +237,13 @@ function ActionModePicker({ onSelectAction, onClose }: ActionModePickerProps) {
   const { t } = useTranslation();
   
   return (
-    <div className="mt-3 rounded-xl bg-muted/30 p-3 animate-fade-in">
+    <motion.div 
+      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+      animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="rounded-xl bg-muted/30 p-3 overflow-hidden"
+    >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium text-muted-foreground">{t('access.chooseAction')}</span>
         <button
@@ -251,7 +267,7 @@ function ActionModePicker({ onSelectAction, onClose }: ActionModePickerProps) {
           onClick={() => onSelectAction('reminder')}
         />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -272,7 +288,13 @@ function ContactActionPicker({
   const { t } = useTranslation();
   
   return (
-    <div className="mt-3 rounded-xl bg-muted/30 p-3 animate-fade-in">
+    <motion.div 
+      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+      animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="rounded-xl bg-muted/30 p-3 overflow-hidden"
+    >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium text-muted-foreground">{t('access.contactType')}</span>
         <button
@@ -326,7 +348,7 @@ function ContactActionPicker({
           onClick={() => onSelectAction('reminder')}
         />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
