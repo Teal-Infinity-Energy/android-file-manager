@@ -28,6 +28,9 @@ import {
   Link,
   Phone,
   HelpCircle,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { useScheduledActions } from '@/hooks/useScheduledActions';
 import { useSheetBackHandler } from '@/hooks/useSheetBackHandler';
@@ -52,6 +55,8 @@ import {
   onSelectionChange,
   getSortPreferences,
   saveSortPreferences,
+  formatTriggerTime,
+  formatRecurrence,
   type SortMode,
 } from '@/lib/scheduledActionsManager';
 import { triggerHaptic } from '@/lib/haptics';
@@ -86,12 +91,21 @@ interface PermissionStatus {
   checked: boolean;
 }
 
+type StatusFilter = 'all' | 'active' | 'disabled' | 'expired';
+
 const RECURRENCE_FILTERS: { value: RecurrenceType | 'all'; labelKey: string; icon: React.ReactNode }[] = [
   { value: 'all', labelKey: 'notificationsPage.filterAll', icon: null },
   { value: 'once', labelKey: 'notificationsPage.filterOnce', icon: <Clock className="h-3 w-3" /> },
   { value: 'daily', labelKey: 'notificationsPage.filterDaily', icon: <RefreshCw className="h-3 w-3" /> },
   { value: 'weekly', labelKey: 'notificationsPage.filterWeekly', icon: <CalendarDays className="h-3 w-3" /> },
   { value: 'yearly', labelKey: 'notificationsPage.filterYearly', icon: <Calendar className="h-3 w-3" /> },
+];
+
+const STATUS_FILTERS: { value: StatusFilter; labelKey: string; icon: React.ReactNode }[] = [
+  { value: 'all', labelKey: 'notificationsPage.statusAll', icon: null },
+  { value: 'active', labelKey: 'notificationsPage.statusActive', icon: <CheckCircle2 className="h-3 w-3" /> },
+  { value: 'disabled', labelKey: 'notificationsPage.statusDisabled', icon: <XCircle className="h-3 w-3" /> },
+  { value: 'expired', labelKey: 'notificationsPage.statusExpired', icon: <AlertCircle className="h-3 w-3" /> },
 ];
 
 export function NotificationsPage({ 
@@ -125,6 +139,7 @@ export function NotificationsPage({
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceType | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   
   // Sort state
   const [sortMode, setSortMode] = useState<SortMode>(() => getSortPreferences().mode);
@@ -237,7 +252,15 @@ export function NotificationsPage({
     }
   }, [permissionStatus.checked, checkPermissions]);
 
-  // Computed: filter counts
+  // Helper to determine action status
+  const getActionStatus = useCallback((action: ScheduledAction): 'active' | 'disabled' | 'expired' => {
+    const isPast = action.triggerTime < Date.now() && action.recurrence === 'once';
+    if (!action.enabled) return 'disabled';
+    if (isPast) return 'expired';
+    return 'active';
+  }, []);
+
+  // Computed: filter counts (recurrence)
   const filterCounts = useMemo(() => {
     const counts: Record<RecurrenceType | 'all', number> = {
       all: actions.length,
@@ -252,24 +275,56 @@ export function NotificationsPage({
     return counts;
   }, [actions]);
 
+  // Computed: status counts
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusFilter, number> = {
+      all: actions.length,
+      active: 0,
+      disabled: 0,
+      expired: 0,
+    };
+    actions.forEach(a => {
+      counts[getActionStatus(a)]++;
+    });
+    return counts;
+  }, [actions, getActionStatus]);
+
   // Computed: filtered and sorted actions
   const filteredActions = useMemo(() => {
     let result = [...actions];
     
-    // Apply search filter
+    // Apply search filter (includes name, destination, and time description)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(a => 
-        a.name.toLowerCase().includes(query) ||
-        (a.destination.type === 'url' && a.destination.uri.toLowerCase().includes(query)) ||
-        (a.destination.type === 'file' && a.destination.name.toLowerCase().includes(query)) ||
-        (a.destination.type === 'contact' && a.destination.contactName.toLowerCase().includes(query))
-      );
+      result = result.filter(a => {
+        // Search by name
+        if (a.name.toLowerCase().includes(query)) return true;
+        
+        // Search by destination
+        if (a.destination.type === 'url' && a.destination.uri.toLowerCase().includes(query)) return true;
+        if (a.destination.type === 'file' && a.destination.name.toLowerCase().includes(query)) return true;
+        if (a.destination.type === 'contact' && a.destination.contactName.toLowerCase().includes(query)) return true;
+        
+        // Search by time description (Today, Tomorrow, day names, dates)
+        const timeDesc = formatTriggerTime(a.triggerTime).toLowerCase();
+        if (timeDesc.includes(query)) return true;
+        
+        // Search by recurrence type
+        const recurrenceDesc = formatRecurrence(a.recurrence).toLowerCase();
+        if (recurrenceDesc.includes(query)) return true;
+        
+        return false;
+      });
     }
     
     // Apply recurrence filter
     if (recurrenceFilter !== 'all') {
       result = result.filter(a => a.recurrence === recurrenceFilter);
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(a => getActionStatus(a) === statusFilter);
     }
     
     // Apply sorting
@@ -303,7 +358,18 @@ export function NotificationsPage({
     });
     
     return result;
-  }, [actions, searchQuery, recurrenceFilter, sortMode, sortReversed]);
+  }, [actions, searchQuery, recurrenceFilter, statusFilter, sortMode, sortReversed, getActionStatus]);
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery.trim() || recurrenceFilter !== 'all' || statusFilter !== 'all';
+
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    setSearchQuery('');
+    setRecurrenceFilter('all');
+    setStatusFilter('all');
+    triggerHaptic('light');
+  }, []);
 
   // Handlers
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -572,7 +638,7 @@ export function NotificationsPage({
         <MissedNotificationsBanner />
       </div>
 
-      {/* Search input */}
+      {/* Search input with result count */}
       {actions.length > 0 && (
         <div className="px-5 pb-3 shrink-0">
           <div className="relative">
@@ -600,12 +666,28 @@ export function NotificationsPage({
               </TooltipProvider>
             )}
           </div>
+          {/* Search result count */}
+          {hasActiveFilters && (
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-muted-foreground">
+                {t('notificationsPage.searchResults', { count: filteredActions.length })}
+              </span>
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearFilters}
+                  className="text-xs text-primary hover:underline"
+                >
+                  {t('notificationsPage.clearFilters')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Filter bar */}
+      {/* Recurrence Filter bar */}
       {actions.length > 0 && (
-        <div id="tutorial-filter-chips" className="px-5 pb-3 shrink-0">
+        <div id="tutorial-filter-chips" className="px-5 pb-2 shrink-0">
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             {RECURRENCE_FILTERS.map(filter => {
               const count = filterCounts[filter.value];
@@ -629,6 +711,51 @@ export function NotificationsPage({
                   {t(filter.labelKey)}
                   {count > 0 && (
                     <Badge variant={isActive ? "secondary" : "outline"} className="h-4 px-1 text-[10px]">
+                      {count}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Status Filter bar */}
+      {actions.length > 0 && (
+        <div className="px-5 pb-3 shrink-0">
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {STATUS_FILTERS.map(filter => {
+              const count = statusCounts[filter.value];
+              if (filter.value !== 'all' && count === 0) return null;
+              
+              const isActive = statusFilter === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setStatusFilter(filter.value);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                    isActive 
+                      ? filter.value === 'expired' 
+                        ? 'bg-destructive text-destructive-foreground'
+                        : filter.value === 'disabled'
+                          ? 'bg-muted-foreground text-background'
+                          : 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {filter.icon}
+                  {t(filter.labelKey)}
+                  {count > 0 && (
+                    <Badge 
+                      variant={isActive ? "secondary" : "outline"} 
+                      className={`h-4 px-1 text-[10px] ${
+                        isActive && filter.value === 'expired' ? 'bg-destructive-foreground/20' : ''
+                      }`}
+                    >
                       {count}
                     </Badge>
                   )}
