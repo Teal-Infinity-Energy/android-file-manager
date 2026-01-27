@@ -824,19 +824,12 @@ export function ScheduledTimingPicker({
           )}
         </motion.div>
 
-        <motion.div
-          key={triggerTime}
-          initial={{ scale: 1 }}
-          animate={{ scale: [1, 1.02, 1] }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
+        <Button 
+          onClick={handleConfirm}
+          className="w-full h-12 rounded-2xl text-base font-semibold"
         >
-          <Button 
-            onClick={handleConfirm}
-            className="w-full h-12 rounded-2xl text-base font-semibold"
-          >
-            {t('common.continue')}
-          </Button>
-        </motion.div>
+          {t('common.continue')}
+        </Button>
       </div>
 
       {/* Full Calendar Dialog - Premium styling */}
