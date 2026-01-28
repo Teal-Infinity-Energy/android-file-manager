@@ -1,71 +1,130 @@
 
+## Back Button Navigation Enhancement Plan
 
-## Missed Notifications System Enhancement - COMPLETED
-
-This enhancement adds proper tracking to distinguish between clicked and missed notifications.
-
----
-
-### Implementation Summary
-
-#### Part 1: Translation Keys ✅
-Added `missedNotifications` section to `src/i18n/locales/en.json` with:
-- `title_one`, `title_other` - Pluralized titles
-- `subtitle`, `missed`, `reschedule`, `dismissAll` - UI labels
-
-#### Part 2: Data Model Extension ✅
-Extended `ScheduledAction` interface in `src/types/scheduledAction.ts`:
-- `lastNotificationTime?: number` - When notification was shown
-- `notificationClicked?: boolean` - Whether user clicked it
-
-#### Part 3: Web Plugin Click Tracking ✅
-Updated `src/plugins/shortcutPluginWeb.ts`:
-- Added `markNotificationShown()` call when notification is displayed
-- Added `markNotificationClicked()` call when notification is clicked
-
-#### Part 4: Manager Functions ✅
-Added to `src/lib/scheduledActionsManager.ts`:
-- `markNotificationClicked(id)` - Marks an action's notification as clicked
-- `markNotificationShown(id)` - Marks notification as shown, resets clicked flag
-- Updated `advanceToNextTrigger()` to reset tracking fields for recurring actions
-
-#### Part 5: Missed Notifications Logic ✅
-Updated `src/hooks/useMissedNotifications.ts`:
-- Filters out actions where `notificationClicked === true`
-- Changed from `sessionStorage` to `localStorage` for persistent dismissed IDs
-- Added `syncNativeClickedIds()` to sync click data from Android on startup
-
-#### Part 6: Native Android Click Tracking ✅
-**New files:**
-- `NotificationClickActivity.java` - Transparent activity that intercepts notification clicks:
-  - Records clicked IDs in SharedPreferences
-  - Executes the action after recording
-  - Provides `getAndClearClickedIds()` for JS bridge
-
-**Updated files:**
-- `NotificationHelper.java` - Routes notification clicks through `NotificationClickActivity`
-- `AndroidManifest.xml` - Registered `NotificationClickActivity`
-- `ShortcutPlugin.java` - Added `getClickedNotificationIds()` plugin method
-- `ShortcutPlugin.ts` - Added TypeScript interface for the new method
-- `shortcutPluginWeb.ts` - Added web fallback (returns empty array)
+This plan addresses the issue where pressing the Android back button in multi-step flows (like creating a scheduled reminder) exits the entire journey instead of navigating back one step at a time.
 
 ---
 
-### How It Works
+### Problem Summary
 
-1. **When notification is shown:**
-   - Web: `markNotificationShown(id)` is called
-   - Android: Notification is displayed with `NotificationClickActivity` as the click handler
+Currently, the back button properly closes sheets and dialogs that are registered with `useSheetBackHandler`, but multi-step flows inside those sheets (like the Reminder Creator's destination → timing → confirm steps) are not registered. This causes the back button to close the entire sheet rather than stepping back within the flow.
 
-2. **When notification is clicked:**
-   - Web: `markNotificationClicked(id)` is called, then action executes
-   - Android: `NotificationClickActivity` records the click in SharedPreferences, then executes the action
+---
 
-3. **When app opens:**
-   - `useMissedNotifications` hook calls `getClickedNotificationIds()` to sync native data
-   - Clicked IDs are marked in local storage via `markNotificationClicked()`
-   - Past-due actions with `notificationClicked === true` are filtered out of the missed list
+### Changes Overview
 
-4. **Result:**
-   - Only truly missed notifications appear in the banner
-   - Clicked notifications are correctly tracked and excluded
+| File | Change |
+|------|--------|
+| `ScheduledActionCreator.tsx` | Register internal steps with back handler |
+| `ScheduledActionEditor.tsx` | Register internal steps with back handler |
+| `SavedLinksSheet.tsx` | Add back handler registration |
+| `TrashSheet.tsx` | Register confirmation dialogs with back handler |
+
+---
+
+### Part 1: ScheduledActionCreator Back Button Support
+
+**File:** `src/components/ScheduledActionCreator.tsx`
+
+Add internal step registration so back button navigates within the flow:
+
+1. Import `useSheetBackHandler` hook
+2. Create a custom back handler that:
+   - If on `urlSubStep`, clear it and stay on destination
+   - If on `confirm` step, go back to `timing`
+   - If on `timing` step with no `initialDestination`, go back to `destination`
+   - If on `destination` step (or timing with initialDestination), allow closing
+
+3. Register the "not on exit step" state with higher priority than the parent sheet
+
+**Key Logic:**
+```
+shouldInterceptBack = (
+  step !== 'destination' || 
+  urlSubStep !== null || 
+  (step === 'timing' && !initialDestination)
+)
+```
+
+When `shouldInterceptBack` is true, register with the back handler to call `handleBack()` instead of closing the creator.
+
+---
+
+### Part 2: ScheduledActionEditor Back Button Support
+
+**File:** `src/components/ScheduledActionEditor.tsx`
+
+Similar approach to the Creator:
+
+1. Import `useSheetBackHandler` hook
+2. Register internal navigation state:
+   - If on `destination` or `timing` step (not `main`), back button should go to `main`
+   - If on `urlSubStep`, back button should clear the sub-step
+3. Register with higher priority than the parent sheet
+
+**Key Logic:**
+```
+shouldInterceptBack = (
+  step !== 'main' || 
+  urlSubStep !== null
+)
+```
+
+---
+
+### Part 3: SavedLinksSheet Back Button Registration
+
+**File:** `src/components/SavedLinksSheet.tsx`
+
+1. Import `useSheetBackHandler` hook
+2. Add registration for the sheet when open
+3. Handle form mode: if `showAddForm` is true, back button should close the form first
+
+**Key Logic:**
+- If `showAddForm` is true → close form (call `resetForm()`)
+- Otherwise → close sheet (call `onOpenChange(false)`)
+
+---
+
+### Part 4: TrashSheet Confirmation Dialogs
+
+**File:** `src/components/TrashSheet.tsx`
+
+1. Import `useSheetBackHandler` hook
+2. Register the confirmation dialogs with higher priority:
+   - `showEmptyConfirm` dialog
+   - `showDeleteConfirm` dialog  
+   - `showRestoreAllConfirm` dialog
+
+This ensures back button closes the confirmation dialog before closing the trash sheet.
+
+---
+
+### Technical Implementation Notes
+
+- All internal step handlers should use a **higher priority** (e.g., 20) than sheet registrations (priority 0) to ensure they intercept first
+- The hook already supports priority ordering: higher priority handlers are called first
+- Callbacks should call the internal `handleBack()` functions that already exist in each component
+- Use stable callback references with `useCallback` to avoid unnecessary re-registrations
+
+---
+
+### Testing Recommendations
+
+After implementation, test these scenarios:
+
+1. **Reminder Creation:**
+   - Start creating a reminder → go to timing → press back → should return to destination (not close creator)
+   - Go to confirm step → press back → should return to timing
+   - On destination step → press back → should close creator
+
+2. **Reminder Editing:**
+   - Open editor → change destination → press back → should return to main view
+   - Open editor → change timing → press back → should return to main view
+
+3. **Saved Links Sheet:**
+   - Open sheet → start adding a new link → press back → should close add form (not sheet)
+
+4. **Trash Sheet:**
+   - Open trash → tap "Empty Trash" → press back → should close confirmation dialog (not trash sheet)
+
