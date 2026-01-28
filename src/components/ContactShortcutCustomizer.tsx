@@ -218,7 +218,7 @@ export function ContactShortcutCustomizer({
           className="w-full h-14 text-lg font-semibold"
           size="lg"
         >
-          {t('shortcutCustomizer.addToHomeScreen')}
+          {t('common.continue')}
         </Button>
       </div>
     </div>
