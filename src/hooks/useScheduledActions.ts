@@ -81,6 +81,7 @@ export function useScheduledActions(): UseScheduledActionsReturn {
       console.log('[ScheduledActions] Calling native scheduleAction with:', {
         id: action.id,
         name: action.name,
+        description: input.description,
         destinationType: input.destination.type,
         triggerTime: input.triggerTime,
         recurrence: input.recurrence,
@@ -89,6 +90,7 @@ export function useScheduledActions(): UseScheduledActionsReturn {
       const result = await ShortcutPlugin.scheduleAction({
         id: action.id,
         name: action.name,
+        description: input.description,
         destinationType: input.destination.type,
         destinationData,
         triggerTime: input.triggerTime,
@@ -125,6 +127,7 @@ export function useScheduledActions(): UseScheduledActionsReturn {
           await ShortcutPlugin.scheduleAction({
             id: updated.id,
             name: updated.name,
+            description: updated.description,
             destinationType: updated.destination.type,
             destinationData,
             triggerTime: updated.triggerTime,
@@ -168,6 +171,7 @@ export function useScheduledActions(): UseScheduledActionsReturn {
         await ShortcutPlugin.scheduleAction({
           id: action.id,
           name: action.name,
+          description: action.description,
           destinationType: action.destination.type,
           destinationData,
           triggerTime: action.triggerTime,

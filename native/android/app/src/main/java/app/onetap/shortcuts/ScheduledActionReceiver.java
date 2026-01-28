@@ -22,6 +22,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
     public static final String ACTION_SCHEDULED = "app.onetap.SCHEDULED_ACTION";
     public static final String EXTRA_ACTION_ID = "action_id";
     public static final String EXTRA_ACTION_NAME = "action_name";
+    public static final String EXTRA_DESCRIPTION = "action_description";
     public static final String EXTRA_DESTINATION_TYPE = "destination_type";
     public static final String EXTRA_DESTINATION_DATA = "destination_data";
     public static final String EXTRA_RECURRENCE = "recurrence";
@@ -37,6 +38,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
         
         String actionId = intent.getStringExtra(EXTRA_ACTION_ID);
         String actionName = intent.getStringExtra(EXTRA_ACTION_NAME);
+        String description = intent.getStringExtra(EXTRA_DESCRIPTION);
         String destinationType = intent.getStringExtra(EXTRA_DESTINATION_TYPE);
         String destinationData = intent.getStringExtra(EXTRA_DESTINATION_DATA);
         String recurrence = intent.getStringExtra(EXTRA_RECURRENCE);
@@ -53,6 +55,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
             context,
             actionId,
             actionName,
+            description,
             destinationType,
             destinationData
         );
@@ -195,6 +198,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
         Context context,
         String actionId,
         String actionName,
+        String description,
         String destinationType,
         String destinationData,
         long triggerTime,
@@ -204,6 +208,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
         intent.setAction(ACTION_SCHEDULED);
         intent.putExtra(EXTRA_ACTION_ID, actionId);
         intent.putExtra(EXTRA_ACTION_NAME, actionName);
+        intent.putExtra(EXTRA_DESCRIPTION, description);
         intent.putExtra(EXTRA_DESTINATION_TYPE, destinationType);
         intent.putExtra(EXTRA_DESTINATION_DATA, destinationData);
         intent.putExtra(EXTRA_TRIGGER_TIME, triggerTime);
@@ -246,6 +251,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
         Context context,
         String actionId,
         String actionName,
+        String description,
         String destinationType,
         String destinationData,
         long triggerTime,
@@ -257,6 +263,7 @@ public class ScheduledActionReceiver extends BroadcastReceiver {
             JSONObject action = new JSONObject();
             action.put("id", actionId);
             action.put("name", actionName);
+            action.put("description", description);
             action.put("destinationType", destinationType);
             action.put("destinationData", destinationData);
             action.put("triggerTime", triggerTime);

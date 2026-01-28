@@ -41,6 +41,7 @@ export interface RecurrenceAnchor {
 export interface ScheduledAction {
   id: string;
   name: string;                              // Short, intent-based name
+  description?: string;                      // Optional description/intent
   destination: ScheduledActionDestination;
   triggerTime: number;                       // Unix timestamp (ms) for next trigger
   recurrence: RecurrenceType;
@@ -52,6 +53,7 @@ export interface ScheduledAction {
 // Utility type for creating new scheduled actions
 export interface CreateScheduledActionInput {
   name: string;
+  description?: string;                      // Optional description/intent
   destination: ScheduledActionDestination;
   triggerTime: number;
   recurrence: RecurrenceType;

@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, FileText, Link, Phone, Check, Clipboard, Globe, Bookmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -49,8 +50,8 @@ export function ScheduledActionCreator({
     anchor: RecurrenceAnchor;
   } | null>(null);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  
   // URL sub-flow state
   const [urlSubStep, setUrlSubStep] = useState<UrlSubStep>(null);
   const [showBookmarkPicker, setShowBookmarkPicker] = useState(false);
@@ -199,6 +200,7 @@ export function ScheduledActionCreator({
 
       const input: CreateScheduledActionInput = {
         name: name.trim() || getSuggestedName(destination),
+        description: description.trim() || undefined,
         destination,
         triggerTime: timing.triggerTime,
         recurrence: timing.recurrence,
@@ -455,7 +457,7 @@ export function ScheduledActionCreator({
         {/* Name input */}
         <div>
           <Label htmlFor="action-name" className="text-sm font-medium mb-2 block">
-            Action name
+            {t('scheduledActions.actionName')}
           </Label>
           <Input
             id="action-name"
@@ -466,7 +468,25 @@ export function ScheduledActionCreator({
             autoFocus
           />
           <p className="text-xs text-muted-foreground mt-2">
-            This will appear in the notification when triggered.
+            {t('scheduledActions.actionNameHint')}
+          </p>
+        </div>
+
+        {/* Description input */}
+        <div>
+          <Label htmlFor="action-description" className="text-sm font-medium mb-2 block">
+            {t('scheduledActions.descriptionLabel')}
+          </Label>
+          <Textarea
+            id="action-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={t('scheduledActions.descriptionPlaceholder')}
+            className="rounded-xl text-base resize-none"
+            rows={2}
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            {t('scheduledActions.descriptionHint')}
           </p>
         </div>
 
