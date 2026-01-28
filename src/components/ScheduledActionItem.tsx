@@ -10,6 +10,7 @@ import {
   Calendar,
   CalendarDays,
   RefreshCw,
+  ChevronDown,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -59,6 +60,7 @@ export function ScheduledActionItem({
   const { t } = useTranslation();
   const { isRTL, isDeleteSwipe, getSwipeTransform } = useRTL();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   
   // Swipe state
   const [swipeX, setSwipeX] = useState(0);
@@ -212,6 +214,14 @@ export function ScheduledActionItem({
     onToggle();
   }, [onToggle]);
 
+  const handleDescriptionClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    if (!isSelectionMode && action.description && action.description.length > 40) {
+      setIsDescriptionExpanded(prev => !prev);
+      triggerHaptic('light');
+    }
+  }, [isSelectionMode, action.description]);
+
   return (
     <>
       <div 
@@ -285,9 +295,28 @@ export function ScheduledActionItem({
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-sm truncate">{action.name}</h4>
               {action.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                  {action.description}
-                </p>
+                <div 
+                  className={cn(
+                    "mt-0.5",
+                    !isSelectionMode && action.description.length > 40 && "cursor-pointer"
+                  )}
+                  onClick={handleDescriptionClick}
+                >
+                  <div className="flex items-start gap-1">
+                    <p className={cn(
+                      "text-xs text-muted-foreground flex-1",
+                      !isDescriptionExpanded && "line-clamp-1"
+                    )}>
+                      {action.description}
+                    </p>
+                    {!isSelectionMode && action.description.length > 40 && (
+                      <ChevronDown className={cn(
+                        "h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 transition-transform",
+                        isDescriptionExpanded && "rotate-180"
+                      )} />
+                    )}
+                  </div>
+                </div>
               )}
               <p className={cn(
                 "text-xs mt-0.5",
