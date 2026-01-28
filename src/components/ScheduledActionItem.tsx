@@ -322,7 +322,7 @@ export function ScheduledActionItem({
                     {!isSelectionMode && action.description.length > 40 && (
                       <motion.div
                         animate={{ rotate: isDescriptionExpanded ? 180 : 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
                       >
                         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                       </motion.div>
