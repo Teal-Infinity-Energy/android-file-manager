@@ -1,6 +1,7 @@
 // Individual scheduled action item with selection mode and swipe-to-delete
 import { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
   Link, 
@@ -303,17 +304,28 @@ export function ScheduledActionItem({
                   onClick={handleDescriptionClick}
                 >
                   <div className="flex items-start gap-1">
-                    <p className={cn(
-                      "text-xs text-muted-foreground flex-1",
-                      !isDescriptionExpanded && "line-clamp-1"
-                    )}>
-                      {action.description}
-                    </p>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.p
+                        key={isDescriptionExpanded ? 'expanded' : 'collapsed'}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className={cn(
+                          "text-xs text-muted-foreground flex-1",
+                          !isDescriptionExpanded && "line-clamp-1"
+                        )}
+                      >
+                        {action.description}
+                      </motion.p>
+                    </AnimatePresence>
                     {!isSelectionMode && action.description.length > 40 && (
-                      <ChevronDown className={cn(
-                        "h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 transition-transform",
-                        isDescriptionExpanded && "rotate-180"
-                      )} />
+                      <motion.div
+                        animate={{ rotate: isDescriptionExpanded ? 180 : 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                      </motion.div>
                     )}
                   </div>
                 </div>
