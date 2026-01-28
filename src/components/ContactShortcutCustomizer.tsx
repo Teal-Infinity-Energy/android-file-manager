@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IconPicker } from '@/components/IconPicker';
-import { ContactAvatar } from '@/components/ContactAvatar';
+import { ContactAvatar, getInitials } from '@/components/ContactAvatar';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 import type { ShortcutIcon } from '@/types/shortcut';
 
@@ -48,9 +48,16 @@ export function ContactShortcutCustomizer({
   const [pickedContact, setPickedContact] = useState<ContactData | null>(contact || null);
   const [contactPhoto, setContactPhoto] = useState<string | null>(contact?.photoBase64 || null);
   const [icon, setIcon] = useState<ShortcutIcon>(() => {
-    // If contact has a photo, use it as default
+    // If contact has a photo, use it as thumbnail icon
     if (contact?.photoBase64) {
       return { type: 'thumbnail', value: contact.photoBase64 };
+    }
+    // If contact has a name but no photo, use initials as text icon
+    if (contact?.name) {
+      const initials = getInitials(contact.name);
+      if (initials) {
+        return { type: 'text', value: initials };
+      }
     }
     // Default icon based on mode
     if (mode === 'dial') {
@@ -77,6 +84,12 @@ export function ContactShortcutCustomizer({
         if (result.photoBase64) {
           setContactPhoto(result.photoBase64);
           setIcon({ type: 'thumbnail', value: result.photoBase64 });
+        } else if (result.name) {
+          // Use initials as text icon when no photo available
+          const initials = getInitials(result.name);
+          if (initials) {
+            setIcon({ type: 'text', value: initials });
+          }
         }
         
         if (result.name && !name) {
