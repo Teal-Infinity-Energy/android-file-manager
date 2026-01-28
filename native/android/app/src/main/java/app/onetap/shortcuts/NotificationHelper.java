@@ -60,6 +60,7 @@ public class NotificationHelper {
         Context context,
         String actionId,
         String actionName,
+        String description,
         String destinationType,
         String destinationData
     ) {
@@ -84,11 +85,16 @@ public class NotificationHelper {
         // Get appropriate icon - use app icon for consistent branding
         int iconRes = getNotificationIcon(destinationType);
         
+        // Use description as content text if present, otherwise fall back to default
+        String contentText = (description != null && !description.isEmpty()) 
+            ? description 
+            : getContentText(destinationType);
+        
         // Build the notification - prominent, one-tap access
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(iconRes)
             .setContentTitle(actionName)
-            .setContentText(getContentText(destinationType))
+            .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_MAX) // Maximum priority for heads-up
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)

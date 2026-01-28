@@ -1991,6 +1991,7 @@ public class ShortcutPlugin extends Plugin {
     public void scheduleAction(PluginCall call) {
         String actionId = call.getString("id");
         String actionName = call.getString("name");
+        String description = call.getString("description", "");
         String destinationType = call.getString("destinationType");
         String destinationData = call.getString("destinationData");
         Long triggerTime = call.getLong("triggerTime");
@@ -2025,6 +2026,7 @@ public class ShortcutPlugin extends Plugin {
                 context,
                 actionId,
                 actionName,
+                description,
                 destinationType,
                 destinationData,
                 triggerTime,
@@ -2036,6 +2038,7 @@ public class ShortcutPlugin extends Plugin {
                 context,
                 actionId,
                 actionName,
+                description,
                 destinationType,
                 destinationData,
                 triggerTime,

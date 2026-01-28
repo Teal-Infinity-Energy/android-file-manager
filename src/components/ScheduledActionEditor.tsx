@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { 
@@ -54,6 +55,7 @@ export function ScheduledActionEditor({
   
   const [step, setStep] = useState<EditorStep>('main');
   const [name, setName] = useState(action.name);
+  const [description, setDescription] = useState(action.description || '');
   const [destination, setDestination] = useState<ScheduledActionDestination>(action.destination);
   const [triggerTime, setTriggerTime] = useState(action.triggerTime);
   const [recurrence, setRecurrence] = useState<RecurrenceType>(action.recurrence);
@@ -70,6 +72,7 @@ export function ScheduledActionEditor({
   const resetState = useCallback(() => {
     setStep('main');
     setName(action.name);
+    setDescription(action.description || '');
     setDestination(action.destination);
     setTriggerTime(action.triggerTime);
     setRecurrence(action.recurrence);
@@ -266,6 +269,7 @@ export function ScheduledActionEditor({
       // Create new action first (safe pattern - old action preserved if creation fails)
       const newAction = await createScheduledAction({
         name: name.trim(),
+        description: description.trim() || undefined,
         destination,
         triggerTime,
         recurrence,
@@ -302,6 +306,7 @@ export function ScheduledActionEditor({
   // Check if anything changed
   const hasChanges = 
     name !== action.name ||
+    description !== (action.description || '') ||
     JSON.stringify(destination) !== JSON.stringify(action.destination) ||
     triggerTime !== action.triggerTime ||
     recurrence !== action.recurrence;
@@ -505,6 +510,24 @@ export function ScheduledActionEditor({
                 placeholder={t('scheduledEditor.actionName')}
                 className="h-12 rounded-xl text-base"
               />
+            </div>
+
+            {/* Description input */}
+            <div>
+              <Label htmlFor="edit-action-description" className="text-sm font-medium mb-2 block">
+                {t('scheduledActions.descriptionLabel')}
+              </Label>
+              <Textarea
+                id="edit-action-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={t('scheduledActions.descriptionPlaceholder')}
+                className="rounded-xl text-base resize-none"
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {t('scheduledActions.descriptionHint')}
+              </p>
             </div>
 
             {/* Destination */}

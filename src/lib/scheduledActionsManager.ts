@@ -72,6 +72,7 @@ export function createScheduledAction(input: CreateScheduledActionInput): Schedu
   const action: ScheduledAction = {
     id: generateId(),
     name: input.name,
+    description: input.description,
     destination: input.destination,
     triggerTime: input.triggerTime,
     recurrence: input.recurrence,

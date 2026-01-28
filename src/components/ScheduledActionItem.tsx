@@ -284,6 +284,11 @@ export function ScheduledActionItem({
             {/* Content */}
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-sm truncate">{action.name}</h4>
+              {action.description && (
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                  {action.description}
+                </p>
+              )}
               <p className={cn(
                 "text-xs mt-0.5",
                 isExpired ? "text-destructive" : "text-muted-foreground"

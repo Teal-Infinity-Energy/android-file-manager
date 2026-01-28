@@ -120,6 +120,7 @@ export interface ShortcutPluginInterface {
   scheduleAction(options: {
     id: string;
     name: string;
+    description?: string;       // Optional description/intent for notification
     destinationType: 'file' | 'url' | 'contact';
     destinationData: string;    // JSON stringified destination object
     triggerTime: number;        // Unix timestamp (ms)
