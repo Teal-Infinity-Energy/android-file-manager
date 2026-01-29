@@ -1,9 +1,11 @@
 package app.onetap.shortcuts;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -150,18 +152,29 @@ public class NotificationClickActivity extends Activity {
                 case "contact":
                     // Directly place the call (one tap promise)
                     String phoneNumber = data.getString("phoneNumber");
-                    actionIntent = new Intent(Intent.ACTION_CALL);
-                    actionIntent.setData(Uri.parse("tel:" + phoneNumber));
                     
-                    // Try direct call, fall back to dialer if permission denied
-                    try {
-                        actionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(actionIntent);
-                        Log.d(TAG, "Executed direct call to: " + phoneNumber);
-                        return; // Success, exit early
-                    } catch (SecurityException se) {
-                        Log.w(TAG, "CALL_PHONE permission denied, falling back to dialer", se);
-                        // Fall back to dialer (no permission required)
+                    // Check permission first, then decide which intent to use
+                    boolean hasCallPermission = checkSelfPermission(Manifest.permission.CALL_PHONE) 
+                        == PackageManager.PERMISSION_GRANTED;
+                    
+                    if (hasCallPermission) {
+                        actionIntent = new Intent(Intent.ACTION_CALL);
+                        actionIntent.setData(Uri.parse("tel:" + phoneNumber));
+                        
+                        // Try direct call, fall back to dialer if it fails
+                        try {
+                            actionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(actionIntent);
+                            Log.d(TAG, "Executed direct call to: " + phoneNumber);
+                            return; // Success, exit early
+                        } catch (SecurityException se) {
+                            Log.w(TAG, "CALL_PHONE failed despite permission, falling back to dialer", se);
+                            // Fall back to dialer
+                            actionIntent = new Intent(Intent.ACTION_DIAL);
+                            actionIntent.setData(Uri.parse("tel:" + phoneNumber));
+                        }
+                    } else {
+                        Log.d(TAG, "CALL_PHONE permission not granted, using dialer");
                         actionIntent = new Intent(Intent.ACTION_DIAL);
                         actionIntent.setData(Uri.parse("tel:" + phoneNumber));
                     }
