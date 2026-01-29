@@ -514,7 +514,7 @@ export function ShortcutsList({ isOpen, onClose, onCreateReminder }: ShortcutsLi
                       <button
                         key={shortcut.id}
                         onClick={() => handleShortcutTap(shortcut)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card mb-2 hover:bg-muted/50 active:bg-muted transition-colors text-start shadow-sm"
+                        className="w-full overflow-hidden flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card mb-2 hover:bg-muted/50 active:bg-muted transition-colors text-start shadow-sm"
                       >
                         <ShortcutIcon shortcut={shortcut} />
                         
