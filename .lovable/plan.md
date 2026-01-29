@@ -1,118 +1,107 @@
 
 
-# Plan: Add ShortcutsList Component with Usage Count Sorting
+# Plan: Sync Shortcuts List with Home Screen Reality
 
-## Overview
+## Problem
 
-Add an in-app shortcuts list view so users can see and manage all their created One Tap Access shortcuts from within the app. The list will display usage count prominently and sort by most-used shortcuts by default.
+The "My Shortcuts" list shows all shortcuts ever created by the app, including ones that users have manually removed from their home screen. This creates confusion because the list is out of sync with what's actually on the home screen.
 
-## Key Features
+## Root Cause
 
-- **Usage Count Column**: Each shortcut displays its total tap count
-- **Default Sort**: Sorted by usage count (descending) - most used shortcuts appear first
-- **Menu Integration**: Accessible from the hamburger menu as "My Shortcuts"
-- **Action Menu**: Tap any shortcut to access Open, Edit, Delete, or Create Reminder options
+When a user removes a shortcut directly from their Android home screen (long-press → Remove), the app has no way to know this happened. Android doesn't send any notification to the app. The shortcut remains stored in the app's data even though it no longer exists on the home screen.
 
-## UI Design
+## Solution
 
-### Menu Entry (AppMenu)
-- New "My Shortcuts" button between Trash and Settings
-- Icon: `Zap` (consistent with Access tab)
-- Badge showing total shortcut count
+Add a sync mechanism that queries Android's ShortcutManager to find out which shortcuts are actually pinned on the home screen, then removes any orphaned entries from the app's storage.
 
-### List Item Layout
+## Technical Approach
+
+### 1. Native Side - Query Pinned Shortcuts
+
+Add a new method to `ShortcutPlugin.java` that returns the list of currently pinned shortcut IDs:
+
+```java
+@PluginMethod
+public void getPinnedShortcutIds(PluginCall call) {
+    ShortcutManager manager = context.getSystemService(ShortcutManager.class);
+    List<ShortcutInfo> pinned = manager.getPinnedShortcuts();
+    
+    JSArray ids = new JSArray();
+    for (ShortcutInfo info : pinned) {
+        ids.put(info.getId());
+    }
+    
+    JSObject result = new JSObject();
+    result.put("ids", ids);
+    call.resolve(result);
+}
 ```
-┌─────────────────────────────────────────────────────┐
-│  [Icon]  Shortcut Name                    42 taps  │
-│          WhatsApp · Mom                        >   │
-└─────────────────────────────────────────────────────┘
-```
 
-Each item shows:
-- **Icon** (48x48): Emoji, thumbnail, or text
-- **Name**: Primary text
-- **Type + Target**: Secondary text (e.g., "WhatsApp · Mom", "Link · google.com")
-- **Usage Count**: Right-aligned badge showing tap count
-- **Chevron**: Visual affordance for tap action
+### 2. TypeScript Plugin Interface
 
-### Empty State
-- Large `Zap` icon
-- "No shortcuts yet" title
-- "Create shortcuts from the Access tab" description
+Add the method to `ShortcutPlugin.ts`:
 
-## Technical Implementation
-
-### Files to Create
-
-**`src/components/ShortcutsList.tsx`**
 ```typescript
-// Key implementation details:
-
-// 1. Sort shortcuts by usage count (descending)
-const sortedShortcuts = useMemo(() => {
-  return [...shortcuts].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
-}, [shortcuts]);
-
-// 2. Display usage count badge
-<Badge variant="secondary" className="shrink-0">
-  {shortcut.usageCount || 0} {t('shortcuts.taps')}
-</Badge>
+getPinnedShortcutIds(): Promise<{ ids: string[] }>;
 ```
 
-### Files to Modify
+### 3. Sync Logic in useShortcuts Hook
 
-**`src/components/AppMenu.tsx`**
-- Add `onOpenShortcuts` prop to interface
-- Add "My Shortcuts" menu button with Zap icon
-- Show shortcut count badge
-- Read count from localStorage on mount/open
+Add a `syncWithHomeScreen` function that:
+1. Calls native to get currently pinned shortcut IDs
+2. Filters localStorage shortcuts to only include those that are still pinned
+3. Updates localStorage with the filtered list
 
-**`src/pages/Index.tsx`**
-- Add `shortcutsListOpen` state
-- Pass handler to AppMenu
-- Render ShortcutsList sheet
-- Wire up action handlers from ShortcutActionSheet
-
-**`src/i18n/locales/en.json`**
-Add keys:
-- `menu.shortcuts`: "My Shortcuts"
-- `shortcuts.title`: "My Shortcuts"
-- `shortcuts.empty`: "No shortcuts yet"
-- `shortcuts.emptyDesc`: "Create shortcuts from the Access tab"
-- `shortcuts.taps`: "taps"
-- `shortcuts.tap`: "tap"
-
-## Component Structure
-
-```
-ShortcutsList
-├── Sheet (full-height)
-│   ├── SheetHeader
-│   │   └── SheetTitle: "My Shortcuts"
-│   ├── ScrollArea
-│   │   └── sortedShortcuts.map(shortcut =>
-│   │       └── ShortcutItem
-│   │           ├── Icon (emoji/thumbnail/text)
-│   │           ├── Name + Type
-│   │           ├── Usage Badge ("42 taps")
-│   │           └── Chevron
-│   │       )
-│   └── Empty State (when no shortcuts)
-└── ShortcutActionSheet (reused)
+```typescript
+const syncWithHomeScreen = useCallback(async () => {
+  if (!Capacitor.isNativePlatform()) return;
+  
+  try {
+    const { ids } = await ShortcutPlugin.getPinnedShortcutIds();
+    const pinnedSet = new Set(ids);
+    
+    // Keep only shortcuts that are still pinned
+    const synced = shortcuts.filter(s => pinnedSet.has(s.id));
+    
+    if (synced.length !== shortcuts.length) {
+      saveShortcuts(synced);
+      console.log('[useShortcuts] Synced with home screen, removed orphaned shortcuts');
+    }
+  } catch (error) {
+    console.warn('[useShortcuts] Failed to sync with home screen:', error);
+  }
+}, [shortcuts, saveShortcuts]);
 ```
 
-## Data Flow
+### 4. Trigger Sync on App Mount
 
-1. `useShortcuts()` provides shortcuts array with `usageCount` field
-2. `ShortcutsList` sorts by `usageCount` descending
-3. Each item displays count in a subtle badge
-4. Tapping opens `ShortcutActionSheet` for actions
-5. After edit/delete, list automatically updates (React state)
+Call `syncWithHomeScreen` when the app starts or when the ShortcutsList is opened, ensuring the list is always accurate.
 
-## Implementation Order
+## Files to Modify
 
-1. Add translation keys to `en.json`
-2. Create `ShortcutsList.tsx` with sorted list and usage badges
-3. Update `AppMenu.tsx` with new menu item
-4. Integrate in `Index.tsx` with sheet state management
+| File | Change |
+|------|--------|
+| `native/.../ShortcutPlugin.java` | Add `getPinnedShortcutIds()` method |
+| `src/plugins/ShortcutPlugin.ts` | Add TypeScript interface for new method |
+| `src/plugins/shortcutPluginWeb.ts` | Add web stub |
+| `src/hooks/useShortcuts.ts` | Add `syncWithHomeScreen()` function and call on mount |
+| `src/components/ShortcutsList.tsx` | Optionally trigger sync when sheet opens |
+
+## Behavior After Implementation
+
+1. **On app start**: Automatically syncs shortcuts with home screen
+2. **When opening "My Shortcuts"**: Shows only shortcuts that actually exist on home screen
+3. **User removes shortcut from home screen**: Next app launch or list open will clean it up
+4. **Seamless**: No user action required, happens automatically in background
+
+## Edge Case: Usage History
+
+The `usageHistoryManager` stores historical usage events separately. These events will reference shortcut IDs that may no longer exist. This is intentional - the usage history is for analytics/insights and should preserve historical data even after shortcuts are removed. No changes needed there.
+
+## User Experience
+
+- No breaking changes
+- List becomes accurate and trustworthy
+- Users see only shortcuts they can actually use
+- Deleted shortcuts' usage history preserved for insights
 
