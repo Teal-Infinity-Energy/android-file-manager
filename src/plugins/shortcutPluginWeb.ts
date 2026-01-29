@@ -417,4 +417,21 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     window.open(url, '_blank');
     return { success: true };
   }
+
+  // ========== Shortcut Edit (Web Fallback) ==========
+
+  async getPendingEditShortcut(): Promise<{
+    success: boolean;
+    shortcutId?: string;
+    error?: string;
+  }> {
+    console.log('[ShortcutPluginWeb] getPendingEditShortcut called (web fallback)');
+    // On web, there's no long-press edit flow from home screen
+    return { success: true };
+  }
+
+  async clearPendingEditShortcut(): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] clearPendingEditShortcut called (web fallback)');
+    return { success: true };
+  }
 }

@@ -748,5 +748,32 @@
     "unavailable": "WhatsApp is not available",
     "copyMessage": "Copy message",
     "messageCopied": "Message copied to clipboard"
+  },
+  "shortcutEdit": {
+    "title": "Edit Access",
+    "name": "Name",
+    "namePlaceholder": "Enter a name...",
+    "icon": "Icon",
+    "resumeReading": "Resume where I left off",
+    "resumeReadingDesc": "Open to the last page you viewed",
+    "saved": "Changes saved",
+    "reAddHint": "Re-add to home screen to see updated icon/name",
+    "reAddToHomeScreen": "Re-add to Home Screen"
+  },
+  "shortcutAction": {
+    "open": "Open",
+    "edit": "Edit",
+    "createReminder": "Create Reminder",
+    "delete": "Delete",
+    "deleteTitle": "Delete this access?",
+    "deleteDesc": "\"{{name}}\" will be permanently deleted. The home screen shortcut will stop working.",
+    "typeContact": "Call",
+    "typeWhatsApp": "WhatsApp",
+    "typeMessage": "Message",
+    "typeLink": "Link",
+    "typeImage": "Photo",
+    "typeVideo": "Video",
+    "typePDF": "PDF",
+    "typeFile": "File"
   }
 }

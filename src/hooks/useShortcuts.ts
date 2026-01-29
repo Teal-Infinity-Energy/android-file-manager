@@ -144,11 +144,27 @@ export function useShortcuts() {
     saveShortcuts(updated);
   }, [shortcuts, saveShortcuts]);
 
+  const updateShortcut = useCallback((
+    id: string,
+    updates: Partial<Pick<ShortcutData, 'name' | 'icon' | 'quickMessages' | 'phoneNumber' | 'resumeEnabled'>>
+  ) => {
+    const updated = shortcuts.map(s => 
+      s.id === id ? { ...s, ...updates } : s
+    );
+    saveShortcuts(updated);
+  }, [shortcuts, saveShortcuts]);
+
+  const getShortcut = useCallback((id: string): ShortcutData | undefined => {
+    return shortcuts.find(s => s.id === id);
+  }, [shortcuts]);
+
   return {
     shortcuts,
     createShortcut,
     createContactShortcut,
     deleteShortcut,
     incrementUsage,
+    updateShortcut,
+    getShortcut,
   };
 }
