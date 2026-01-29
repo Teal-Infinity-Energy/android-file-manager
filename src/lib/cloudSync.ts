@@ -1,10 +1,34 @@
+/**
+ * Cloud Sync Module
+ * 
+ * All sync operations MUST go through the guarded entry points:
+ * - guardedSync() - Primary: bidirectional sync
+ * - guardedUpload() - Recovery: upload-only
+ * - guardedDownload() - Recovery: download-only
+ * 
+ * Direct calls to internal functions are forbidden and will be caught
+ * at review time. The legacy exports are preserved for backward compatibility
+ * but route through guards.
+ */
+
 import { supabase } from '@/integrations/supabase/client';
-import { getSavedLinks, SavedLink, getTrashLinks, TrashedLink, normalizeUrl } from './savedLinksManager';
+import { getSavedLinks, SavedLink, getTrashLinks, TrashedLink } from './savedLinksManager';
+import { 
+  validateSyncAttempt, 
+  markSyncStarted, 
+  markSyncCompleted,
+  type SyncTrigger 
+} from './syncGuard';
+import { recordSync } from './syncStatusManager';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface CloudBookmark {
   id: string;
   user_id: string;
-  entity_id: string; // Canonical ID from local storage
+  entity_id: string;
   url: string;
   title: string | null;
   description: string | null;
@@ -17,7 +41,7 @@ export interface CloudBookmark {
 export interface CloudTrashItem {
   id: string;
   user_id: string;
-  entity_id: string; // Canonical ID from local storage
+  entity_id: string;
   url: string;
   title: string | null;
   description: string | null;
@@ -29,11 +53,205 @@ export interface CloudTrashItem {
   updated_at: string;
 }
 
+export interface GuardedSyncResult {
+  success: boolean;
+  uploaded: number;
+  downloaded: number;
+  error?: string;
+  blocked?: boolean;
+  blockReason?: string;
+}
+
+// ============================================================================
+// GUARDED SYNC ENTRY POINTS
+// All external sync calls MUST go through these functions
+// ============================================================================
+
+/**
+ * PRIMARY SYNC ENTRY POINT
+ * 
+ * This is the ONLY function that should be called for normal sync operations.
+ * It validates the sync attempt, runs bidirectional sync, and records results.
+ * 
+ * @param trigger - The type of sync trigger (manual, daily_auto)
+ */
+export async function guardedSync(trigger: SyncTrigger): Promise<GuardedSyncResult> {
+  const validation = validateSyncAttempt(trigger);
+  
+  if (!validation.allowed) {
+    return {
+      success: false,
+      uploaded: 0,
+      downloaded: 0,
+      blocked: true,
+      blockReason: validation.reason
+    };
+  }
+  
+  markSyncStarted(trigger);
+  
+  try {
+    const result = await performBidirectionalSync();
+    
+    if (result.success) {
+      recordSync(result.uploaded, result.downloaded);
+    }
+    
+    markSyncCompleted(trigger, result.success);
+    return result;
+  } catch (error) {
+    markSyncCompleted(trigger, false);
+    return {
+      success: false,
+      uploaded: 0,
+      downloaded: 0,
+      error: error instanceof Error ? error.message : 'Sync failed'
+    };
+  }
+}
+
+/**
+ * RECOVERY: Upload-only sync
+ * For use in recovery tools only - user explicitly chose this action
+ */
+export async function guardedUpload(): Promise<GuardedSyncResult> {
+  const trigger: SyncTrigger = 'recovery_upload';
+  const validation = validateSyncAttempt(trigger);
+  
+  if (!validation.allowed) {
+    return {
+      success: false,
+      uploaded: 0,
+      downloaded: 0,
+      blocked: true,
+      blockReason: validation.reason
+    };
+  }
+  
+  markSyncStarted(trigger);
+  
+  try {
+    const [bookmarkResult, trashResult] = await Promise.all([
+      uploadBookmarksInternal(),
+      uploadTrashInternal()
+    ]);
+    
+    const success = bookmarkResult.success;
+    if (success) {
+      recordSync(bookmarkResult.uploaded + (trashResult.uploaded || 0), 0);
+    }
+    
+    markSyncCompleted(trigger, success);
+    
+    return {
+      success,
+      uploaded: bookmarkResult.uploaded + (trashResult.uploaded || 0),
+      downloaded: 0,
+      error: bookmarkResult.error
+    };
+  } catch (error) {
+    markSyncCompleted(trigger, false);
+    return {
+      success: false,
+      uploaded: 0,
+      downloaded: 0,
+      error: error instanceof Error ? error.message : 'Upload failed'
+    };
+  }
+}
+
+/**
+ * RECOVERY: Download-only sync
+ * For use in recovery tools only - user explicitly chose this action
+ */
+export async function guardedDownload(): Promise<GuardedSyncResult> {
+  const trigger: SyncTrigger = 'recovery_download';
+  const validation = validateSyncAttempt(trigger);
+  
+  if (!validation.allowed) {
+    return {
+      success: false,
+      uploaded: 0,
+      downloaded: 0,
+      blocked: true,
+      blockReason: validation.reason
+    };
+  }
+  
+  markSyncStarted(trigger);
+  
+  try {
+    const [bookmarkResult, trashResult] = await Promise.all([
+      downloadBookmarksInternal(),
+      downloadTrashInternal()
+    ]);
+    
+    const success = bookmarkResult.success;
+    if (success) {
+      recordSync(0, bookmarkResult.downloaded + (trashResult.downloaded || 0));
+    }
+    
+    markSyncCompleted(trigger, success);
+    
+    return {
+      success,
+      uploaded: 0,
+      downloaded: bookmarkResult.downloaded + (trashResult.downloaded || 0),
+      error: bookmarkResult.error
+    };
+  } catch (error) {
+    markSyncCompleted(trigger, false);
+    return {
+      success: false,
+      uploaded: 0,
+      downloaded: 0,
+      error: error instanceof Error ? error.message : 'Download failed'
+    };
+  }
+}
+
+// ============================================================================
+// INTERNAL SYNC FUNCTIONS
+// These perform the actual sync work - NOT to be called directly
+// ============================================================================
+
+/**
+ * Performs bidirectional sync: upload local → cloud, then download cloud → local
+ * INTERNAL: Do not call directly - use guardedSync() instead
+ */
+async function performBidirectionalSync(): Promise<{ success: boolean; uploaded: number; downloaded: number; error?: string }> {
+  const uploadResult = await uploadBookmarksInternal();
+  if (!uploadResult.success) {
+    return { success: false, uploaded: 0, downloaded: 0, error: uploadResult.error };
+  }
+
+  const trashUploadResult = await uploadTrashInternal();
+  if (!trashUploadResult.success) {
+    console.error('[CloudSync] Trash upload failed but continuing:', trashUploadResult.error);
+  }
+
+  const downloadResult = await downloadBookmarksInternal();
+  if (!downloadResult.success) {
+    return { success: false, uploaded: uploadResult.uploaded, downloaded: 0, error: downloadResult.error };
+  }
+
+  const trashDownloadResult = await downloadTrashInternal();
+  if (!trashDownloadResult.success) {
+    console.error('[CloudSync] Trash download failed but continuing:', trashDownloadResult.error);
+  }
+
+  return {
+    success: true,
+    uploaded: uploadResult.uploaded,
+    downloaded: downloadResult.downloaded,
+  };
+}
+
 /**
  * Upload local bookmarks to cloud
- * Uses local ID as entity_id - local is source of truth for identity
+ * INTERNAL: Uses local ID as entity_id - local is source of truth for identity
  */
-export async function uploadBookmarksToCloud(): Promise<{ success: boolean; uploaded: number; error?: string }> {
+async function uploadBookmarksInternal(): Promise<{ success: boolean; uploaded: number; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -47,7 +265,7 @@ export async function uploadBookmarksToCloud(): Promise<{ success: boolean; uplo
       const { error } = await supabase
         .from('cloud_bookmarks')
         .upsert({
-          entity_id: bookmark.id, // Local ID is canonical
+          entity_id: bookmark.id,
           user_id: user.id,
           url: bookmark.url,
           title: bookmark.title || null,
@@ -56,7 +274,7 @@ export async function uploadBookmarksToCloud(): Promise<{ success: boolean; uplo
           favicon: null,
           created_at: new Date(bookmark.createdAt).toISOString(),
         }, {
-          onConflict: 'user_id,entity_id', // Upsert by entity_id, not URL
+          onConflict: 'user_id,entity_id',
           ignoreDuplicates: false,
         });
 
@@ -76,9 +294,9 @@ export async function uploadBookmarksToCloud(): Promise<{ success: boolean; uplo
 
 /**
  * Upload local trash to cloud
- * Uses local ID as entity_id - local is source of truth for identity
+ * INTERNAL: Uses local ID as entity_id
  */
-export async function uploadTrashToCloud(): Promise<{ success: boolean; uploaded: number; error?: string }> {
+async function uploadTrashInternal(): Promise<{ success: boolean; uploaded: number; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -92,7 +310,7 @@ export async function uploadTrashToCloud(): Promise<{ success: boolean; uploaded
       const { error } = await supabase
         .from('cloud_trash')
         .upsert({
-          entity_id: item.id, // Local ID is canonical
+          entity_id: item.id,
           user_id: user.id,
           url: item.url,
           title: item.title || null,
@@ -102,7 +320,7 @@ export async function uploadTrashToCloud(): Promise<{ success: boolean; uploaded
           retention_days: item.retentionDays,
           original_created_at: new Date(item.createdAt).toISOString(),
         }, {
-          onConflict: 'user_id,entity_id', // Upsert by entity_id, not URL
+          onConflict: 'user_id,entity_id',
           ignoreDuplicates: false,
         });
 
@@ -122,9 +340,9 @@ export async function uploadTrashToCloud(): Promise<{ success: boolean; uploaded
 
 /**
  * Download bookmarks from cloud to local storage
- * Uses entity_id as local ID - never rewrites local IDs
+ * INTERNAL: Uses entity_id as local ID - never rewrites local IDs
  */
-export async function downloadBookmarksFromCloud(): Promise<{ success: boolean; downloaded: number; error?: string }> {
+async function downloadBookmarksInternal(): Promise<{ success: boolean; downloaded: number; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -144,23 +362,17 @@ export async function downloadBookmarksFromCloud(): Promise<{ success: boolean; 
       return { success: true, downloaded: 0 };
     }
 
-    // Get existing local bookmarks
     const STORAGE_KEY = 'saved_links';
     const existingLinks = getSavedLinks();
-    
-    // Build set of existing entity_ids (local IDs)
     const existingIds = new Set(existingLinks.map(l => l.id));
 
-    // Convert cloud bookmarks to local format
-    // Only add items whose entity_id doesn't exist locally
     const newBookmarks: SavedLink[] = [];
     for (const cloudBookmark of cloudBookmarks) {
-      // Use entity_id as local ID - this is the canonical ID
       const entityId = cloudBookmark.entity_id;
       
       if (!existingIds.has(entityId)) {
         newBookmarks.push({
-          id: entityId, // Use entity_id, NOT cloud primary key
+          id: entityId,
           url: cloudBookmark.url,
           title: cloudBookmark.title || '',
           description: cloudBookmark.description || '',
@@ -186,9 +398,9 @@ export async function downloadBookmarksFromCloud(): Promise<{ success: boolean; 
 
 /**
  * Download trash from cloud to local storage
- * Uses entity_id as local ID - marks non-restorable items
+ * INTERNAL: Uses entity_id as local ID
  */
-export async function downloadTrashFromCloud(): Promise<{ success: boolean; downloaded: number; error?: string }> {
+async function downloadTrashInternal(): Promise<{ success: boolean; downloaded: number; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -208,23 +420,17 @@ export async function downloadTrashFromCloud(): Promise<{ success: boolean; down
       return { success: true, downloaded: 0 };
     }
 
-    // Get existing local trash
     const TRASH_STORAGE_KEY = 'saved_links_trash';
     const existingTrash = getTrashLinks();
-    
-    // Build set of existing entity_ids (local IDs)
     const existingIds = new Set(existingTrash.map(l => l.id));
 
-    // Convert cloud trash to local format
-    // Only add items whose entity_id doesn't exist locally
     const newTrashItems: TrashedLink[] = [];
     for (const cloudItem of cloudTrash) {
-      // Use entity_id as local ID - this is the canonical ID
       const entityId = cloudItem.entity_id;
       
       if (!existingIds.has(entityId)) {
         newTrashItems.push({
-          id: entityId, // Use entity_id, NOT cloud primary key
+          id: entityId,
           url: cloudItem.url,
           title: cloudItem.title || '',
           description: cloudItem.description || '',
@@ -233,7 +439,6 @@ export async function downloadTrashFromCloud(): Promise<{ success: boolean; down
           isShortlisted: false,
           deletedAt: new Date(cloudItem.deleted_at).getTime(),
           retentionDays: cloudItem.retention_days,
-          // Note: restorable flag will be computed when restoring
         });
         existingIds.add(entityId);
       }
@@ -251,40 +456,58 @@ export async function downloadTrashFromCloud(): Promise<{ success: boolean; down
   }
 }
 
+// ============================================================================
+// LEGACY EXPORTS
+// Preserved for backward compatibility - route through guards
+// ============================================================================
+
 /**
- * Full sync: upload local then download cloud (bookmarks + trash)
+ * @deprecated Use guardedSync('manual') instead
  */
 export async function syncBookmarks(): Promise<{ success: boolean; uploaded: number; downloaded: number; error?: string }> {
-  // Upload bookmarks first - local is source of truth
-  const uploadResult = await uploadBookmarksToCloud();
-  if (!uploadResult.success) {
-    return { success: false, uploaded: 0, downloaded: 0, error: uploadResult.error };
-  }
-
-  // Upload trash
-  const trashUploadResult = await uploadTrashToCloud();
-  if (!trashUploadResult.success) {
-    console.error('[CloudSync] Trash upload failed but continuing:', trashUploadResult.error);
-  }
-
-  // Download bookmarks (only adds items not in local)
-  const downloadResult = await downloadBookmarksFromCloud();
-  if (!downloadResult.success) {
-    return { success: false, uploaded: uploadResult.uploaded, downloaded: 0, error: downloadResult.error };
-  }
-
-  // Download trash (only adds items not in local)
-  const trashDownloadResult = await downloadTrashFromCloud();
-  if (!trashDownloadResult.success) {
-    console.error('[CloudSync] Trash download failed but continuing:', trashDownloadResult.error);
-  }
-
-  return {
-    success: true,
-    uploaded: uploadResult.uploaded,
-    downloaded: downloadResult.downloaded,
-  };
+  console.warn('[CloudSync] syncBookmarks() is deprecated - use guardedSync() instead');
+  return guardedSync('manual');
 }
+
+/**
+ * @deprecated Use guardedUpload() instead
+ */
+export async function uploadBookmarksToCloud(): Promise<{ success: boolean; uploaded: number; error?: string }> {
+  console.warn('[CloudSync] uploadBookmarksToCloud() is deprecated - use guardedUpload() instead');
+  const result = await guardedUpload();
+  return { success: result.success, uploaded: result.uploaded, error: result.error };
+}
+
+/**
+ * @deprecated Use guardedDownload() instead
+ */
+export async function downloadBookmarksFromCloud(): Promise<{ success: boolean; downloaded: number; error?: string }> {
+  console.warn('[CloudSync] downloadBookmarksFromCloud() is deprecated - use guardedDownload() instead');
+  const result = await guardedDownload();
+  return { success: result.success, downloaded: result.downloaded, error: result.error };
+}
+
+/**
+ * @deprecated Use guardedUpload() instead
+ */
+export async function uploadTrashToCloud(): Promise<{ success: boolean; uploaded: number; error?: string }> {
+  console.warn('[CloudSync] uploadTrashToCloud() is deprecated - use guardedUpload() instead');
+  const result = await guardedUpload();
+  return { success: result.success, uploaded: result.uploaded, error: result.error };
+}
+
+/**
+ * @deprecated Use guardedDownload() instead
+ */
+export async function downloadTrashFromCloud(): Promise<{ success: boolean; downloaded: number; error?: string }> {
+  console.warn('[CloudSync] downloadTrashFromCloud() is deprecated - use guardedDownload() instead');
+  const result = await guardedDownload();
+  return { success: result.success, downloaded: result.downloaded, error: result.error };
+}
+
+// ============================================================================
+// CLOUD MANAGEMENT UTILITIES
+// ============================================================================
 
 /**
  * Delete all cloud bookmarks for the current user
