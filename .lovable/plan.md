@@ -1,59 +1,97 @@
 
-# Plan: Consistent Overflow Handling for Name and Metadata Rows
+
+# Plan: Fix Gesture Conflict Between Text Scrolling and Swipe-to-Delete
 
 ## Problem
 
-In the My Shortcuts list, while the name row now uses `HorizontalScrollText`, the **Type + Target metadata row** (e.g., "Link · very-long-domain-name.com") still uses basic `truncate` which can fail to constrain overflow in certain flex layouts.
+The `HorizontalScrollText` component uses native CSS `overflow-x-auto` for horizontal scrolling, while the parent containers (`BookmarkItem`, `TrashItem`) use custom touch event handlers for swipe-to-delete gestures. These two mechanisms compete for horizontal touch events, potentially causing:
 
-## Solution
+- Accidental deletions when trying to scroll text
+- Blocked text scrolling when the swipe gesture takes over
+- Inconsistent user experience
 
-Apply the same `HorizontalScrollText` component to **both** the name and the metadata row in `ShortcutsList.tsx`. This ensures:
+## Solution: CSS `touch-action` Property
 
-1. **Consistent behavior**: Both rows can be horizontally scrolled to reveal full content
-2. **No layout overflow**: The container bounds are strictly enforced
-3. **Better UX**: Users can swipe to see full type + target instead of it being cut off with ellipsis
+Use the CSS `touch-action` property to explicitly control which gestures are handled by the browser vs. JavaScript:
+
+- **`touch-action: pan-y`** on `HorizontalScrollText`: Tells the browser to only handle vertical panning natively, allowing horizontal gestures to bubble up to the parent's JavaScript handlers
+- This approach is simple, performant, and follows platform conventions
+
+## Technical Details
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  BookmarkItem (swipe handlers: onTouchStart/Move/End)       │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │  HorizontalScrollText (touch-action: pan-y)             ││
+│  │  - Vertical scroll: handled by browser (page scroll)   ││
+│  │  - Horizontal swipe: bubbles to parent JS handlers     ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Trade-off
+
+With `touch-action: pan-y`, the text will no longer horizontally scroll on its own. Instead:
+- The **swipe-to-delete** gesture takes priority for horizontal movements
+- Long text will show with **ellipsis** (already styled with `text-overflow: ellipsis`)
+- Users can still read full content via expandable URL areas (where applicable)
+
+This is the correct trade-off because:
+1. Swipe-to-delete is a primary action that should never be accidentally blocked
+2. The ellipsis provides visual indication of overflow
+3. Critical content (like URLs) already has expandable sections
 
 ## Files to Modify
 
-### `src/components/ShortcutsList.tsx`
+### `src/components/HorizontalScrollText.tsx`
 
-**Current (lines 538-541):**
+Add `touch-action: pan-y` to prevent the component from capturing horizontal touch events, allowing parent swipe handlers to work reliably.
+
+**Current:**
 ```tsx
-<span className="text-xs text-muted-foreground truncate block max-w-full">
-  {typeLabel}
-  {target && ` · ${target}`}
-</span>
+<span
+  className={cn(
+    "block max-w-full min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap",
+    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+    "[text-overflow:ellipsis]",
+    className
+  )}
+  style={{ WebkitOverflowScrolling: "touch" }}
+>
 ```
 
 **Proposed:**
 ```tsx
-<HorizontalScrollText className="text-xs text-muted-foreground">
-  {typeLabel}
-  {target && ` · ${target}`}
-</HorizontalScrollText>
+<span
+  className={cn(
+    "block max-w-full min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap",
+    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+    "[text-overflow:ellipsis]",
+    // Prevent text scrolling from capturing horizontal swipes needed for parent gestures
+    "touch-action-pan-y",
+    className
+  )}
+  style={{ 
+    WebkitOverflowScrolling: "touch",
+    touchAction: "pan-y"  // Inline style as fallback
+  }}
+>
 ```
 
-## Visual Result
+## Alternative Considered (Not Recommended)
 
-```
-┌────────────────────────────────────────────────────────┐
-│ [Icon] │ Shortcut Name...→        │ 5 taps │    >     │
-│        │ Link · very-long-targ...→                    │
-└────────────────────────────────────────────────────────┘
-         ↑                          ↑
-         Swipe to scroll            Swipe to scroll
-```
-
-Both text rows can now be independently scrolled horizontally to reveal full content, while fixed elements (icon, badge, chevron) remain visible.
-
-## Additional Consideration
-
-The parent `div` (line 526) already has `max-w-full min-w-0` constraints, which should work properly with `HorizontalScrollText`. If needed, we can also add explicit width constraints to the button container.
+An alternative approach would be to use `e.stopPropagation()` on the text element to completely isolate text scrolling from parent swipes. However, this would:
+- Require more complex JavaScript touch handling
+- Potentially break the swipe-to-delete feature entirely when touching text areas
+- Create dead zones where swipe-to-delete doesn't work
 
 ## Testing Checklist
 
-- Shortcuts with long names display correctly with horizontal scroll
-- Shortcuts with long URLs/targets display correctly with horizontal scroll  
-- Tap count badge always remains visible
-- Chevron icon always remains visible
-- Both rows can be scrolled independently
+- Swipe-to-delete works reliably on bookmark items with long titles
+- Swipe-to-delete works reliably on trash items with long titles  
+- Swipe gestures in `ScheduledActionItem` (if present) still work
+- Vertical scrolling of the list is not affected
+- Long text displays with ellipsis as visual overflow indicator
+- No accidental deletions occur when interacting with text
+
