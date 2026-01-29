@@ -1,72 +1,39 @@
 
-# Plan: Auto-Update Shortcuts on Home Screen When Edited
 
-## Overview
+# Plan: Auto-Update Shortcuts for All Edit Types
 
-When a user edits a shortcut (changing name or icon), the home screen icon will update automatically in-place, preserving its position. The "Re-Add to Home Screen" button will be kept as a fallback option.
+## Problem Statement
 
-## What Will Change
+The current `updatePinnedShortcut` implementation only updates **label and icon**, but shortcuts can have other editable properties that affect the **intent data**:
 
-### User Experience
-1. Edit a shortcut's name or icon in the app
-2. Tap "Save"
-3. The home screen icon updates automatically (same position)
-4. No need to manually re-add the shortcut
-5. "Re-Add to Home Screen" button remains available as a fallback
+| Shortcut Type | Editable Properties | Stored In |
+|---------------|---------------------|-----------|
+| **WhatsApp** | Quick messages, phone number | Intent extras |
+| **PDF** | Resume enabled | Intent extra |
+| **Contact** | Phone number | Intent data |
+| **URL/File** | Name, icon only | Label/Icon |
 
-### Files to Modify
+When a user edits WhatsApp quick messages, the home screen shortcut should update to include the new messages in its intent.
 
-| File | Change |
-|------|--------|
-| `ShortcutPlugin.java` | Add `updatePinnedShortcut()` method |
-| `ShortcutPlugin.ts` | Add TypeScript interface |
-| `shortcutPluginWeb.ts` | Add web fallback stub |
-| `useShortcuts.ts` | Call native update when saving |
-| `ShortcutEditSheet.tsx` | Update toast message |
+## Technical Limitation
 
-## Technical Details
+Android's `ShortcutManager.updateShortcuts()` **does support updating the intent**, but with caveats:
+- Works reliably for dynamic shortcuts that are also pinned
+- For pinned-only shortcuts, the behavior varies by launcher
+- The safest approach is to update with a complete `ShortcutInfo` including the intent
 
-### 1. Native Android Method
+## Solution
 
-Add `updatePinnedShortcut` to `ShortcutPlugin.java` that:
-- Takes shortcut ID, new label, and icon data
-- Uses existing `createEmojiIcon`, `createTextIcon`, and `createBitmapIcon` helpers
-- Calls `ShortcutManager.updateShortcuts()` to update in-place
+Expand `updatePinnedShortcut` to accept **all editable properties** and rebuild the complete intent when needed. The native method will:
+1. Receive the full shortcut data (type, phone number, quick messages, resume enabled, etc.)
+2. Rebuild the correct intent based on shortcut type
+3. Call `updateShortcuts()` with the complete `ShortcutInfo`
 
-```java
-@PluginMethod
-public void updatePinnedShortcut(PluginCall call) {
-    String id = call.getString("id");
-    String label = call.getString("label");
-    String iconEmoji = call.getString("iconEmoji");
-    String iconText = call.getString("iconText");
-    String iconData = call.getString("iconData");
-    
-    // Create icon using existing helpers
-    Icon icon;
-    if (iconData != null) {
-        icon = createBitmapIcon(iconData);
-    } else if (iconEmoji != null) {
-        icon = createEmojiIcon(iconEmoji);
-    } else if (iconText != null) {
-        icon = createTextIcon(iconText);
-    } else {
-        icon = defaultIcon;
-    }
-    
-    // Build updated ShortcutInfo with same ID
-    ShortcutInfo updatedInfo = new ShortcutInfo.Builder(context, id)
-        .setShortLabel(label)
-        .setLongLabel(label)
-        .setIcon(icon)
-        .build();
-    
-    // Update in-place (preserves position)
-    shortcutManager.updateShortcuts(Collections.singletonList(updatedInfo));
-}
-```
+## Changes Required
 
-### 2. TypeScript Plugin Interface
+### 1. Update TypeScript Interface (`src/plugins/ShortcutPlugin.ts`)
+
+Expand the `updatePinnedShortcut` options to include all editable properties:
 
 ```typescript
 updatePinnedShortcut(options: {
@@ -75,53 +42,150 @@ updatePinnedShortcut(options: {
     iconEmoji?: string;
     iconText?: string;
     iconData?: string;
+    // New: Intent-affecting properties
+    shortcutType?: 'file' | 'link' | 'contact' | 'message';
+    phoneNumber?: string;
+    quickMessages?: string[];  // WhatsApp quick messages
+    messageApp?: string;       // 'whatsapp' | 'telegram' etc.
+    resumeEnabled?: boolean;   // PDF resume
+    contentUri?: string;       // For file/link shortcuts
+    mimeType?: string;
 }): Promise<{ success: boolean; error?: string }>;
 ```
 
-### 3. Hook Integration
+### 2. Update Web Fallback (`src/plugins/shortcutPluginWeb.ts`)
 
-Modify `updateShortcut` in `useShortcuts.ts` to call native update:
+Add the new parameters to the web stub (no-op).
+
+### 3. Update Native Plugin (`ShortcutPlugin.java`)
+
+Modify `updatePinnedShortcut` to:
+1. Parse new parameters (shortcutType, phoneNumber, quickMessages, etc.)
+2. Rebuild the intent based on shortcut type (reusing logic from `createPinnedShortcut`)
+3. Include the intent in the `ShortcutInfo.Builder`
+
+Key code changes:
+```java
+@PluginMethod
+public void updatePinnedShortcut(PluginCall call) {
+    String shortcutId = call.getString("id");
+    String label = call.getString("label");
+    String shortcutType = call.getString("shortcutType");
+    String phoneNumber = call.getString("phoneNumber");
+    String messageApp = call.getString("messageApp");
+    Boolean resumeEnabled = call.getBoolean("resumeEnabled", false);
+    String contentUri = call.getString("contentUri");
+    String mimeType = call.getString("mimeType");
+    
+    // Parse quick messages JSON array
+    JSArray quickMessagesArray = call.getArray("quickMessages");
+    String quickMessagesJson = quickMessagesArray != null ? 
+        quickMessagesArray.toString() : null;
+    
+    // Build intent based on shortcut type
+    Intent intent = null;
+    if ("message".equals(shortcutType) && "whatsapp".equals(messageApp)) {
+        // WhatsApp shortcut - route through proxy
+        intent = new Intent(context, WhatsAppProxyActivity.class);
+        intent.setAction("app.onetap.WHATSAPP_MESSAGE");
+        intent.putExtra(EXTRA_PHONE_NUMBER, phoneNumber);
+        intent.putExtra(EXTRA_QUICK_MESSAGES, quickMessagesJson);
+        // ... etc
+    } else if ("contact".equals(shortcutType)) {
+        intent = new Intent(context, ContactProxyActivity.class);
+        // ...
+    }
+    // ... other types
+    
+    // Build ShortcutInfo with intent
+    ShortcutInfo.Builder builder = new ShortcutInfo.Builder(context, shortcutId)
+        .setShortLabel(label)
+        .setLongLabel(label)
+        .setIcon(icon);
+    
+    if (intent != null) {
+        builder.setIntent(intent);
+    }
+    
+    manager.updateShortcuts(Collections.singletonList(builder.build()));
+}
+```
+
+### 4. Update useShortcuts Hook (`src/hooks/useShortcuts.ts`)
+
+Pass all relevant shortcut data to the native update:
 
 ```typescript
 const updateShortcut = useCallback(async (id, updates) => {
-    // Update localStorage first
     const updated = shortcuts.map(s => 
         s.id === id ? { ...s, ...updates } : s
     );
     saveShortcuts(updated);
-    
-    // Update home screen shortcut if name or icon changed
-    if (Capacitor.isNativePlatform() && (updates.name || updates.icon)) {
+
+    if (Capacitor.isNativePlatform()) {
         const shortcut = updated.find(s => s.id === id);
         if (shortcut) {
+            // Determine if intent needs updating
+            const needsIntentUpdate = 
+                updates.quickMessages !== undefined ||
+                updates.phoneNumber !== undefined ||
+                updates.resumeEnabled !== undefined;
+
             await ShortcutPlugin.updatePinnedShortcut({
                 id,
                 label: shortcut.name,
                 iconEmoji: shortcut.icon.type === 'emoji' ? shortcut.icon.value : undefined,
                 iconText: shortcut.icon.type === 'text' ? shortcut.icon.value : undefined,
                 iconData: shortcut.icon.type === 'thumbnail' ? shortcut.icon.value : undefined,
+                // Intent data (only sent if intent needs updating)
+                shortcutType: shortcut.type,
+                phoneNumber: shortcut.phoneNumber,
+                quickMessages: shortcut.quickMessages,
+                messageApp: shortcut.messageApp,
+                resumeEnabled: shortcut.resumeEnabled,
+                contentUri: shortcut.contentUri,
+                mimeType: shortcut.mimeType,
             });
         }
     }
 }, [shortcuts, saveShortcuts]);
 ```
 
-### 4. UI Changes
+### 5. Update ShortcutEditSheet
 
-Update `ShortcutEditSheet.tsx`:
-- Remove the "re-add hint" from the toast since updates happen automatically
-- Keep the "Re-Add to Home Screen" button as a manual fallback option
-- Button still shows when icon/name changed for users who want to force re-creation
+The current code already passes `quickMessages` and `resumeEnabled` in the `updates` object, so minimal changes needed. Just ensure the `updateShortcut` signature allows `phoneNumber` updates too.
 
-## Why Keep the Re-Add Button?
+## Files to Modify
 
-1. **Fallback**: Some custom launchers may not refresh immediately
-2. **User Control**: Users can manually recreate if update doesn't work
-3. **No Downside**: It's optional and doesn't interfere with auto-update
+| File | Change |
+|------|--------|
+| `src/plugins/ShortcutPlugin.ts` | Expand `updatePinnedShortcut` interface |
+| `src/plugins/shortcutPluginWeb.ts` | Update web fallback stub |
+| `native/.../ShortcutPlugin.java` | Rebuild intent in `updatePinnedShortcut` |
+| `src/hooks/useShortcuts.ts` | Pass full shortcut data to native |
 
-## Android API Notes
+## Shortcut Types Covered
 
-- `ShortcutManager.updateShortcuts()` requires API 25+ (Android 7.1)
-- App already requires API 26+ (Android 8.0) for pinned shortcuts
-- Update only changes label/icon - the underlying intent stays the same
-- Most modern launchers support this API correctly
+| Type | Edits Auto-Updated |
+|------|-------------------|
+| **WhatsApp** | ✅ Name, icon, phone number, quick messages |
+| **Contact** | ✅ Name, icon, phone number |
+| **PDF** | ✅ Name, icon, resume enabled |
+| **URL/Link** | ✅ Name, icon |
+| **File (image/video)** | ✅ Name, icon |
+
+## Edge Cases Handled
+
+1. **No intent change needed** - If only name/icon changed, the intent is optional
+2. **Launcher compatibility** - Some custom launchers may not refresh immediately; the "Re-Add" button remains as fallback
+3. **Validation** - Proper null checks on all optional parameters
+
+## User Experience
+
+1. User opens "My Shortcuts"
+2. Taps a WhatsApp shortcut → "Edit"
+3. Changes quick messages (adds/removes/reorders)
+4. Taps "Save"
+5. The home screen shortcut updates automatically
+6. Next tap opens WhatsApp with the new message options
+
