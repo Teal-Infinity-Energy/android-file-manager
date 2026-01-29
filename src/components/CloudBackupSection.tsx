@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Cloud, CloudOff, RefreshCw, Upload, Download, LogOut, Loader2 } from 'lucide-react';
+import { Cloud, RefreshCw, LogOut, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/hooks/useAuth';
-import { syncBookmarks, uploadBookmarksToCloud, downloadBookmarksFromCloud } from '@/lib/cloudSync';
+import { syncBookmarks, uploadBookmarksToCloud, downloadBookmarksFromCloud, uploadTrashToCloud, downloadTrashFromCloud } from '@/lib/cloudSync';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export function CloudBackupSection() {
   const { user, loading: authLoading, isAuthenticated, signInWithGoogle, signOut } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [isRecoveryAction, setIsRecoveryAction] = useState(false);
 
   const handleSignIn = async () => {
     try {
@@ -45,23 +47,31 @@ export function CloudBackupSection() {
     }
   };
 
+  /**
+   * Safe bidirectional sync:
+   * 1. Upload local → cloud (upsert by entity_id, never overwrites)
+   * 2. Download cloud → local (only adds missing entity_ids)
+   * Result: Union of both datasets, safe to run repeatedly
+   */
   const handleSync = async () => {
     setIsSyncing(true);
     try {
       const result = await syncBookmarks();
       if (result.success) {
+        const hasChanges = result.uploaded > 0 || result.downloaded > 0;
         toast({
           title: 'Sync complete',
-          description: `Uploaded ${result.uploaded} and downloaded ${result.downloaded} bookmarks.`,
+          description: hasChanges 
+            ? `Added ${result.downloaded} from cloud, backed up ${result.uploaded} to cloud.`
+            : 'Everything is already in sync.',
         });
         if (result.downloaded > 0) {
-          // Reload to show new bookmarks
           window.location.reload();
         }
       } else {
         toast({
           title: 'Sync failed',
-          description: result.error || 'Could not sync bookmarks.',
+          description: result.error || 'Could not sync bookmarks. Try again.',
           variant: 'destructive',
         });
       }
@@ -70,50 +80,59 @@ export function CloudBackupSection() {
     }
   };
 
-  const handleUpload = async () => {
-    setIsUploading(true);
+  // Recovery tools - hidden by default
+  const handleForceUpload = async () => {
+    setIsRecoveryAction(true);
     try {
-      const result = await uploadBookmarksToCloud();
-      if (result.success) {
+      const [bookmarkResult, trashResult] = await Promise.all([
+        uploadBookmarksToCloud(),
+        uploadTrashToCloud()
+      ]);
+      
+      if (bookmarkResult.success) {
         toast({
           title: 'Upload complete',
-          description: `Uploaded ${result.uploaded} bookmarks to cloud.`,
+          description: `Uploaded ${bookmarkResult.uploaded} bookmarks to cloud.`,
         });
       } else {
         toast({
           title: 'Upload failed',
-          description: result.error || 'Could not upload bookmarks.',
+          description: bookmarkResult.error || 'Could not upload bookmarks.',
           variant: 'destructive',
         });
       }
     } finally {
-      setIsUploading(false);
+      setIsRecoveryAction(false);
     }
   };
 
-  const handleDownload = async () => {
-    setIsDownloading(true);
+  const handleForceDownload = async () => {
+    setIsRecoveryAction(true);
     try {
-      const result = await downloadBookmarksFromCloud();
-      if (result.success) {
+      const [bookmarkResult, trashResult] = await Promise.all([
+        downloadBookmarksFromCloud(),
+        downloadTrashFromCloud()
+      ]);
+      
+      if (bookmarkResult.success) {
         toast({
           title: 'Download complete',
-          description: result.downloaded > 0 
-            ? `Downloaded ${result.downloaded} new bookmarks.`
+          description: bookmarkResult.downloaded > 0 
+            ? `Downloaded ${bookmarkResult.downloaded} new bookmarks.`
             : 'No new bookmarks to download.',
         });
-        if (result.downloaded > 0) {
+        if (bookmarkResult.downloaded > 0) {
           window.location.reload();
         }
       } else {
         toast({
           title: 'Download failed',
-          description: result.error || 'Could not download bookmarks.',
+          description: bookmarkResult.error || 'Could not download bookmarks.',
           variant: 'destructive',
         });
       }
     } finally {
-      setIsDownloading(false);
+      setIsRecoveryAction(false);
     }
   };
 
@@ -152,6 +171,8 @@ export function CloudBackupSection() {
     );
   }
 
+  const isBusy = isSyncing || isRecoveryAction;
+
   return (
     <>
       <Separator className="my-3" />
@@ -180,12 +201,12 @@ export function CloudBackupSection() {
         </div>
       </div>
 
-      {/* Sync button */}
+      {/* Primary action: Single Sync button */}
       <Button
         variant="ghost"
         className="w-full justify-start h-12 px-3"
         onClick={handleSync}
-        disabled={isSyncing || isUploading || isDownloading}
+        disabled={isBusy}
       >
         <div className="flex items-center gap-3 flex-1">
           <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -197,48 +218,58 @@ export function CloudBackupSection() {
           </div>
           <div className="text-left">
             <span className="font-medium block">Sync Now</span>
-            <span className="text-xs text-muted-foreground">Upload & download bookmarks</span>
+            <span className="text-xs text-muted-foreground">
+              Merge local & cloud data safely
+            </span>
           </div>
         </div>
       </Button>
 
-      {/* Upload only */}
-      <Button
-        variant="ghost"
-        className="w-full justify-start h-12 px-3"
-        onClick={handleUpload}
-        disabled={isSyncing || isUploading || isDownloading}
-      >
-        <div className="flex items-center gap-3 flex-1">
-          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-          <span className="font-medium">Upload to Cloud</span>
-        </div>
-      </Button>
-
-      {/* Download only */}
-      <Button
-        variant="ghost"
-        className="w-full justify-start h-12 px-3"
-        onClick={handleDownload}
-        disabled={isSyncing || isUploading || isDownloading}
-      >
-        <div className="flex items-center gap-3 flex-1">
-          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
-            {isDownloading ? (
-              <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-          <span className="font-medium">Download from Cloud</span>
-        </div>
-      </Button>
+      {/* Recovery tools - hidden by default */}
+      <Collapsible open={showRecovery} onOpenChange={setShowRecovery}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center h-8 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <span>Recovery tools</span>
+            <ChevronDown className={cn(
+              "h-3 w-3 ms-1 transition-transform",
+              showRecovery && "rotate-180"
+            )} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-1 pt-1">
+          <p className="text-[10px] text-muted-foreground px-3 mb-1">
+            Use only if sync behaves unexpectedly
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start h-9 px-3 text-xs"
+            onClick={handleForceUpload}
+            disabled={isBusy}
+          >
+            {isRecoveryAction ? (
+              <Loader2 className="h-3 w-3 me-2 animate-spin" />
+            ) : null}
+            Force upload local → cloud
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start h-9 px-3 text-xs"
+            onClick={handleForceDownload}
+            disabled={isBusy}
+          >
+            {isRecoveryAction ? (
+              <Loader2 className="h-3 w-3 me-2 animate-spin" />
+            ) : null}
+            Force download cloud → local
+          </Button>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Sign out */}
       <Button
