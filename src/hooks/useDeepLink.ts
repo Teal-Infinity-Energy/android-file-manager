@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react';
 import { App, URLOpenListenerEvent } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
-import { supabase } from '@/integrations/supabase/client';
-
-const OAUTH_CALLBACK_HOST = 'id-preview--2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovable.app';
-const OAUTH_CALLBACK_PATH = '/auth-callback';
+import { 
+  completeOAuth, 
+  isOAuthCallback,
+  attemptOAuthRecovery,
+} from '@/lib/oauthCompletion';
 
 // Store the last received deep link for debugging
 let lastDeepLinkUrl: string | null = null;
@@ -19,11 +20,22 @@ export function getLastDeepLink() {
 }
 
 export function useDeepLink() {
-  const handledUrls = useRef<Set<string>>(new Set());
+  const isProcessing = useRef(false);
+  const hasAttemptedRecovery = useRef(false);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
       return;
+    }
+
+    // Attempt cold-start recovery once on mount
+    if (!hasAttemptedRecovery.current) {
+      hasAttemptedRecovery.current = true;
+      attemptOAuthRecovery().then(result => {
+        if (result) {
+          console.log('[DeepLink] Cold-start recovery result:', result.success);
+        }
+      });
     }
 
     const handleAppUrlOpen = async (event: URLOpenListenerEvent) => {
@@ -34,44 +46,40 @@ export function useDeepLink() {
       lastDeepLinkUrl = url;
       lastDeepLinkTime = new Date();
 
-      // Check if this is an OAuth callback (App Links approach)
-      if (!url.includes(OAUTH_CALLBACK_HOST) || !url.includes(OAUTH_CALLBACK_PATH)) {
+      // Only handle OAuth callbacks
+      if (!isOAuthCallback(url)) {
         console.log('[DeepLink] Not an auth callback, ignoring');
         return;
       }
 
-      // Prevent duplicate handling
-      if (handledUrls.current.has(url)) {
-        console.log('[DeepLink] URL already handled, skipping');
+      // Prevent concurrent processing
+      if (isProcessing.current) {
+        console.log('[DeepLink] Already processing, skipping');
         return;
       }
-      handledUrls.current.add(url);
+
+      isProcessing.current = true;
 
       try {
         // Close the browser if it's still open
         try {
           await Browser.close();
-        } catch (e) {
+        } catch {
           // Browser might not be open, that's fine
         }
 
-        console.log('[DeepLink] Exchanging code for session...');
-        
-        // The URL contains the auth code as a query parameter or fragment
-        // Supabase SDK can parse this directly
-        const { data, error } = await supabase.auth.exchangeCodeForSession(url);
+        // Use the canonical OAuth completion function
+        const result = await completeOAuth(url);
 
-        if (error) {
-          console.error('[DeepLink] Code exchange failed:', error);
-          // Clear the handled URL so user can retry
-          handledUrls.current.delete(url);
-          return;
+        if (result.alreadyProcessed) {
+          console.log('[DeepLink] URL was already processed');
+        } else if (result.success) {
+          console.log('[DeepLink] OAuth completed successfully');
+        } else if (result.error) {
+          console.error('[DeepLink] OAuth failed:', result.error);
         }
-
-        console.log('[DeepLink] Session established successfully:', data.session?.user?.email);
-      } catch (err) {
-        console.error('[DeepLink] Error handling OAuth callback:', err);
-        handledUrls.current.delete(url);
+      } finally {
+        isProcessing.current = false;
       }
     };
 
