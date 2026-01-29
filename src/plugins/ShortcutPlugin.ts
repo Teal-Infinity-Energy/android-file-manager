@@ -221,6 +221,21 @@ export interface ShortcutPluginInterface {
     success: boolean;
     error?: string;
   }>;
+
+  // ========== Shortcut Edit ==========
+
+  // Get pending edit shortcut ID (from home screen long-press edit action)
+  getPendingEditShortcut(): Promise<{
+    success: boolean;
+    shortcutId?: string;
+    error?: string;
+  }>;
+
+  // Clear pending edit shortcut ID after handling
+  clearPendingEditShortcut(): Promise<{
+    success: boolean;
+    error?: string;
+  }>;
 }
 
 // This plugin bridges to native Android code

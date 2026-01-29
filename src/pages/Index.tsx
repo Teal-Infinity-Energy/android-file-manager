@@ -12,6 +12,7 @@ import { SharedUrlActionSheet } from '@/components/SharedUrlActionSheet';
 import { OnboardingFlow } from '@/components/OnboardingFlow';
 import { LanguageSelectionStep } from '@/components/LanguageSelectionStep';
 import { MessageChooserSheet } from '@/components/MessageChooserSheet';
+import { ShortcutEditSheet } from '@/components/ShortcutEditSheet';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useBackButton } from '@/hooks/useBackButton';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +20,8 @@ import { useAutoSync } from '@/hooks/useAutoSync';
 import { useDeepLink } from '@/hooks/useDeepLink';
 import { useOAuthRecovery } from '@/hooks/useOAuthRecovery';
 import { usePendingWhatsAppAction } from '@/hooks/usePendingWhatsAppAction';
+import { usePendingShortcutEdit } from '@/hooks/usePendingShortcutEdit';
+import { useShortcuts } from '@/hooks/useShortcuts';
 import { OAuthRecoveryBanner } from '@/components/auth/OAuthRecoveryBanner';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -28,6 +31,7 @@ import { getShortlistedLinks, clearAllShortlist, addSavedLink } from '@/lib/save
 import { getActiveCount, onScheduledActionsChange } from '@/lib/scheduledActionsManager';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 import type { ScheduledActionDestination } from '@/types/scheduledAction';
+import type { ShortcutData } from '@/types/shortcut';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +90,11 @@ const Index = () => {
     clearPendingAction: clearWhatsAppPendingAction,
   } = usePendingWhatsAppAction();
   
+  // Handle pending shortcut edit from home screen long-press
+  const { pendingEditId, clearPendingEdit } = usePendingShortcutEdit();
+  const { shortcuts, updateShortcut, getShortcut, deleteShortcut } = useShortcuts();
+  const [editingShortcut, setEditingShortcut] = useState<ShortcutData | null>(null);
+  
   // Handle shared content from Android Share Sheet (always active regardless of tab)
   const { sharedContent, sharedAction, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
   
@@ -98,6 +107,33 @@ const Index = () => {
     const unsubscribe = onScheduledActionsChange(updateCount);
     return unsubscribe;
   }, []);
+
+  // Handle pending shortcut edit from home screen long-press
+  useEffect(() => {
+    if (pendingEditId) {
+      const shortcut = getShortcut(pendingEditId);
+      if (shortcut) {
+        console.log('[Index] Opening edit sheet for shortcut:', pendingEditId);
+        setEditingShortcut(shortcut);
+      } else {
+        console.warn('[Index] Pending edit shortcut not found:', pendingEditId);
+      }
+      clearPendingEdit();
+    }
+  }, [pendingEditId, getShortcut, clearPendingEdit]);
+
+  // Handler for saving shortcut edits
+  const handleSaveShortcutEdit = useCallback((id: string, updates: Parameters<typeof updateShortcut>[1]) => {
+    updateShortcut(id, updates);
+  }, [updateShortcut]);
+
+  // Handler for deleting shortcut from action sheet
+  const handleDeleteShortcut = useCallback((id: string) => {
+    deleteShortcut(id);
+    toast({
+      title: t('shortcutAction.deleted', 'Access deleted'),
+    });
+  }, [deleteShortcut, toast, t]);
 
   // Handle shared content from Android Share Sheet
   useEffect(() => {
@@ -510,6 +546,14 @@ const Index = () => {
         contactName={pendingWhatsAppAction?.contactName}
         onSelectMessage={handleWhatsAppMessageSelected}
         onOpenChatOnly={handleWhatsAppOpenChatOnly}
+      />
+
+      {/* Shortcut Edit Sheet (for editing shortcuts) */}
+      <ShortcutEditSheet
+        shortcut={editingShortcut}
+        isOpen={!!editingShortcut}
+        onClose={() => setEditingShortcut(null)}
+        onSave={handleSaveShortcutEdit}
       />
     </div>
   );

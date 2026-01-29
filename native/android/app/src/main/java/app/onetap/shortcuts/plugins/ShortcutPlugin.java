@@ -59,6 +59,7 @@ import app.onetap.shortcuts.PDFProxyActivity;
 import app.onetap.shortcuts.VideoProxyActivity;
 import app.onetap.shortcuts.ContactProxyActivity;
 import app.onetap.shortcuts.WhatsAppProxyActivity;
+import app.onetap.shortcuts.ShortcutEditProxyActivity;
 import app.onetap.shortcuts.ScheduledActionReceiver;
 import app.onetap.shortcuts.NotificationHelper;
 import app.onetap.shortcuts.NotificationClickActivity;
@@ -2741,6 +2742,79 @@ public class ShortcutPlugin extends Plugin {
             call.resolve(result);
         } catch (Exception e) {
             android.util.Log.e("ShortcutPlugin", "Error opening WhatsApp: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    // ========== Shortcut Edit ==========
+
+    /**
+     * Get pending edit shortcut ID (from home screen long-press edit action).
+     * Called by JS layer on app startup to check if user wants to edit a shortcut.
+     */
+    @PluginMethod
+    public void getPendingEditShortcut(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "getPendingEditShortcut called");
+
+        try {
+            Context context = getContext();
+            if (context == null) {
+                JSObject result = new JSObject();
+                result.put("success", false);
+                result.put("error", "Context is null");
+                call.resolve(result);
+                return;
+            }
+
+            String shortcutId = ShortcutEditProxyActivity.getPendingEditId(context);
+            
+            JSObject result = new JSObject();
+            result.put("success", true);
+            
+            if (shortcutId != null && !shortcutId.isEmpty()) {
+                result.put("shortcutId", shortcutId);
+                android.util.Log.d("ShortcutPlugin", "Found pending edit shortcut: " + shortcutId);
+            } else {
+                android.util.Log.d("ShortcutPlugin", "No pending edit shortcut");
+            }
+            
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error getting pending edit shortcut: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    /**
+     * Clear pending edit shortcut ID after it has been handled.
+     */
+    @PluginMethod
+    public void clearPendingEditShortcut(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "clearPendingEditShortcut called");
+
+        try {
+            Context context = getContext();
+            if (context == null) {
+                JSObject result = new JSObject();
+                result.put("success", false);
+                result.put("error", "Context is null");
+                call.resolve(result);
+                return;
+            }
+
+            ShortcutEditProxyActivity.clearPendingEditId(context);
+            
+            JSObject result = new JSObject();
+            result.put("success", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error clearing pending edit shortcut: " + e.getMessage());
             JSObject result = new JSObject();
             result.put("success", false);
             result.put("error", e.getMessage());
