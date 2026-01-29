@@ -35,6 +35,10 @@ export interface ShortcutData {
   messageApp?: MessageApp;     // Which messaging app to use
   slackUserId?: string;        // For Slack DM shortcuts
   slackTeamId?: string;        // For Slack workspace
+  // WhatsApp Quick Messages - optional message templates for WhatsApp shortcuts
+  // Messages are drafts that open in WhatsApp for user to review and send
+  // Empty array or undefined = open chat only
+  quickMessages?: string[];
 }
 
 export interface ContentSource {

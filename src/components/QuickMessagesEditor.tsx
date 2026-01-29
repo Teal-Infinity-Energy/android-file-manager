@@ -1,0 +1,153 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Plus, X, GripVertical, MessageCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+
+interface QuickMessagesEditorProps {
+  messages: string[];
+  onChange: (messages: string[]) => void;
+  maxMessages?: number;
+}
+
+/**
+ * QuickMessagesEditor - A calm, optional editor for WhatsApp quick messages.
+ * 
+ * Philosophy:
+ * - Messages are drafts, never auto-sent
+ * - Empty messages array means "open chat only"
+ * - Plain text only (emojis and line breaks allowed)
+ * - User is always in control
+ */
+export function QuickMessagesEditor({
+  messages,
+  onChange,
+  maxMessages = 5,
+}: QuickMessagesEditorProps) {
+  const { t } = useTranslation();
+  const [isAdding, setIsAdding] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+
+  const handleAddMessage = () => {
+    const trimmed = newMessage.trim();
+    if (trimmed && messages.length < maxMessages) {
+      onChange([...messages, trimmed]);
+      setNewMessage('');
+      setIsAdding(false);
+    }
+  };
+
+  const handleRemoveMessage = (index: number) => {
+    const updated = messages.filter((_, i) => i !== index);
+    onChange(updated);
+  };
+
+  const handleUpdateMessage = (index: number, value: string) => {
+    const updated = [...messages];
+    updated[index] = value;
+    onChange(updated);
+  };
+
+  const canAddMore = messages.length < maxMessages;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium text-foreground">
+          {t('whatsapp.quickMessages', 'Quick messages')}
+        </Label>
+        <span className="text-xs text-muted-foreground">
+          {t('whatsapp.optional', 'Optional')}
+        </span>
+      </div>
+      
+      <p className="text-xs text-muted-foreground">
+        {t('whatsapp.quickMessagesHint', 'Messages open as drafts for you to review and send.')}
+      </p>
+
+      {/* Existing messages */}
+      {messages.length > 0 && (
+        <div className="space-y-2">
+          {messages.map((message, index) => (
+            <div 
+              key={index}
+              className="group relative flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/50"
+            >
+              <GripVertical className="h-4 w-4 mt-1 text-muted-foreground/50 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <Textarea
+                  value={message}
+                  onChange={(e) => handleUpdateMessage(index, e.target.value)}
+                  className="min-h-[60px] text-sm resize-none bg-transparent border-0 p-0 focus-visible:ring-0"
+                  placeholder={t('whatsapp.messagePlaceholder', 'Type a message...')}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemoveMessage(index)}
+                className="p-1 rounded-full hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive shrink-0"
+                aria-label={t('common.remove', 'Remove')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add new message */}
+      {isAdding ? (
+        <div className="space-y-2 p-3 rounded-lg border border-dashed border-primary/30 bg-primary/5">
+          <Textarea
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className="min-h-[80px] text-sm resize-none"
+            placeholder={t('whatsapp.messagePlaceholder', 'Type a message...')}
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsAdding(false);
+                setNewMessage('');
+              }}
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAddMessage}
+              disabled={!newMessage.trim()}
+            >
+              {t('common.add', 'Add')}
+            </Button>
+          </div>
+        </div>
+      ) : canAddMore ? (
+        <button
+          type="button"
+          onClick={() => setIsAdding(true)}
+          className="w-full flex items-center justify-center gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5 transition-colors text-muted-foreground hover:text-primary"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="text-sm">{t('whatsapp.addMessage', 'Add quick message')}</span>
+        </button>
+      ) : null}
+
+      {/* Behavior explanation based on message count */}
+      <div className="flex items-start gap-2 p-2 rounded-lg bg-muted/20">
+        <MessageCircle className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+        <p className="text-xs text-muted-foreground">
+          {messages.length === 0 && t('whatsapp.behaviorNoMessages', 'Opens WhatsApp chat directly.')}
+          {messages.length === 1 && t('whatsapp.behaviorOneMessage', 'Opens chat with message pre-filled.')}
+          {messages.length > 1 && t('whatsapp.behaviorMultipleMessages', 'Shows a chooser, then opens chat with selected message.')}
+        </p>
+      </div>
+    </div>
+  );
+}

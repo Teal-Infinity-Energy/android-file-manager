@@ -275,6 +275,7 @@ export function AccessFlow({
     messageApp?: MessageApp;
     slackTeamId?: string;
     slackUserId?: string;
+    quickMessages?: string[];
   }) => {
     // If pending action is reminder, create reminder instead
     if (pendingActionMode === 'reminder') {
@@ -282,6 +283,9 @@ export function AccessFlow({
         type: 'contact',
         phoneNumber: data.phoneNumber,
         contactName: data.name,
+        // For WhatsApp reminders, include message data
+        isWhatsApp: !!data.messageApp && data.messageApp === 'whatsapp',
+        quickMessage: data.quickMessages?.[0], // For reminders, use first message if any
       };
       onCreateReminder?.(destination);
       handleReset();
@@ -297,7 +301,8 @@ export function AccessFlow({
         data.messageApp,
         data.slackTeamId && data.slackUserId
           ? { teamId: data.slackTeamId, userId: data.slackUserId }
-          : undefined
+          : undefined,
+        data.quickMessages
       );
 
       const success = await createHomeScreenShortcut(shortcut);
