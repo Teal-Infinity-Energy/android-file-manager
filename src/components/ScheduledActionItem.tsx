@@ -312,7 +312,7 @@ export function ScheduledActionItem({
             <div className="flex-1 min-w-0 overflow-hidden">
               <p 
                 className={cn(
-                  "font-medium text-sm cursor-pointer",
+                  "font-medium text-sm min-w-0 cursor-pointer",
                   isTitleExpanded ? "break-all" : "truncate"
                 )}
                 onClick={(e) => {
