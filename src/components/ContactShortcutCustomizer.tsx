@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IconPicker } from '@/components/IconPicker';
 import { ContactAvatar, getInitials } from '@/components/ContactAvatar';
+import { QuickMessagesEditor } from '@/components/QuickMessagesEditor';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
 import type { ShortcutIcon } from '@/types/shortcut';
 
@@ -24,6 +25,7 @@ interface ContactShortcutCustomizerProps {
     icon: ShortcutIcon;
     phoneNumber: string;
     messageApp?: 'whatsapp';
+    quickMessages?: string[];
   }) => void;
   onBack: () => void;
 }
@@ -47,6 +49,7 @@ export function ContactShortcutCustomizer({
   const [isPickingContact, setIsPickingContact] = useState(false);
   const [pickedContact, setPickedContact] = useState<ContactData | null>(contact || null);
   const [contactPhoto, setContactPhoto] = useState<string | null>(contact?.photoBase64 || null);
+  const [quickMessages, setQuickMessages] = useState<string[]>([]);
   const [icon, setIcon] = useState<ShortcutIcon>(() => {
     // If contact has a photo, use it as thumbnail icon
     if (contact?.photoBase64) {
@@ -126,6 +129,7 @@ export function ContactShortcutCustomizer({
       icon,
       phoneNumber,
       messageApp: mode === 'message' ? 'whatsapp' : undefined,
+      quickMessages: mode === 'message' ? quickMessages : undefined,
     });
   };
 
@@ -189,6 +193,7 @@ export function ContactShortcutCustomizer({
                     setPickedContact(null);
                     setContactPhoto(null);
                     setName('');
+                    setQuickMessages([]);
                     // Reset icon to default
                     setIcon({ type: 'emoji', value: mode === 'dial' ? '📞' : '💬' });
                   }}
@@ -243,6 +248,14 @@ export function ContactShortcutCustomizer({
           onSelect={setIcon}
           thumbnail={contactPhoto || undefined}
         />
+
+        {/* Quick Messages Editor - WhatsApp mode only */}
+        {mode === 'message' && (
+          <QuickMessagesEditor
+            messages={quickMessages}
+            onChange={setQuickMessages}
+          />
+        )}
 
         {/* Spacer */}
         <div className="flex-1 min-h-4" />

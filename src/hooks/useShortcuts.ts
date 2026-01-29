@@ -84,7 +84,8 @@ export function useShortcuts() {
     icon: ShortcutIcon,
     phoneNumber: string,
     messageApp?: MessageApp,
-    slackDetails?: { teamId: string; userId: string }
+    slackDetails?: { teamId: string; userId: string },
+    quickMessages?: string[]
   ): ShortcutData => {
     const shortcut: ShortcutData = {
       id: crypto.randomUUID(),
@@ -98,6 +99,8 @@ export function useShortcuts() {
       messageApp,
       slackTeamId: slackDetails?.teamId,
       slackUserId: slackDetails?.userId,
+      // WhatsApp quick messages - optional message templates
+      quickMessages: type === 'message' && quickMessages?.length ? quickMessages : undefined,
     };
 
     const updated = [...shortcuts, shortcut];

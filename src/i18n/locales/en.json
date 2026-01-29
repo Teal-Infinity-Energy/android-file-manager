@@ -730,5 +730,23 @@
     "stockStep2": "Select \"Unrestricted\" to allow background activity",
     "stockStep3": "Go to Settings → Battery → Adaptive preferences",
     "stockStep4": "Disable \"Adaptive Battery\" or add OneTap to exceptions"
+  },
+  "whatsapp": {
+    "quickMessages": "Quick messages",
+    "optional": "Optional",
+    "quickMessagesHint": "Messages open as drafts for you to review and send.",
+    "addMessage": "Add quick message",
+    "messagePlaceholder": "Type a message...",
+    "behaviorNoMessages": "Opens WhatsApp chat directly.",
+    "behaviorOneMessage": "Opens chat with message pre-filled.",
+    "behaviorMultipleMessages": "Shows a chooser, then opens chat with selected message.",
+    "chooseMessage": "Choose message",
+    "chooseMessageFor": "Message for {{name}}",
+    "openChatOnly": "Open chat",
+    "openChatOnlyDesc": "Start fresh, type your own message",
+    "orUseQuickMessage": "or use a quick message",
+    "unavailable": "WhatsApp is not available",
+    "copyMessage": "Copy message",
+    "messageCopied": "Message copied to clipboard"
   }
 }

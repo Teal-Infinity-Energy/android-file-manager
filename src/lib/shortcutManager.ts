@@ -7,7 +7,7 @@ export interface ShortcutIntent {
   action: string;
   data: string;
   type?: string;
-  extras?: Record<string, string>;
+  extras?: Record<string, string | undefined>;
 }
 
 // Build intent for opening content
@@ -33,9 +33,15 @@ export function buildContentIntent(shortcut: ShortcutData): ShortcutIntent {
     switch (shortcut.messageApp) {
       case 'whatsapp':
         // WhatsApp uses wa.me for universal linking
+        // Note: Message is NOT included in the intent data here
+        // For shortcuts with quickMessages, the execution logic handles message selection
         return {
           action: 'android.intent.action.VIEW',
           data: `https://wa.me/${phoneNumber}`,
+          extras: {
+            // Pass quickMessages as JSON for native handling
+            quick_messages: shortcut.quickMessages ? JSON.stringify(shortcut.quickMessages) : undefined,
+          },
         };
       case 'telegram':
         return {

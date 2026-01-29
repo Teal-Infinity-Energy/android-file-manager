@@ -173,7 +173,7 @@ public class NotificationHelper {
             case "url":
                 return "Tap to open";
             case "contact":
-                return "Tap to call";
+                return "Tap to call or message";
             case "file":
                 return "Tap to open file";
             default:

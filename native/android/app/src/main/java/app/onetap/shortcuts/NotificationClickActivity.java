@@ -150,33 +150,52 @@ public class NotificationClickActivity extends Activity {
                     break;
                     
                 case "contact":
-                    // Directly place the call (one tap promise)
                     String phoneNumber = data.getString("phoneNumber");
+                    boolean isWhatsApp = data.optBoolean("isWhatsApp", false);
+                    String quickMessage = data.optString("quickMessage", null);
                     
-                    // Check permission first, then decide which intent to use
-                    boolean hasCallPermission = checkSelfPermission(Manifest.permission.CALL_PHONE) 
-                        == PackageManager.PERMISSION_GRANTED;
-                    
-                    if (hasCallPermission) {
-                        actionIntent = new Intent(Intent.ACTION_CALL);
-                        actionIntent.setData(Uri.parse("tel:" + phoneNumber));
+                    if (isWhatsApp) {
+                        // WhatsApp reminder - open chat with optional message prefill
+                        String cleanNumber = phoneNumber.replaceAll("[^0-9]", "");
+                        String whatsappUrl = "https://wa.me/" + cleanNumber;
                         
-                        // Try direct call, fall back to dialer if it fails
-                        try {
-                            actionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(actionIntent);
-                            Log.d(TAG, "Executed direct call to: " + phoneNumber);
-                            return; // Success, exit early
-                        } catch (SecurityException se) {
-                            Log.w(TAG, "CALL_PHONE failed despite permission, falling back to dialer", se);
-                            // Fall back to dialer
+                        // If there's a quick message, append it as text parameter
+                        if (quickMessage != null && !quickMessage.isEmpty()) {
+                            try {
+                                whatsappUrl += "?text=" + java.net.URLEncoder.encode(quickMessage, "UTF-8");
+                            } catch (java.io.UnsupportedEncodingException e) {
+                                Log.w(TAG, "Failed to encode message, opening chat without prefill", e);
+                            }
+                        }
+                        
+                        actionIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(whatsappUrl));
+                        Log.d(TAG, "Opening WhatsApp: " + (quickMessage != null ? "with message prefill" : "chat only"));
+                    } else {
+                        // Call reminder - use dialer or direct call
+                        boolean hasCallPermission = checkSelfPermission(Manifest.permission.CALL_PHONE) 
+                            == PackageManager.PERMISSION_GRANTED;
+                        
+                        if (hasCallPermission) {
+                            actionIntent = new Intent(Intent.ACTION_CALL);
+                            actionIntent.setData(Uri.parse("tel:" + phoneNumber));
+                            
+                            // Try direct call, fall back to dialer if it fails
+                            try {
+                                actionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(actionIntent);
+                                Log.d(TAG, "Executed direct call to: " + phoneNumber);
+                                return; // Success, exit early
+                            } catch (SecurityException se) {
+                                Log.w(TAG, "CALL_PHONE failed despite permission, falling back to dialer", se);
+                                // Fall back to dialer
+                                actionIntent = new Intent(Intent.ACTION_DIAL);
+                                actionIntent.setData(Uri.parse("tel:" + phoneNumber));
+                            }
+                        } else {
+                            Log.d(TAG, "CALL_PHONE permission not granted, using dialer");
                             actionIntent = new Intent(Intent.ACTION_DIAL);
                             actionIntent.setData(Uri.parse("tel:" + phoneNumber));
                         }
-                    } else {
-                        Log.d(TAG, "CALL_PHONE permission not granted, using dialer");
-                        actionIntent = new Intent(Intent.ACTION_DIAL);
-                        actionIntent.setData(Uri.parse("tel:" + phoneNumber));
                     }
                     break;
                     

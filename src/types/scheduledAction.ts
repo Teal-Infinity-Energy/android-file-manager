@@ -21,6 +21,12 @@ export interface ContactDestination {
   phoneNumber: string;
   contactName: string;
   photoUri?: string;
+  // WhatsApp Quick Messages - optional message to pre-fill when reminder fires
+  // Message is a draft that opens in WhatsApp for user to review and send
+  // undefined = open chat or dialer only
+  quickMessage?: string;
+  // Whether this is a WhatsApp reminder vs a call reminder
+  isWhatsApp?: boolean;
 }
 
 export type ScheduledActionDestination = 
