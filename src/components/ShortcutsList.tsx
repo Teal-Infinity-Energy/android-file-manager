@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Zap, ChevronRight } from 'lucide-react';
 import {
@@ -110,12 +110,19 @@ function ShortcutIcon({ shortcut }: { shortcut: ShortcutData }) {
 
 export function ShortcutsList({ isOpen, onClose, onCreateReminder }: ShortcutsListProps) {
   const { t } = useTranslation();
-  const { shortcuts, deleteShortcut, updateShortcut, incrementUsage } = useShortcuts();
+  const { shortcuts, deleteShortcut, updateShortcut, incrementUsage, syncWithHomeScreen } = useShortcuts();
   const [selectedShortcut, setSelectedShortcut] = useState<ShortcutData | null>(null);
   const [editingShortcut, setEditingShortcut] = useState<ShortcutData | null>(null);
   
   // Register with back handler
   useSheetBackHandler('shortcuts-list-sheet', isOpen, onClose);
+  
+  // Sync with home screen when sheet opens
+  useEffect(() => {
+    if (isOpen) {
+      syncWithHomeScreen();
+    }
+  }, [isOpen, syncWithHomeScreen]);
   
   // Sort shortcuts by usage count (descending)
   const sortedShortcuts = useMemo(() => {

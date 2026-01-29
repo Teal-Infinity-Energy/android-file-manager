@@ -2821,4 +2821,59 @@ public class ShortcutPlugin extends Plugin {
             call.resolve(result);
         }
     }
+
+    // ========== Home Screen Sync ==========
+
+    /**
+     * Get IDs of shortcuts currently pinned on the home screen.
+     * Used to sync app storage with actual home screen state.
+     */
+    @PluginMethod
+    public void getPinnedShortcutIds(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "getPinnedShortcutIds called");
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            // ShortcutManager not available before Android 8.0
+            JSObject result = new JSObject();
+            result.put("ids", new JSArray());
+            call.resolve(result);
+            return;
+        }
+
+        try {
+            Context context = getContext();
+            if (context == null) {
+                JSObject result = new JSObject();
+                result.put("ids", new JSArray());
+                call.resolve(result);
+                return;
+            }
+
+            ShortcutManager manager = context.getSystemService(ShortcutManager.class);
+            if (manager == null) {
+                JSObject result = new JSObject();
+                result.put("ids", new JSArray());
+                call.resolve(result);
+                return;
+            }
+
+            List<ShortcutInfo> pinnedShortcuts = manager.getPinnedShortcuts();
+            JSArray ids = new JSArray();
+            
+            for (ShortcutInfo info : pinnedShortcuts) {
+                ids.put(info.getId());
+            }
+
+            android.util.Log.d("ShortcutPlugin", "Found " + pinnedShortcuts.size() + " pinned shortcuts");
+
+            JSObject result = new JSObject();
+            result.put("ids", ids);
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error getting pinned shortcuts: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("ids", new JSArray());
+            call.resolve(result);
+        }
+    }
 }

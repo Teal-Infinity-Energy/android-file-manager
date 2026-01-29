@@ -434,4 +434,13 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     console.log('[ShortcutPluginWeb] clearPendingEditShortcut called (web fallback)');
     return { success: true };
   }
+
+  // ========== Home Screen Sync (Web Fallback) ==========
+
+  async getPinnedShortcutIds(): Promise<{ ids: string[] }> {
+    console.log('[ShortcutPluginWeb] getPinnedShortcutIds called (web fallback)');
+    // On web, return empty array - all shortcuts are "pinned" conceptually
+    // The sync logic will skip filtering when this returns empty
+    return { ids: [] };
+  }
 }

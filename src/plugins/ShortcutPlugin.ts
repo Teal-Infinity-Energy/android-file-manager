@@ -236,6 +236,12 @@ export interface ShortcutPluginInterface {
     success: boolean;
     error?: string;
   }>;
+
+  // ========== Home Screen Sync ==========
+
+  // Get IDs of shortcuts currently pinned on the home screen
+  // Used to sync app storage with actual home screen state
+  getPinnedShortcutIds(): Promise<{ ids: string[] }>;
 }
 
 // This plugin bridges to native Android code

@@ -38,11 +38,42 @@ export function useShortcuts() {
     syncToWidgets(data);
   }, [syncToWidgets]);
 
+  // Sync with home screen - remove orphaned shortcuts that were deleted from home screen
+  const syncWithHomeScreen = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    try {
+      const { ids } = await ShortcutPlugin.getPinnedShortcutIds();
+      
+      // If no pinned shortcuts returned (empty array), skip sync
+      // This handles the case where the API isn't available or returns empty
+      if (ids.length === 0 && shortcuts.length > 0) {
+        console.log('[useShortcuts] No pinned shortcuts returned, skipping sync');
+        return;
+      }
+      
+      const pinnedSet = new Set(ids);
+      
+      // Keep only shortcuts that are still pinned on home screen
+      const synced = shortcuts.filter(s => pinnedSet.has(s.id));
+      
+      if (synced.length !== shortcuts.length) {
+        const removedCount = shortcuts.length - synced.length;
+        console.log(`[useShortcuts] Synced with home screen, removed ${removedCount} orphaned shortcuts`);
+        saveShortcuts(synced);
+      }
+    } catch (error) {
+      console.warn('[useShortcuts] Failed to sync with home screen:', error);
+    }
+  }, [shortcuts, saveShortcuts]);
+
   // Initial sync on mount + migrate usage history
   useEffect(() => {
     syncToWidgets(shortcuts);
     // Migrate existing usage data to history (one-time)
     usageHistoryManager.migrateExistingUsage(shortcuts);
+    // Sync with home screen to remove orphaned shortcuts
+    syncWithHomeScreen();
   }, []); // Only on mount
 
   const createShortcut = useCallback((
@@ -166,5 +197,6 @@ export function useShortcuts() {
     incrementUsage,
     updateShortcut,
     getShortcut,
+    syncWithHomeScreen,
   };
 }
