@@ -1,97 +1,93 @@
 
+# Plan: Fix Title Tap-to-Expand Functionality
 
-# Plan: Fix Gesture Conflict Between Text Scrolling and Swipe-to-Delete
+## Problem Analysis
 
-## Problem
+The tap-to-expand feature for titles is not working correctly in `BookmarkItem.tsx`. When tapping on the title text, the parent button's `onClick` handler fires, opening the action sheet instead of toggling title expansion.
 
-The `HorizontalScrollText` component uses native CSS `overflow-x-auto` for horizontal scrolling, while the parent containers (`BookmarkItem`, `TrashItem`) use custom touch event handlers for swipe-to-delete gestures. These two mechanisms compete for horizontal touch events, potentially causing:
+### Root Cause
 
-- Accidental deletions when trying to scroll text
-- Blocked text scrolling when the swipe gesture takes over
-- Inconsistent user experience
+In `BookmarkItem.tsx`, the clickable title `<p>` element is nested inside a `<button>` element (lines 294-380). This creates issues because:
 
-## Solution: CSS `touch-action` Property
+1. Button elements have native click handling that can interfere with nested click handlers
+2. The `handleClick` function on the parent button is being triggered despite `e.stopPropagation()` on the title
+3. Touch events on mobile may behave differently than mouse events
 
-Use the CSS `touch-action` property to explicitly control which gestures are handled by the browser vs. JavaScript:
+### Component Comparison
 
-- **`touch-action: pan-y`** on `HorizontalScrollText`: Tells the browser to only handle vertical panning natively, allowing horizontal gestures to bubble up to the parent's JavaScript handlers
-- This approach is simple, performant, and follows platform conventions
+| Component | Title Container | Title Expansion Works? |
+|-----------|-----------------|------------------------|
+| BookmarkItem | Nested inside `<button>` | No |
+| TrashItem | Inside `<div>` | Yes |
+| ScheduledActionItem | Inside `<div>` | Yes |
 
-## Technical Details
+## Solution
+
+Convert the outer `<button>` element in `BookmarkItem.tsx` to a `<div>` with proper accessibility attributes, matching the pattern used successfully in `TrashItem` and `ScheduledActionItem`.
+
+### Technical Changes
+
+**File: `src/components/BookmarkItem.tsx`**
+
+1. **Change the clickable container from `<button>` to `<div>`**:
+   - Replace `<button>` with `<div role="button" tabIndex={0}`
+   - Add `onKeyDown` handler for keyboard accessibility (Enter/Space to activate)
+   - Keep existing touch and mouse event handlers
+
+2. **Why this works**:
+   - `<div>` elements don't have native click capture behavior like `<button>`
+   - `e.stopPropagation()` works reliably on nested elements
+   - The `role="button"` and `tabIndex={0}` maintain keyboard accessibility
+   - Pattern is already proven in `TrashItem` and `ScheduledActionItem`
+
+### Code Changes
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  BookmarkItem (swipe handlers: onTouchStart/Move/End)       │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  HorizontalScrollText (touch-action: pan-y)             ││
-│  │  - Vertical scroll: handled by browser (page scroll)   ││
-│  │  - Horizontal swipe: bubbles to parent JS handlers     ││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
+Lines 294-300 (approximate):
+BEFORE:
+  <button
+    type="button"
+    onClick={handleClick}
+    onMouseDown={handleLongPressStart}
+    onMouseUp={handleLongPressEnd}
+    onMouseLeave={handleLongPressEnd}
+    className="flex-1 flex items-start gap-3 text-start active:scale-[0.99] transition-transform select-none"
+  >
+
+AFTER:
+  <div
+    role="button"
+    tabIndex={0}
+    onClick={handleClick}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleClick();
+      }
+    }}
+    onMouseDown={handleLongPressStart}
+    onMouseUp={handleLongPressEnd}
+    onMouseLeave={handleLongPressEnd}
+    className="flex-1 flex items-start gap-3 text-start active:scale-[0.99] transition-transform select-none cursor-pointer"
+  >
+
+Lines 379-380 (approximate):
+BEFORE:
+        </button>
+
+AFTER:
+        </div>
 ```
-
-### Trade-off
-
-With `touch-action: pan-y`, the text will no longer horizontally scroll on its own. Instead:
-- The **swipe-to-delete** gesture takes priority for horizontal movements
-- Long text will show with **ellipsis** (already styled with `text-overflow: ellipsis`)
-- Users can still read full content via expandable URL areas (where applicable)
-
-This is the correct trade-off because:
-1. Swipe-to-delete is a primary action that should never be accidentally blocked
-2. The ellipsis provides visual indication of overflow
-3. Critical content (like URLs) already has expandable sections
 
 ## Files to Modify
 
-### `src/components/HorizontalScrollText.tsx`
-
-Add `touch-action: pan-y` to prevent the component from capturing horizontal touch events, allowing parent swipe handlers to work reliably.
-
-**Current:**
-```tsx
-<span
-  className={cn(
-    "block max-w-full min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap",
-    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-    "[text-overflow:ellipsis]",
-    className
-  )}
-  style={{ WebkitOverflowScrolling: "touch" }}
->
-```
-
-**Proposed:**
-```tsx
-<span
-  className={cn(
-    "block max-w-full min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap",
-    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-    "[text-overflow:ellipsis]",
-    // Prevent text scrolling from capturing horizontal swipes needed for parent gestures
-    "touch-action-pan-y",
-    className
-  )}
-  style={{ 
-    WebkitOverflowScrolling: "touch",
-    touchAction: "pan-y"  // Inline style as fallback
-  }}
->
-```
-
-## Alternative Considered (Not Recommended)
-
-An alternative approach would be to use `e.stopPropagation()` on the text element to completely isolate text scrolling from parent swipes. However, this would:
-- Require more complex JavaScript touch handling
-- Potentially break the swipe-to-delete feature entirely when touching text areas
-- Create dead zones where swipe-to-delete doesn't work
+- `src/components/BookmarkItem.tsx` - Convert inner `<button>` to `<div>` with proper ARIA attributes
 
 ## Testing Checklist
 
-- Swipe-to-delete works reliably on bookmark items with long titles
-- Swipe-to-delete works reliably on trash items with long titles  
-- Swipe gestures in `ScheduledActionItem` (if present) still work
-- Vertical scrolling of the list is not affected
-- Long text displays with ellipsis as visual overflow indicator
-- No accidental deletions occur when interacting with text
-
+- Tap on bookmark title text - should toggle expansion (truncated vs full text)
+- Tap on bookmark icon, URL area, or tags - should open action sheet
+- Long press on bookmark - should enter selection mode
+- Keyboard navigation (Tab + Enter) - should still activate bookmark
+- Swipe-to-delete gesture - should continue working
+- Selection mode tap behavior - should toggle selection correctly
