@@ -291,13 +291,20 @@ export function BookmarkItem({
         )}
         
         {/* Clickable content area */}
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={handleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleClick();
+            }
+          }}
           onMouseDown={handleLongPressStart}
           onMouseUp={handleLongPressEnd}
           onMouseLeave={handleLongPressEnd}
-          className="flex-1 flex items-start gap-3 text-start active:scale-[0.99] transition-transform select-none"
+          className="flex-1 flex items-start gap-3 text-start active:scale-[0.99] transition-transform select-none cursor-pointer"
         >
           {/* Platform icon or Favicon */}
           {platform ? (
@@ -377,7 +384,7 @@ export function BookmarkItem({
               </span>
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       {/* Create Shortcut Confirmation Dialog */}
