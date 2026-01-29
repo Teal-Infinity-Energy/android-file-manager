@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/hooks/useAuth';
-import { syncBookmarks, uploadBookmarksToCloud, downloadBookmarksFromCloud, uploadTrashToCloud, downloadTrashFromCloud } from '@/lib/cloudSync';
-import { recordSync } from '@/lib/syncStatusManager';
+import { guardedSync, guardedUpload, guardedDownload } from '@/lib/cloudSync';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -49,21 +48,31 @@ export function CloudBackupSection() {
   };
 
   /**
-   * Safe bidirectional sync:
-   * 1. Upload local → cloud (upsert by entity_id, never overwrites)
-   * 2. Download cloud → local (only adds missing entity_ids)
+   * Safe bidirectional sync via guarded entry point:
+   * 1. Validates sync is allowed (guards check timing, concurrency, etc.)
+   * 2. Upload local → cloud (upsert by entity_id, never overwrites)
+   * 3. Download cloud → local (only adds missing entity_ids)
    * Result: Union of both datasets, safe to run repeatedly
    * 
-   * Manual sync always runs immediately and resets the daily sync timer.
+   * Manual sync always uses 'manual' trigger which bypasses timing guards
+   * but still enforces concurrency guards.
    */
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      const result = await syncBookmarks();
+      const result = await guardedSync('manual');
+      
+      if (result.blocked) {
+        // Should not happen for manual sync, but handle gracefully
+        toast({
+          title: 'Sync blocked',
+          description: result.blockReason || 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
       if (result.success) {
-        // Record successful sync - resets the 24h daily sync timer
-        recordSync(result.uploaded, result.downloaded);
-        
         const hasChanges = result.uploaded > 0 || result.downloaded > 0;
         toast({
           title: 'Sync complete',
@@ -87,25 +96,30 @@ export function CloudBackupSection() {
   };
 
   // Recovery tools - hidden by default, for edge cases only
+  // Uses guardedUpload/guardedDownload with recovery triggers
   const handleForceUpload = async () => {
     setIsRecoveryAction(true);
     try {
-      const [bookmarkResult] = await Promise.all([
-        uploadBookmarksToCloud(),
-        uploadTrashToCloud()
-      ]);
+      const result = await guardedUpload();
       
-      if (bookmarkResult.success) {
-        // Record as sync (upload-only still resets daily timer)
-        recordSync(bookmarkResult.uploaded, 0);
+      if (result.blocked) {
+        toast({
+          title: 'Upload blocked',
+          description: result.blockReason || 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (result.success) {
         toast({
           title: 'Upload complete',
-          description: `Uploaded ${bookmarkResult.uploaded} bookmarks to cloud.`,
+          description: `Uploaded ${result.uploaded} items to cloud.`,
         });
       } else {
         toast({
           title: 'Upload failed',
-          description: bookmarkResult.error || 'Could not upload bookmarks.',
+          description: result.error || 'Could not upload.',
           variant: 'destructive',
         });
       }
@@ -117,27 +131,31 @@ export function CloudBackupSection() {
   const handleForceDownload = async () => {
     setIsRecoveryAction(true);
     try {
-      const [bookmarkResult] = await Promise.all([
-        downloadBookmarksFromCloud(),
-        downloadTrashFromCloud()
-      ]);
+      const result = await guardedDownload();
       
-      if (bookmarkResult.success) {
-        // Record as sync (download-only still resets daily timer)
-        recordSync(0, bookmarkResult.downloaded);
+      if (result.blocked) {
+        toast({
+          title: 'Download blocked',
+          description: result.blockReason || 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (result.success) {
         toast({
           title: 'Download complete',
-          description: bookmarkResult.downloaded > 0 
-            ? `Downloaded ${bookmarkResult.downloaded} new bookmarks.`
-            : 'No new bookmarks to download.',
+          description: result.downloaded > 0 
+            ? `Downloaded ${result.downloaded} new items.`
+            : 'No new items to download.',
         });
-        if (bookmarkResult.downloaded > 0) {
+        if (result.downloaded > 0) {
           window.location.reload();
         }
       } else {
         toast({
           title: 'Download failed',
-          description: bookmarkResult.error || 'Could not download bookmarks.',
+          description: result.error || 'Could not download.',
           variant: 'destructive',
         });
       }

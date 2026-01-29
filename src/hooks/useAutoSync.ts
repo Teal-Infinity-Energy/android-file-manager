@@ -1,9 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from './useAuth';
 import { useNetworkStatus } from './useNetworkStatus';
-import { syncBookmarks } from '@/lib/cloudSync';
-import { getSyncStatus, recordSync } from '@/lib/syncStatusManager';
+import { guardedSync } from '@/lib/cloudSync';
+import { getSyncStatus } from '@/lib/syncStatusManager';
 import { getSettings } from '@/lib/settingsManager';
+import { SyncGuardViolation } from '@/lib/syncGuard';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -24,6 +25,9 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
  * - Sync on debounced local changes
  * - Background timers, polling, or hidden retries
  * - Network reconnection triggers
+ * 
+ * Runtime guards in syncGuard.ts enforce these constraints and will throw
+ * in development if violated.
  */
 export function useAutoSync() {
   const { user, loading } = useAuth();
@@ -59,17 +63,19 @@ export function useAutoSync() {
 
   /**
    * Perform the daily foreground sync.
+   * Uses guardedSync with 'daily_auto' trigger - guards enforce timing.
    * Only runs if:
    * - User is authenticated
    * - Auto-sync is enabled
    * - Device is online
-   * - Last successful sync was >24h ago
+   * - Last successful sync was >24h ago (enforced by guard)
    */
   const performDailySync = useCallback(async () => {
     if (!user || !isEnabled || !isOnline || isSyncing.current) {
       return;
     }
 
+    // Skip if we already know it's too soon (optimization to avoid guard throw in dev)
     if (!shouldPerformDailySync()) {
       console.log('[DailySync] Skipped - synced within last 24 hours');
       return;
@@ -79,10 +85,17 @@ export function useAutoSync() {
     console.log('[DailySync] Starting daily foreground sync...');
 
     try {
-      const result = await syncBookmarks();
+      // Use guarded sync with daily_auto trigger
+      // Guards will validate timing and prevent duplicates
+      const result = await guardedSync('daily_auto');
+      
+      if (result.blocked) {
+        // Guard blocked the sync - this is expected in some cases
+        console.log('[DailySync] Blocked by guard:', result.blockReason);
+        return;
+      }
       
       if (result.success) {
-        recordSync(result.uploaded, result.downloaded);
         console.log('[DailySync] Completed:', { 
           uploaded: result.uploaded, 
           downloaded: result.downloaded 
@@ -94,11 +107,15 @@ export function useAutoSync() {
         }
       } else {
         // Failed sync - log but don't retry aggressively
-        // User can manually sync if needed
         console.warn('[DailySync] Failed:', result.error);
       }
     } catch (error) {
-      console.error('[DailySync] Error:', error);
+      // In development, SyncGuardViolation will throw - this catches other errors
+      if (error instanceof SyncGuardViolation) {
+        console.warn('[DailySync] Guard violation:', error.message);
+      } else {
+        console.error('[DailySync] Error:', error);
+      }
     } finally {
       isSyncing.current = false;
     }
