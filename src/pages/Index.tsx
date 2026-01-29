@@ -16,6 +16,8 @@ import { useBackButton } from '@/hooks/useBackButton';
 import { useAuth } from '@/hooks/useAuth';
 import { useAutoSync } from '@/hooks/useAutoSync';
 import { useDeepLink } from '@/hooks/useDeepLink';
+import { useOAuthRecovery } from '@/hooks/useOAuthRecovery';
+import { OAuthRecoveryBanner } from '@/components/auth/OAuthRecoveryBanner';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useToast } from '@/hooks/use-toast';
@@ -70,6 +72,9 @@ const Index = () => {
   
   // Handle native OAuth deep links
   useDeepLink();
+  
+  // Handle OAuth recovery after app kill during sign-in
+  const { state: oauthRecoveryState, retry: retryOAuth, dismiss: dismissOAuthRecovery } = useOAuthRecovery();
   
   // Handle shared content from Android Share Sheet (always active regardless of tab)
   const { sharedContent, sharedAction, isLoading: isLoadingShared, clearSharedContent } = useSharedContent();
@@ -372,6 +377,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-hidden">
+      {/* OAuth Recovery Banner - calm UI for interrupted sign-in */}
+      {(oauthRecoveryState === 'checking' || oauthRecoveryState === 'recovering' || oauthRecoveryState === 'failed') && (
+        <OAuthRecoveryBanner
+          state={oauthRecoveryState}
+          onRetry={retryOAuth}
+          onDismiss={dismissOAuthRecovery}
+        />
+      )}
       {/* Access Tab Content */}
       {activeTab === 'access' && (
         <div 

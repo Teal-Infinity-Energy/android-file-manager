@@ -3,11 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { 
+  getOAuthRedirectUrl, 
+  markOAuthStarted,
+  clearPendingOAuth,
+} from '@/lib/oauthCompletion';
 
 const AUTH_STORAGE_KEY = 'sb-qyokhlaexuywzuyasqxo-auth-token';
-
-// HTTPS redirect URL for native OAuth callback (Android App Links)
-const NATIVE_REDIRECT_URL = 'https://id-preview--2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovable.app/auth-callback';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,6 +26,11 @@ export function useAuth() {
           // Token refresh failed, clear and re-authenticate
           console.warn('[Auth] Token refresh failed, clearing session');
           await supabase.auth.signOut();
+        }
+        
+        // Clear pending OAuth on successful sign in
+        if (event === 'SIGNED_IN' && session) {
+          clearPendingOAuth();
         }
         
         setSession(session);
@@ -70,6 +77,7 @@ export function useAuth() {
     try {
       // Clear any stale auth state before attempting sign-in
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      clearPendingOAuth();
       
       const { data: existingSession } = await supabase.auth.getSession();
       if (existingSession?.session) {
@@ -77,15 +85,19 @@ export function useAuth() {
       }
 
       const isNative = Capacitor.isNativePlatform();
+      const redirectUrl = getOAuthRedirectUrl();
       
+      // Mark OAuth as started for cold-start recovery
+      markOAuthStarted();
+
       if (isNative) {
         // Native flow: use skipBrowserRedirect and open browser manually
-        console.log('[Auth] Starting native OAuth flow with redirect:', NATIVE_REDIRECT_URL);
+        console.log('[Auth] Starting native OAuth flow with redirect:', redirectUrl);
         
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: NATIVE_REDIRECT_URL,
+            redirectTo: redirectUrl,
             skipBrowserRedirect: true,
           },
         });
@@ -101,7 +113,7 @@ export function useAuth() {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: `${window.location.origin}/auth-callback`,
+            redirectTo: redirectUrl,
           },
         });
         
@@ -109,6 +121,7 @@ export function useAuth() {
       }
     } catch (error) {
       console.error('[Auth] Google sign-in error:', error);
+      clearPendingOAuth();
       throw error;
     }
   }, []);
@@ -117,6 +130,7 @@ export function useAuth() {
     try {
       const { error } = await supabase.auth.signOut();
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      clearPendingOAuth();
       if (error) {
         console.error('[Auth] Sign-out error:', error);
         throw error;
@@ -124,12 +138,14 @@ export function useAuth() {
     } catch (error) {
       // Even if signOut fails, clear local state
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      clearPendingOAuth();
       throw error;
     }
   }, []);
 
   const clearAuthState = useCallback(() => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    clearPendingOAuth();
     setSession(null);
     setUser(null);
   }, []);
