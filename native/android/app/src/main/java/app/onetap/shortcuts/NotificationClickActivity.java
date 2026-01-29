@@ -79,11 +79,9 @@ public class NotificationClickActivity extends Activity {
         } catch (JSONException e) {
             Log.e(TAG, "Error recording click", e);
             // Reset to just this ID
-            try {
-                JSONArray fresh = new JSONArray();
-                fresh.put(actionId);
-                prefs.edit().putString(KEY_CLICKED_IDS, fresh.toString()).apply();
-            } catch (JSONException ignored) {}
+            JSONArray fresh = new JSONArray();
+            fresh.put(actionId);
+            prefs.edit().putString(KEY_CLICKED_IDS, fresh.toString()).apply();
         }
     }
     
