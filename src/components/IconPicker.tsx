@@ -14,6 +14,7 @@ import type { ShortcutIcon, IconType } from '@/types/shortcut';
 interface IconPickerProps {
   thumbnail?: string;
   platformIcon?: string; // Platform icon key from platformIcons.ts (e.g., 'youtube', 'netflix')
+  faviconUrl?: string; // Favicon URL for unrecognized URLs
   selectedIcon: ShortcutIcon;
   onSelect: (icon: ShortcutIcon) => void;
 }
@@ -28,7 +29,7 @@ const COMMON_EMOJIS = [
   '🎨', '💻', '📦', '📚', '⚙️', '🔔', '📍', '🔗',
 ];
 
-export function IconPicker({ thumbnail, platformIcon, selectedIcon, onSelect }: IconPickerProps) {
+export function IconPicker({ thumbnail, platformIcon, faviconUrl, selectedIcon, onSelect }: IconPickerProps) {
   const { t } = useTranslation();
   const [textValue, setTextValue] = useState(
     selectedIcon.type === 'text' ? selectedIcon.value : ''
@@ -130,13 +131,19 @@ export function IconPicker({ thumbnail, platformIcon, selectedIcon, onSelect }: 
     }, 100);
   }, [selectedIcon.value, onSelect]);
 
-  // Build icon types array with platform option when available
+  // Build icon types array with platform/favicon option when available
   const iconTypes: { type: IconType; icon: React.ReactNode; label: string }[] = [
     // Platform icon option - shown first when available
     ...(platformIcon && platformInfo ? [{ 
       type: 'platform' as IconType, 
       icon: <Globe className="h-5 w-5" />, 
       label: platformInfo.name 
+    }] : []),
+    // Favicon option - shown for unrecognized URLs when favicon is available
+    ...(faviconUrl && !platformIcon ? [{ 
+      type: 'favicon' as IconType, 
+      icon: <Globe className="h-5 w-5" />, 
+      label: t('iconPicker.website') 
     }] : []),
     // Thumbnail option
     ...(validThumbnail && !thumbnailFailed ? [{ 
@@ -162,6 +169,8 @@ export function IconPicker({ thumbnail, platformIcon, selectedIcon, onSelect }: 
             onClick={() => {
               if (type === 'platform' && platformIcon) {
                 onSelect({ type: 'platform', value: platformIcon });
+              } else if (type === 'favicon' && faviconUrl) {
+                onSelect({ type: 'favicon', value: faviconUrl });
               } else if (type === 'thumbnail' && thumbnail) {
                 onSelect({ type: 'thumbnail', value: thumbnail });
               } else if (type === 'emoji') {
@@ -183,7 +192,7 @@ export function IconPicker({ thumbnail, platformIcon, selectedIcon, onSelect }: 
         ))}
       </div>
       
-      {/* Icon preview - for platform, thumbnail, and text types */}
+      {/* Icon preview - for platform, favicon, thumbnail, and text types */}
       {selectedIcon.type !== 'emoji' && (
         <div 
           key={`preview-${selectedIcon.type}`}
@@ -193,14 +202,25 @@ export function IconPicker({ thumbnail, platformIcon, selectedIcon, onSelect }: 
             className={cn(
               "h-16 w-16 rounded-2xl flex items-center justify-center elevation-2 overflow-hidden",
               selectedIcon.type === 'thumbnail' ? 'p-0' : '',
-              selectedIcon.type === 'platform' ? '' : 'bg-primary'
+              selectedIcon.type === 'platform' || selectedIcon.type === 'favicon' ? '' : 'bg-primary'
             )}
-            style={selectedIcon.type === 'platform' && platformInfo ? {
-              backgroundColor: platformInfo.bgColor.startsWith('bg-') ? undefined : platformInfo.bgColor
-            } : undefined}
+            style={
+              selectedIcon.type === 'platform' && platformInfo 
+                ? { backgroundColor: platformInfo.bgColor.startsWith('bg-') ? undefined : platformInfo.bgColor }
+                : selectedIcon.type === 'favicon'
+                  ? { backgroundColor: '#3B82F6' } // Blue-500 matching native
+                  : undefined
+            }
           >
             {selectedIcon.type === 'platform' && platformInfo && (
               <PlatformIcon platform={platformInfo} size="lg" />
+            )}
+            {selectedIcon.type === 'favicon' && (
+              <img 
+                src={selectedIcon.value} 
+                alt="Website icon" 
+                className="h-8 w-8 object-contain"
+              />
             )}
             {selectedIcon.type === 'thumbnail' && thumbnailSources.length > 0 && (
               <ImageWithFallback

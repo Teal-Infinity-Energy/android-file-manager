@@ -281,6 +281,7 @@ export async function createHomeScreenShortcut(
       iconText?: string;
       iconData?: string; // base64 thumbnail data for native icon
       iconPlatform?: string; // Platform key for branded icons
+      iconFaviconUrl?: string; // URL to fetch favicon from
     } = {};
     
     if (shortcut.icon.type === 'thumbnail') {
@@ -318,6 +319,9 @@ export async function createHomeScreenShortcut(
     } else if (shortcut.icon.type === 'platform') {
       iconOptions.iconPlatform = shortcut.icon.value;
       console.log('[ShortcutManager] Using platform icon:', shortcut.icon.value);
+    } else if (shortcut.icon.type === 'favicon') {
+      iconOptions.iconFaviconUrl = shortcut.icon.value;
+      console.log('[ShortcutManager] Using favicon URL:', shortcut.icon.value);
     }
     
     // Prepare file data for web file picker flow

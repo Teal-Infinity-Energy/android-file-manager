@@ -9,6 +9,7 @@ export interface ShortcutPluginInterface {
     iconText?: string;
     iconData?: string; // base64 thumbnail data for icon
     iconPlatform?: string; // Platform key for branded icons (e.g., 'youtube', 'netflix')
+    iconFaviconUrl?: string; // URL to fetch favicon from for unrecognized URLs
     intentAction: string;
     intentData: string;
     intentType?: string;

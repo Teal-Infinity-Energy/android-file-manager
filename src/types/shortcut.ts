@@ -2,7 +2,7 @@ export type ShortcutType = 'file' | 'link' | 'contact' | 'message';
 
 export type FileType = 'image' | 'video' | 'pdf' | 'document' | 'audio';
 
-export type IconType = 'thumbnail' | 'emoji' | 'text' | 'platform';
+export type IconType = 'thumbnail' | 'emoji' | 'text' | 'platform' | 'favicon';
 
 export type MessageApp = 'whatsapp' | 'telegram' | 'signal' | 'slack';
 
