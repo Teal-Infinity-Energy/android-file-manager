@@ -66,6 +66,7 @@ function getShortcutTarget(shortcut: ShortcutData): string | null {
 
 // Render shortcut icon
 function ShortcutIcon({ shortcut }: { shortcut: ShortcutData }) {
+  const [imageError, setImageError] = useState(false);
   const { icon } = shortcut;
   
   if (icon.type === 'emoji') {
@@ -78,13 +79,14 @@ function ShortcutIcon({ shortcut }: { shortcut: ShortcutData }) {
   
   if (icon.type === 'thumbnail') {
     const thumbnailSrc = icon.value || shortcut.thumbnailData;
-    if (thumbnailSrc) {
+    if (thumbnailSrc && !imageError) {
       return (
         <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted">
           <img 
             src={thumbnailSrc} 
             alt={shortcut.name}
             className="h-full w-full object-cover"
+            onError={() => setImageError(true)}
           />
         </div>
       );
@@ -101,7 +103,7 @@ function ShortcutIcon({ shortcut }: { shortcut: ShortcutData }) {
     );
   }
   
-  // Default fallback
+  // Default fallback (also used when thumbnail fails to load)
   return (
     <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
       <Zap className="h-5 w-5 text-muted-foreground" />

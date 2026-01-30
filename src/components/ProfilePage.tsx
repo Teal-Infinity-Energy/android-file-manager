@@ -49,6 +49,7 @@ export function ProfilePage({}: ProfilePageProps = {}) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const tutorial = useTutorial('profile');
 
   // Register dialog with back button handler
@@ -336,12 +337,13 @@ export function ProfilePage({}: ProfilePageProps = {}) {
       <Card id="tutorial-user-card" className="mb-4">
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
-            {avatarUrl ? (
+            {avatarUrl && !avatarError ? (
               <img 
                 src={avatarUrl} 
                 alt={fullName} 
                 className="w-16 h-16 rounded-full"
                 referrerPolicy="no-referrer"
+                onError={() => setAvatarError(true)}
               />
             ) : (
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">

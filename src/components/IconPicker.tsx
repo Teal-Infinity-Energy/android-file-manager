@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, Type, Smile, X } from 'lucide-react';
+import { Image as ImageIcon, Type, Smile, X, ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { triggerSelectionFeedback } from '@/lib/haptics';
 import { Input } from '@/components/ui/input';
@@ -30,9 +30,15 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
   const [textValue, setTextValue] = useState(
     selectedIcon.type === 'text' ? selectedIcon.value : ''
   );
+  const [thumbnailError, setThumbnailError] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserScrolling = useRef(true);
+  
+  // Reset thumbnail error when thumbnail changes
+  useEffect(() => {
+    setThumbnailError(false);
+  }, [thumbnail]);
 
   // Scroll to selected emoji when switching to emoji type or on selection
   useEffect(() => {
@@ -107,7 +113,7 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
   }, [selectedIcon.value, onSelect]);
 
   const iconTypes: { type: IconType; icon: React.ReactNode; label: string }[] = [
-    ...(thumbnail ? [{ type: 'thumbnail' as IconType, icon: <Image className="h-5 w-5" />, label: t('iconPicker.image') }] : []),
+    ...(thumbnail && !thumbnailError ? [{ type: 'thumbnail' as IconType, icon: <ImageIcon className="h-5 w-5" />, label: t('iconPicker.image') }] : []),
     { type: 'emoji', icon: <Smile className="h-5 w-5" />, label: t('iconPicker.emoji') },
     { type: 'text', icon: <Type className="h-5 w-5" />, label: t('iconPicker.text') },
   ];
@@ -155,12 +161,16 @@ export function IconPicker({ thumbnail, selectedIcon, onSelect }: IconPickerProp
               selectedIcon.type === 'thumbnail' ? 'p-0 overflow-hidden' : 'bg-primary'
             )}
           >
-            {selectedIcon.type === 'thumbnail' && (
+            {selectedIcon.type === 'thumbnail' && !thumbnailError && (
               <img
                 src={selectedIcon.value}
                 alt="Icon preview"
                 className="h-full w-full object-cover"
+                onError={() => setThumbnailError(true)}
               />
+            )}
+            {selectedIcon.type === 'thumbnail' && thumbnailError && (
+              <ImageOff className="h-6 w-6 text-primary-foreground/50" />
             )}
             {selectedIcon.type === 'text' && (
               <span className="text-2xl font-bold text-primary-foreground">
