@@ -1,101 +1,189 @@
 
-# Plan: Ensure Title Text Never Overflows Screen
+# Plan: Redesign List Item Layout for Proper Overflow Handling
 
 ## Problem Summary
 
-When titles are truncated, they should show an ellipsis and fit within the container. When expanded, they should wrap properly without causing horizontal overflow. The current implementation uses `break-all` for expanded titles, but we need to verify all parent containers are properly constrained.
+List items across the app (BookmarkItem, ScheduledActionItem, ShortcutListItem, TrashItem) have layout issues where:
 
-## Analysis of Current Implementation
+1. The outermost container can overflow the screen width
+2. When titles are collapsed (truncated), they still appear "too big" and push right-side elements (badges, chevrons, switches) off-screen
+3. The `min-w-0` utility is applied but nested flex structures break the constraint inheritance
 
-All four components follow a similar pattern:
+## Root Cause Analysis
 
-| Component | Content Container Classes | Title Classes (Collapsed) | Title Classes (Expanded) |
-|-----------|--------------------------|---------------------------|--------------------------|
-| BookmarkItem | `flex-1 min-w-0 overflow-hidden` | `truncate` | `break-all` |
-| TrashItem | `flex-1 min-w-0 overflow-hidden` | `truncate` | `break-all` |
-| ScheduledActionItem | `flex-1 min-w-0 overflow-hidden` | `truncate` | `break-all` |
-| ShortcutListItem | `flex-1 min-w-0 overflow-hidden` | `truncate` | `break-all` |
+The issue stems from nested flex containers where:
 
-The parent containers use `min-w-0` which is essential for flex items to allow text truncation. Combined with `overflow-hidden`, this should prevent horizontal overflow.
+```
+Parent [w-full]
+  -> Flex Container [flex, items-start, gap-3]
+       -> Icon [shrink-0, h-10, w-10]
+       -> Content [flex-1, min-w-0] <-- This works
+            -> Title [truncate] <-- This should truncate but...
+            -> Badge/Meta Row [flex]
+                 -> Badge [shrink-0] <-- This pushes content
+       -> Right Actions [shrink-0] <-- These compete for space
+```
 
-## Identified Issues
+The problem: When there are `shrink-0` elements (badges, chevrons, switches) alongside `flex-1` content, the content area doesn't shrink properly because `min-w-0` only applies to direct flex children, not nested elements.
 
-1. **ShortcutListItem** (line 137): The outer container has `overflow-hidden` but the text container uses the same flex pattern. However, the title `<p>` element is inside a flex container with a Badge sibling. The flex layout could potentially cause issues.
+## Solution: Constrained Content Layout
 
-2. **All Components**: While `break-all` allows word breaking, it doesn't limit vertical growth. This is intentional for the "expanded" state.
+Apply a consistent pattern across all list items:
 
-## Solution
+1. **Explicit width calculation** on the content container using `calc(100% - fixed_elements_width)`
+2. **Add `overflow-hidden`** at every level that contains text
+3. **Ensure `min-w-0`** is on every flex child that can contain text
+4. **Move badges/metadata to a new line** to prevent horizontal overflow
 
-Add explicit `overflow-hidden` to the title `<p>` elements themselves as a safety measure, and ensure the flex layout properly constrains content. The changes are minimal:
+### Layout Pattern
 
-### File: `src/components/BookmarkItem.tsx`
+```
+Container [w-full, overflow-hidden]
+  -> Inner Flex [flex, items-start, gap-3, min-w-0]
+       -> Icon [shrink-0, w-10]
+       -> Content [flex-1, min-w-0, overflow-hidden]
+            -> Title Row
+                 -> Title [min-w-0, truncate OR break-all]
+            -> URL/Subtitle [line-clamp-2, break-all]
+            -> Metadata Row (new line, wrap allowed)
+       -> Actions [shrink-0, ml-auto]
+```
 
-**Line 331-334** - Add `min-w-0` to the title element as a flex child safety:
+## File Changes
+
+### 1. `src/components/BookmarkItem.tsx`
+
+**Lines 307**: Add `min-w-0 overflow-hidden` to the clickable container
+**Lines 330-334**: Ensure title has proper constraints
+
 ```tsx
-// Current
+// Line 307: Clickable content area
+className="flex-1 flex items-start gap-3 min-w-0 overflow-hidden text-start active:scale-[0.99] transition-transform select-none cursor-pointer"
+
+// Line 331-334: Title element with explicit min-w-0
 <p 
   className={cn(
-    "font-medium text-foreground cursor-pointer",
+    "font-medium text-foreground cursor-pointer min-w-0",
     isTitleExpanded ? "break-all" : "truncate"
   )}
-
-// Updated - No change needed, parent already has min-w-0 overflow-hidden
-// The title is a direct child of this constrained container
 ```
 
-The parent `div` on line 330 already has `flex-1 min-w-0 overflow-hidden` which correctly constrains the children.
+### 2. `src/components/ScheduledActionItem.tsx`
 
-### File: `src/components/TrashItem.tsx`
-
-**Line 189** - Parent already has `flex-1 min-w-0 overflow-hidden`. No changes needed.
-
-### File: `src/components/ScheduledActionItem.tsx`
-
-**Line 312** - Parent already has `flex-1 min-w-0 overflow-hidden`. No changes needed.
-
-### File: `src/components/ShortcutsList.tsx`
-
-**Lines 144-157** - The ShortcutListItem has a nested flex container around the title and badge. This needs adjustment:
+**Lines 286**: The main flex container needs `min-w-0` on the content wrapper
+**Lines 312-326**: Title already has `min-w-0`, ensure parent has overflow constraint
 
 ```tsx
-// Line 144-157 - Current structure
+// Line 286: Main flex container
+<div className="flex items-start gap-3 min-w-0">
+
+// Line 312: Content wrapper - add overflow-hidden
 <div className="flex-1 min-w-0 overflow-hidden">
-  <div className="flex items-start gap-2 max-w-full min-w-0">
-    <p className={cn(
-      "font-medium flex-1 cursor-pointer",
-      isTitleExpanded ? "break-all" : "truncate"
-    )}>
 
-// The title <p> should also have min-w-0 to properly truncate within the flex container
+// Line 362-371: Recurrence info row - ensure it doesn't overflow
+<div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground min-w-0 overflow-hidden">
 ```
 
-**Change needed**: Add `min-w-0` to the title `<p>` element on line 147:
+**Lines 374-386**: The toggle switch container needs to stay fixed width
+
 ```tsx
-className={cn(
-  "font-medium flex-1 min-w-0 cursor-pointer",  // Added min-w-0
-  isTitleExpanded ? "break-all" : "truncate"
-)}
+// Toggle switch container - ensure shrink-0 and fixed positioning
+<div 
+  className="flex items-center shrink-0 relative z-10 pt-2 ml-2" 
+  onClick={handleToggleSwitch}
+>
 ```
 
-## Summary of Changes
+### 3. `src/components/ShortcutsList.tsx` (ShortcutListItem)
 
-| File | Change | Lines |
-|------|--------|-------|
-| `src/components/ShortcutsList.tsx` | Add `min-w-0` to title element class | 147-149 |
+**Lines 137**: Button container - ensure overflow is handled
+**Lines 144-165**: Restructure to prevent badge from pushing title off-screen
 
-The other components (BookmarkItem, TrashItem, ScheduledActionItem) already have proper overflow handling and don't need changes.
+```tsx
+// Line 137: Button container with strict overflow
+<button className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card mb-2 hover:bg-muted/50 active:bg-muted transition-colors text-start shadow-sm overflow-hidden min-w-0">
 
-## Why This Works
+// Lines 144-170: Restructured content area
+<div className="flex-1 min-w-0 overflow-hidden">
+  <div className="flex items-center gap-2 min-w-0">
+    <p 
+      className={cn(
+        "font-medium min-w-0 cursor-pointer",
+        isTitleExpanded ? "break-all" : "truncate"
+      )}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsTitleExpanded(!isTitleExpanded);
+      }}
+    >
+      {shortcut.name}
+    </p>
+  </div>
+  {/* Badge moved to second row to prevent overflow */}
+  <div className="flex items-center gap-2 mt-1">
+    <p className="text-xs text-muted-foreground truncate min-w-0 flex-1">
+      {typeLabel}
+      {target && ` · ${target}`}
+    </p>
+    <Badge 
+      variant="outline" 
+      className="shrink-0 text-[10px] px-1.5 py-0 h-5 font-semibold bg-primary/5 border-primary/20 text-primary whitespace-nowrap"
+    >
+      {usageCount} {usageCount === 1 ? t('shortcuts.tap') : t('shortcuts.taps')}
+    </Badge>
+  </div>
+</div>
 
-- `flex-1`: Allows the element to grow and shrink
-- `min-w-0`: Critical for flex items - allows the element to shrink below its content width (otherwise min-width defaults to content size)
-- `overflow-hidden`: Clips any content that exceeds the container bounds
-- `truncate`: Single line with ellipsis (includes overflow-hidden, text-ellipsis, whitespace-nowrap)
-- `break-all`: Allows breaking at any character to prevent horizontal overflow when expanded
+// Line 172: Chevron stays at the end
+<ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 rtl:rotate-180" />
+```
+
+### 4. `src/components/TrashItem.tsx`
+
+**Lines 162**: Main content container needs overflow control
+**Lines 189-201**: Title needs min-w-0
+
+```tsx
+// Line 162: Main content flex
+<div className="flex items-start gap-3 p-3 bg-muted/50 border border-border/50 min-w-0 overflow-hidden">
+
+// Line 189: Content container
+<div className="flex-1 min-w-0 overflow-hidden">
+
+// Lines 190-201: Title with proper constraints
+<p 
+  className={cn(
+    "text-sm font-medium text-foreground cursor-pointer min-w-0",
+    isTitleExpanded ? "break-all" : "truncate"
+  )}
+>
+```
+
+**Lines 242-259**: Action buttons container stays fixed
+
+```tsx
+// Action buttons container - fixed width
+<div className="flex items-center gap-1 shrink-0 flex-none">
+```
+
+## Summary of Key Changes
+
+| File | Lines | Change |
+|------|-------|--------|
+| BookmarkItem.tsx | 307 | Add `min-w-0 overflow-hidden` to clickable area |
+| BookmarkItem.tsx | 331 | Add `min-w-0` to title element |
+| ScheduledActionItem.tsx | 286 | Add `min-w-0` to main flex container |
+| ScheduledActionItem.tsx | 376 | Add `ml-2` spacing before switch |
+| ShortcutsList.tsx | 137 | Add `overflow-hidden min-w-0` to button |
+| ShortcutsList.tsx | 145-165 | Move badge to second row, restructure layout |
+| TrashItem.tsx | 162 | Add `min-w-0 overflow-hidden` to main container |
+| TrashItem.tsx | 191 | Add `min-w-0` to title element |
 
 ## Testing Checklist
 
-- Create a shortcut with a very long name (50+ characters) and verify it truncates
-- Tap the title to expand and verify it wraps without horizontal scrolling
-- Repeat for bookmarks, trash items, and scheduled reminders
-- Test on narrow mobile viewport to ensure no horizontal scrolling occurs
+- Create items with very long titles (50+ characters with no spaces)
+- Verify collapsed titles show ellipsis and don't push other elements off-screen
+- Tap to expand titles - verify they wrap without horizontal scrolling
+- Check all four item types: Bookmarks, Trash, Reminders, Shortcuts
+- Test on narrow viewport (320px width)
+- Verify right-side elements (badges, switches, chevrons) remain visible
