@@ -343,7 +343,7 @@ public class ShortcutPlugin extends Plugin {
                     intent.putExtra(LinkProxyActivity.EXTRA_SHORTCUT_ID, finalId);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 } else if ("app.onetap.OPEN_MESSAGE".equals(finalIntentAction)) {
-                    // Message shortcuts (WhatsApp 0-1 msg, Telegram, Signal, Slack) - route through MessageProxyActivity
+                    // WhatsApp shortcuts (0-1 messages) - route through MessageProxyActivity
                     android.util.Log.d("ShortcutPlugin", "Using MessageProxyActivity for message shortcut");
                     intent = new Intent(context, MessageProxyActivity.class);
                     intent.setAction("app.onetap.OPEN_MESSAGE");
@@ -3703,10 +3703,6 @@ public class ShortcutPlugin extends Plugin {
         String mimeType = call.getString("mimeType");
         String contactName = call.getString("contactName");
         
-        // Slack-specific properties
-        String slackTeamId = call.getString("slackTeamId");
-        String slackUserId = call.getString("slackUserId");
-        
         // Parse quick messages array
         JSArray quickMessagesArray = call.getArray("quickMessages");
         String quickMessagesJson = null;
@@ -3768,10 +3764,9 @@ public class ShortcutPlugin extends Plugin {
             // Create icon from params
             Icon icon = createIconForUpdate(call);
 
-            // Build intent based on shortcut type
+            // Build intent based on shortcut type (WhatsApp messaging only)
             Intent intent = buildIntentForUpdate(context, shortcutType, messageApp, phoneNumber, 
-                quickMessagesJson, contactName, resumeEnabled, contentUri, mimeType, label, shortcutId,
-                slackTeamId, slackUserId);
+                quickMessagesJson, contactName, resumeEnabled, contentUri, mimeType, label, shortcutId);
 
             // Build updated ShortcutInfo with same ID
             ShortcutInfo.Builder builder = new ShortcutInfo.Builder(context, shortcutId)
@@ -3818,8 +3813,7 @@ public class ShortcutPlugin extends Plugin {
      */
     private Intent buildIntentForUpdate(Context context, String shortcutType, String messageApp,
             String phoneNumber, String quickMessagesJson, String contactName,
-            Boolean resumeEnabled, String contentUri, String mimeType, String label, String shortcutId,
-            String slackTeamId, String slackUserId) {
+            Boolean resumeEnabled, String contentUri, String mimeType, String label, String shortcutId) {
         
         if (shortcutType == null) {
             // No type specified, can't rebuild intent
@@ -3877,38 +3871,6 @@ public class ShortcutPlugin extends Plugin {
                     } catch (Exception e) {}
                 }
                 
-                intent.setData(Uri.parse(url));
-                intent.putExtra(MessageProxyActivity.EXTRA_URL, url);
-                intent.putExtra(MessageProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
-            
-        } else if ("message".equals(shortcutType) && messageApp != null) {
-            // Non-WhatsApp message shortcuts (Telegram, Signal, Slack)
-            android.util.Log.d("ShortcutPlugin", "Building " + messageApp + " message intent for update");
-            
-            String url = null;
-            switch (messageApp) {
-                case "telegram":
-                    if (phoneNumber != null) {
-                        url = "tg://resolve?phone=" + phoneNumber;
-                    }
-                    break;
-                case "signal":
-                    if (phoneNumber != null) {
-                        url = "sgnl://signal.me/#p/+" + phoneNumber;
-                    }
-                    break;
-                case "slack":
-                    if (slackTeamId != null && slackUserId != null) {
-                        url = "slack://user?team=" + slackTeamId + "&id=" + slackUserId;
-                    }
-                    break;
-            }
-            
-            if (url != null) {
-                intent = new Intent(context, MessageProxyActivity.class);
-                intent.setAction("app.onetap.OPEN_MESSAGE");
                 intent.setData(Uri.parse(url));
                 intent.putExtra(MessageProxyActivity.EXTRA_URL, url);
                 intent.putExtra(MessageProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);

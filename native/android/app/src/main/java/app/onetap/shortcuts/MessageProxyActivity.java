@@ -7,15 +7,15 @@ import android.os.Bundle;
 import android.util.Log;
 
 /**
- * MessageProxyActivity - Transparent proxy for message shortcut taps.
+ * MessageProxyActivity - Transparent proxy for WhatsApp message shortcut taps.
  * 
- * This activity intercepts taps on messaging shortcuts (WhatsApp 0-1 msg, Telegram,
- * Signal, Slack) to record usage stats before forwarding to the target app.
+ * This activity intercepts taps on WhatsApp shortcuts (with 0-1 messages) to 
+ * record usage stats before forwarding to WhatsApp.
  * 
  * Flow:
  * 1. Home screen shortcut tap → MessageProxyActivity
  * 2. Record tap via NativeUsageTracker
- * 3. Open the messaging URL via ACTION_VIEW
+ * 3. Open the WhatsApp URL via ACTION_VIEW
  * 4. Finish immediately (transparent, no UI)
  * 
  * Why needed:

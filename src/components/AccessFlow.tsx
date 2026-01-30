@@ -273,8 +273,6 @@ export function AccessFlow({
     icon: ShortcutIcon;
     phoneNumber: string;
     messageApp?: MessageApp;
-    slackTeamId?: string;
-    slackUserId?: string;
     quickMessages?: string[];
   }) => {
     // If pending action is reminder, create reminder instead
@@ -299,9 +297,6 @@ export function AccessFlow({
         data.icon,
         data.phoneNumber,
         data.messageApp,
-        data.slackTeamId && data.slackUserId
-          ? { teamId: data.slackTeamId, userId: data.slackUserId }
-          : undefined,
         data.quickMessages
       );
 

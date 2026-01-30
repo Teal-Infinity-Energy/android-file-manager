@@ -222,7 +222,6 @@ export function useShortcuts() {
     icon: ShortcutIcon,
     phoneNumber: string,
     messageApp?: MessageApp,
-    slackDetails?: { teamId: string; userId: string },
     quickMessages?: string[]
   ): ShortcutData => {
     const shortcut: ShortcutData = {
@@ -235,8 +234,6 @@ export function useShortcuts() {
       usageCount: 0,
       phoneNumber,
       messageApp,
-      slackTeamId: slackDetails?.teamId,
-      slackUserId: slackDetails?.userId,
       // WhatsApp quick messages - optional message templates
       quickMessages: type === 'message' && quickMessages?.length ? quickMessages : undefined,
     };
@@ -310,7 +307,7 @@ export function useShortcuts() {
 
   const updateShortcut = useCallback(async (
     id: string,
-    updates: Partial<Pick<ShortcutData, 'name' | 'icon' | 'quickMessages' | 'phoneNumber' | 'resumeEnabled' | 'slackTeamId' | 'slackUserId'>>
+    updates: Partial<Pick<ShortcutData, 'name' | 'icon' | 'quickMessages' | 'phoneNumber' | 'resumeEnabled'>>
   ): Promise<{ success: boolean; nativeUpdateFailed?: boolean }> => {
     // Update localStorage first
     const updated = shortcuts.map(s => 
@@ -341,9 +338,6 @@ export function useShortcuts() {
             contentUri: shortcut.contentUri,
             mimeType: shortcut.mimeType,
             contactName: shortcut.contactName || shortcut.name,
-            // Slack-specific data
-            slackTeamId: shortcut.slackTeamId,
-            slackUserId: shortcut.slackUserId,
           });
           if (result.success) {
             console.log('[useShortcuts] Updated pinned shortcut on home screen:', id);
