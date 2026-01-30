@@ -1,227 +1,109 @@
 
-# Platform Icon Consistency Audit - Complete Standardization
+# Fix: Back Button Not Properly Closing Shortcut Creation Journeys
 
-## Audit Findings
+## Problem Summary
 
-After thorough code review, platform icons are rendered in **TWO different modes** across the app:
+When the back button is pressed during shortcut creation journeys (URL input → customize → success), the bottom navigation bar appears but the shortcut creation screens remain visible. This creates a confusing broken state.
 
-### Mode 1: Default (Colored Background + White Logo)
-Used in:
-- `BookmarkItem.tsx` (line 311) - ✅ Default mode
-- `ScheduledActionItem.tsx` (lines 100-107) - ✅ Default mode
-- `SharedUrlActionSheet.tsx` (line 262) - ✅ Default mode
-- `ClipboardSuggestion.tsx` (line 450) - ✅ Default mode
+## Root Cause
 
-### Mode 2: brandColored (Brand-Colored Logo on White Background)
-Used in:
-- `IconPicker.tsx` (lines 184, 285) - Uses `brandColored`
-- `MyShortcutsContent.tsx` (line 101) - Uses `brandColored` with white bg wrapper
-- `ShortcutCustomizer.tsx` (line 288) - Uses `brandColored` with white bg
-- `ContentPreview.tsx` (line 48) - Uses `brandColored` with white bg
+There's a **state synchronization issue** between `Index.tsx` and `AccessFlow.tsx`:
 
-## The Problem
+| Component | State Variable | Who Controls It |
+|-----------|---------------|-----------------|
+| `Index.tsx` | `accessStep` | Index itself |
+| `AccessFlow.tsx` | `step` | AccessFlow itself |
 
-The app currently shows **TWO different visual identities** for the same platform:
+The data flow is **one-directional**:
+- AccessFlow notifies Index of step changes via `onStepChange` callback
+- Index changes its `accessStep` on back button press
+- But AccessFlow never receives this change - it only sends, never receives
 
-| Location | LinkedIn Appearance |
-|----------|---------------------|
-| Bookmark Library | Blue bg + white "in" |
-| Reminders List | Blue bg + white "in" |
-| Shared URL Sheet | Blue bg + white "in" |
-| Shortcut Creation (IconPicker) | White bg + blue "in" |
-| My Shortcuts List | White bg + blue "in" |
-| Content Preview | White bg + blue "in" |
-| ShortcutCustomizer Preview | White bg + blue "in" |
+When back is pressed:
+1. Index sets `accessStep = 'source'`
+2. `showBottomNav` becomes true (bottom nav appears)
+3. AccessFlow still has `step = 'customize'` (shortcut creator stays visible)
 
-## Solution: Standardize to Default Mode
+## Solution
 
-Revert all components to use the **default mode** (colored background + white logo). This is the original and canonical appearance for platform icons.
-
-### Why Default Mode is Correct:
-
-1. **Original design** - Matches how these icons were initially designed
-2. **Self-contained** - PlatformIcon renders its own background, no wrapper needed
-3. **Consistent with other lists** - Bookmark Library, Reminders already use default mode
-4. **Visually distinct** - Brand colors are more recognizable (YouTube red, LinkedIn blue)
+Register each sub-step of the shortcut creation journey with `useSheetBackHandler` inside `AccessFlow.tsx`. This ensures the back button properly navigates through the flow before Index.tsx's fallback logic is triggered.
 
 ## Technical Changes
 
-### 1. ContentPreview.tsx
-**Current** (line 42-48):
+### 1. Update `AccessFlow.tsx`
+
+Register each journey step with the sheet back handler:
+
 ```tsx
-<div className={cn(
-  "flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center",
-  platform ? "bg-white dark:bg-gray-100 shadow-sm" : "bg-primary/10"
-)}>
-  {platform ? (
-    <PlatformIcon platform={platform} size="lg" brandColored />
+// Import at top
+import { useSheetBackHandler } from '@/hooks/useSheetBackHandler';
+
+// Register each step with back handler (priority 10 to intercept before Index)
+useSheetBackHandler(
+  'access-url-step',
+  step === 'url',
+  handleGoBack,
+  10
+);
+
+useSheetBackHandler(
+  'access-customize-step',
+  step === 'customize',
+  handleGoBack,
+  10
+);
+
+useSheetBackHandler(
+  'access-contact-step',
+  step === 'contact',
+  handleGoBack,
+  10
+);
+
+useSheetBackHandler(
+  'access-success-step',
+  step === 'success',
+  handleReset,
+  10
+);
 ```
 
-**Change to**:
-```tsx
-<div className={cn(
-  "flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center",
-  !platform && "bg-primary/10"
-)}>
-  {platform ? (
-    <PlatformIcon platform={platform} size="lg" />
+This ensures:
+- When user is on `customize` step and presses back → `handleGoBack()` is called → navigates to `url` or `source`
+- When user is on `url` step and presses back → `handleGoBack()` is called → navigates to `source`
+- When user is on `success` step and presses back → `handleReset()` is called → full reset
+- When user is on `contact` step and presses back → `handleGoBack()` is called → navigates to `source`
+
+### 2. Remove Redundant Logic from `Index.tsx`
+
+After AccessFlow handles its own back navigation, the fallback logic in Index.tsx (lines 340-355) becomes redundant. However, keeping it as a fallback is harmless and provides defense-in-depth.
+
+Optionally, we can simplify or remove the access flow back navigation in Index.tsx since AccessFlow now handles it internally.
+
+## Flow After Fix
+
 ```
-- Remove `brandColored` prop
-- Remove white bg condition for platform (default mode has its own bg)
-
-### 2. IconPicker.tsx (Collapsed Preview)
-**Current** (lines 182-185):
-```tsx
-<div className="h-10 w-10 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center shadow-sm overflow-hidden">
-  <PlatformIcon platform={platformInfo} size="md" brandColored />
-</div>
+User on Customize Step → Presses Back
+├─ SheetRegistry checks for registered handlers
+├─ Finds 'access-customize-step' registered (priority 10)
+├─ Calls handleGoBack()
+├─ AccessFlow.step changes to 'url' or 'source'
+├─ AccessFlow notifies Index via onStepChange
+└─ Index.accessStep updates → showBottomNav updates correctly
 ```
-
-**Change to**:
-```tsx
-<div className="h-10 w-10 rounded-xl overflow-hidden">
-  <PlatformIcon platform={platformInfo} size="md" />
-</div>
-```
-- Remove white bg wrapper classes
-- Remove `brandColored` prop
-
-### 3. IconPicker.tsx (Expanded Preview)
-**Current** (lines 275-286):
-```tsx
-<div className={cn(
-  "h-16 w-16 rounded-2xl flex items-center justify-center elevation-2 overflow-hidden",
-  ...
-  (selectedIcon.type === 'platform' || selectedIcon.type === 'favicon') && 'bg-white dark:bg-gray-100 shadow-sm',
-  ...
-)}>
-  {selectedIcon.type === 'platform' && platformInfo && (
-    <PlatformIcon platform={platformInfo} size="lg" brandColored />
-  )}
-```
-
-**Change to**:
-```tsx
-<div className={cn(
-  "h-16 w-16 rounded-2xl flex items-center justify-center elevation-2 overflow-hidden",
-  ...
-  selectedIcon.type === 'favicon' && 'bg-white dark:bg-gray-100 shadow-sm',
-  ...
-)}>
-  {selectedIcon.type === 'platform' && platformInfo && (
-    <PlatformIcon platform={platformInfo} size="lg" />
-  )}
-```
-- Remove platform from white bg condition (keep favicon)
-- Remove `brandColored` prop
-
-### 4. MyShortcutsContent.tsx
-**Current** (lines 99-103):
-```tsx
-if (icon.type === 'platform') {
-  const platform = detectPlatform(`https://${icon.value}.com`);
-  if (platform) {
-    return (
-      <div className="h-12 w-12 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm">
-        <PlatformIcon platform={platform} size="lg" brandColored />
-      </div>
-    );
-  }
-}
-```
-
-**Change to**:
-```tsx
-if (icon.type === 'platform') {
-  const platform = detectPlatform(`https://${icon.value}.com`);
-  if (platform) {
-    return <PlatformIcon platform={platform} size="lg" className="rounded-xl" />;
-  }
-}
-```
-- Remove wrapper div (default mode includes its own bg)
-- Remove `brandColored` prop
-
-### 5. ShortcutCustomizer.tsx (Preview Section)
-**Current** (lines 253-259, 287-289):
-```tsx
-<div
-  className="h-14 w-14 rounded-2xl flex items-center justify-center elevation-2 overflow-hidden relative"
-  style={
-    icon.type === 'platform' || icon.type === 'favicon'
-      ? { backgroundColor: '#FFFFFF' }
-      : icon.type === 'thumbnail' 
-        ? {} 
-        : { backgroundColor: 'hsl(var(--primary))' }
-  }
->
-...
-{!isLoadingThumbnail && icon.type === 'platform' && detectedPlatform && (
-  <PlatformIcon platform={detectedPlatform} size="md" brandColored />
-)}
-```
-
-**Change to**:
-```tsx
-<div
-  className="h-14 w-14 rounded-2xl flex items-center justify-center elevation-2 overflow-hidden relative"
-  style={
-    icon.type === 'favicon'
-      ? { backgroundColor: '#FFFFFF' }
-      : icon.type === 'thumbnail' || icon.type === 'platform'
-        ? {} 
-        : { backgroundColor: 'hsl(var(--primary))' }
-  }
->
-...
-{!isLoadingThumbnail && icon.type === 'platform' && detectedPlatform && (
-  <PlatformIcon platform={detectedPlatform} size="md" />
-)}
-```
-- Remove platform from white bg condition (keep favicon)
-- Remove `brandColored` prop
-
-## Favicon Handling (Keep White Background)
-
-Favicons are external images that may have transparency. They should **keep** the white background:
-
-| Component | Favicon Treatment |
-|-----------|-------------------|
-| `IconPicker.tsx` | White bg container ✓ |
-| `ShortcutCustomizer.tsx` | White bg via style ✓ |
-| `MyShortcutsContent.tsx` | Already has white bg wrapper ✓ |
-
-No changes needed for favicon rendering.
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/ContentPreview.tsx` | Remove `brandColored`, remove white bg for platform |
-| `src/components/IconPicker.tsx` | Remove `brandColored` (2 places), remove white bg for platform |
-| `src/components/MyShortcutsContent.tsx` | Remove wrapper, remove `brandColored` |
-| `src/components/ShortcutCustomizer.tsx` | Remove `brandColored`, update bg logic |
+| `src/components/AccessFlow.tsx` | Add 4 `useSheetBackHandler` calls for each journey step |
 
-## Visual Result After Fix
+## Priority Hierarchy After Fix
 
-Every platform icon across the entire app will now appear identically:
-
-| Location | Icon Appearance |
-|----------|----------------|
-| ContentPreview (shortcut creation) | LinkedIn: Blue bg + white "in" ✓ |
-| IconPicker (collapsed) | LinkedIn: Blue bg + white "in" ✓ |
-| IconPicker (expanded) | LinkedIn: Blue bg + white "in" ✓ |
-| ShortcutCustomizer Preview | LinkedIn: Blue bg + white "in" ✓ |
-| My Shortcuts List | LinkedIn: Blue bg + white "in" ✓ |
-| Bookmark Library | LinkedIn: Blue bg + white "in" ✓ |
-| Reminders List | LinkedIn: Blue bg + white "in" ✓ |
-| Shared URL Sheet | LinkedIn: Blue bg + white "in" ✓ |
-| Clipboard Suggestion | LinkedIn: Blue bg + white "in" ✓ |
-
-## About Native Android Icons
-
-The native Android home screen shortcuts use brand colors on white adaptive backgrounds, which is correct for Android's adaptive icon system. This is **different from the in-app preview** by design:
-- In-app: Shows the actual branded icon (colored bg + white logo)
-- Home screen: Android's adaptive icon system applies masking to the icon
-
-The `brandColored` mode will be retained in the codebase for potential future use cases where brand-colored logos on neutral backgrounds are specifically needed.
+| Priority | Handler | Purpose |
+|----------|---------|---------|
+| 30 | Confirmation dialogs | Close confirmations first |
+| 20 | Sub-flow steps (creators/editors) | Close editing forms |
+| 10 | **AccessFlow steps (NEW)** | Navigate back in shortcut journey |
+| 0 | Sheets (trash, settings, etc.) | Close overlay sheets |
+| -1 | Index fallback | Selection modes, exit confirmation |
