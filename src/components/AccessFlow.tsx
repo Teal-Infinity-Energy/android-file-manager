@@ -411,10 +411,10 @@ export function AccessFlow({
   return (
     <>
       {step === 'source' && (
-        <>
+        <div className="flex-1 flex flex-col min-h-0 pb-[calc(5rem+env(safe-area-inset-bottom))]">
           {/* Offline indicator banner */}
           {!isOnline && (
-            <div className="bg-muted/80 border-b border-border ps-5 pe-5 py-2 flex items-center gap-2">
+            <div className="bg-muted/80 border-b border-border ps-5 pe-5 py-2 flex items-center gap-2 shrink-0">
               <WifiOff className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
                 {t('access.offline')}
@@ -422,7 +422,7 @@ export function AccessFlow({
             </div>
           )}
 
-          <header className="ps-5 pe-5 pt-header-safe pb-4">
+          <header className="ps-5 pe-5 pt-header-safe pb-4 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary" />
@@ -431,6 +431,8 @@ export function AccessFlow({
               <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
             </div>
           </header>
+          
+          {/* Scrollable content area with fixed button */}
           <ContentSourcePicker
             onSelectFile={handleSelectFile}
             onSelectContact={handleSelectContact}
@@ -459,7 +461,7 @@ export function AccessFlow({
               onDismiss={tutorial.skip}
             />
           )}
-        </>
+        </div>
       )}
 
       {step === 'url' && (
