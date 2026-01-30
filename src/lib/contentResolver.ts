@@ -53,6 +53,11 @@ const PLATFORM_EMOJIS: Record<string, string> = {
   default: '🔗',
 };
 
+// Helper to match exact domain (including subdomains like www.x.com)
+function hostMatchesDomain(host: string, domain: string): boolean {
+  return host === domain || host.endsWith('.' + domain);
+}
+
 // Parse deep links for supported platforms
 export function parseDeepLink(url: string): { platform: string; isDeepLink: boolean } {
   try {
@@ -65,8 +70,9 @@ export function parseDeepLink(url: string): { platform: string; isDeepLink: bool
     if (host.includes('youtube.com') || host.includes('youtu.be')) {
       return { platform: 'YouTube', isDeepLink: true };
     }
-    if (host.includes('twitter.com') || host.includes('x.com')) {
-      return { platform: 'Twitter/X', isDeepLink: true };
+    // Use exact match for x.com to avoid matching netflix.com, fedex.com, etc.
+    if (host.includes('twitter.com') || hostMatchesDomain(host, 'x.com')) {
+      return { platform: 'X', isDeepLink: true };
     }
     if (host.includes('tiktok.com')) {
       return { platform: 'TikTok', isDeepLink: true };
@@ -110,7 +116,14 @@ export function getPlatformEmoji(url: string): string {
     
     // Check each platform key against the hostname
     for (const [key, emoji] of Object.entries(PLATFORM_EMOJIS)) {
-      if (key !== 'default' && host.includes(key)) {
+      if (key === 'default') continue;
+      
+      // For very short keys (x, t), use exact domain matching to avoid false positives
+      if (key.length <= 2) {
+        if (hostMatchesDomain(host, key + '.com') || hostMatchesDomain(host, key + '.me')) {
+          return emoji;
+        }
+      } else if (host.includes(key)) {
         return emoji;
       }
     }
