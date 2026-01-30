@@ -39,6 +39,9 @@ export function useShortcuts() {
     
     // Sync to Android widgets
     syncToWidgets(data);
+    
+    // Broadcast change to other hook instances
+    window.dispatchEvent(new CustomEvent('shortcuts-changed', { detail: data }));
   }, [syncToWidgets]);
 
   // Sync with home screen - remove orphaned shortcuts that were deleted from home screen
@@ -48,9 +51,13 @@ export function useShortcuts() {
     try {
       const { ids } = await ShortcutPlugin.getPinnedShortcutIds();
       
+      // Read fresh data from localStorage instead of stale closure state
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const currentShortcuts: ShortcutData[] = stored ? JSON.parse(stored) : [];
+      
       // If no pinned shortcuts returned (empty array), skip sync
       // This handles the case where the API isn't available or returns empty
-      if (ids.length === 0 && shortcuts.length > 0) {
+      if (ids.length === 0 && currentShortcuts.length > 0) {
         console.log('[useShortcuts] No pinned shortcuts returned, skipping sync');
         return;
       }
@@ -58,17 +65,20 @@ export function useShortcuts() {
       const pinnedSet = new Set(ids);
       
       // Keep only shortcuts that are still pinned on home screen
-      const synced = shortcuts.filter(s => pinnedSet.has(s.id));
+      const synced = currentShortcuts.filter(s => pinnedSet.has(s.id));
       
-      if (synced.length !== shortcuts.length) {
-        const removedCount = shortcuts.length - synced.length;
+      if (synced.length !== currentShortcuts.length) {
+        const removedCount = currentShortcuts.length - synced.length;
         console.log(`[useShortcuts] Synced with home screen, removed ${removedCount} orphaned shortcuts`);
         saveShortcuts(synced);
+      } else {
+        // Even if no orphans removed, update state from localStorage to pick up any new shortcuts
+        setShortcuts(currentShortcuts);
       }
     } catch (error) {
       console.warn('[useShortcuts] Failed to sync with home screen:', error);
     }
-  }, [shortcuts, saveShortcuts]);
+  }, [saveShortcuts]); // Removed `shortcuts` dependency - now reads fresh from localStorage
 
   // Sync native usage events from home screen taps
   const syncNativeUsageEvents = useCallback(async () => {
@@ -139,6 +149,20 @@ export function useShortcuts() {
     
     initialSyncDone.current = true;
   }, []); // Only on mount
+
+  // Listen for changes from other hook instances
+  useEffect(() => {
+    const handleShortcutsChanged = (event: CustomEvent<ShortcutData[]>) => {
+      // Update local state from event payload (avoids re-reading localStorage)
+      setShortcuts(event.detail);
+    };
+
+    window.addEventListener('shortcuts-changed', handleShortcutsChanged as EventListener);
+    
+    return () => {
+      window.removeEventListener('shortcuts-changed', handleShortcutsChanged as EventListener);
+    };
+  }, []);
 
   // Sync native usage events when app comes to foreground
   useEffect(() => {
@@ -333,6 +357,18 @@ export function useShortcuts() {
     return shortcuts.find(s => s.id === id);
   }, [shortcuts]);
 
+  // Manually refresh state from localStorage
+  const refreshFromStorage = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const data: ShortcutData[] = stored ? JSON.parse(stored) : [];
+      setShortcuts(data);
+      return data;
+    } catch {
+      return [];
+    }
+  }, []);
+
   return {
     shortcuts,
     createShortcut,
@@ -342,5 +378,6 @@ export function useShortcuts() {
     updateShortcut,
     getShortcut,
     syncWithHomeScreen,
+    refreshFromStorage,
   };
 }
