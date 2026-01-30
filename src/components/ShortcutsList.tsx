@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
 import { Zap, ChevronRight, ChevronDown, RefreshCw, Search, X, Link2, FileIcon, MessageCircle, Phone, BarChart3, Clock, ArrowDownAZ } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -184,12 +185,13 @@ function ShortcutListItem({
               className="shrink-0 p-0.5 rounded hover:bg-muted/80 transition-colors cursor-pointer"
               aria-label={isTargetExpanded ? t('common.collapse') : t('common.expand')}
             >
-              <ChevronDown 
-                className={cn(
-                  "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-                  isTargetExpanded && "rotate-180"
-                )} 
-              />
+              <motion.span
+                animate={{ rotate: isTargetExpanded ? 180 : 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                style={{ display: 'flex' }}
+              >
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </motion.span>
             </span>
           )}
 
