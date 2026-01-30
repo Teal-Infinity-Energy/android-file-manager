@@ -23,7 +23,7 @@ const PLATFORM_PATTERNS: PlatformPattern[] = [
     info: { name: 'Instagram', bgColor: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', textColor: 'text-white', icon: 'instagram' }
   },
   {
-    pattern: /(?:twitter\.com|x\.com)/i,
+    pattern: /(?:twitter\.com|(?:^|\.|\/)x\.com)/i,
     info: { name: 'X', bgColor: 'bg-black', textColor: 'text-white', icon: 'twitter' }
   },
   {
@@ -63,11 +63,11 @@ const PLATFORM_PATTERNS: PlatformPattern[] = [
     info: { name: 'Discord', bgColor: 'bg-indigo-600', textColor: 'text-white', icon: 'discord' }
   },
   {
-    pattern: /whatsapp\.com|wa\.me/i,
+    pattern: /whatsapp\.com|(?:^|\.|\/)wa\.me/i,
     info: { name: 'WhatsApp', bgColor: 'bg-green-500', textColor: 'text-white', icon: 'whatsapp' }
   },
   {
-    pattern: /(?:telegram\.org|t\.me)/i,
+    pattern: /(?:telegram\.org|(?:^|\.|\/)t\.me)/i,
     info: { name: 'Telegram', bgColor: 'bg-sky-500', textColor: 'text-white', icon: 'telegram' }
   },
   {
