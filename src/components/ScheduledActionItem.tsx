@@ -283,7 +283,7 @@ export function ScheduledActionItem({
             setIsSwiping(false);
           }}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 min-w-0">
             {/* Selection checkbox */}
             {isSelectionMode && (
               <div 
@@ -309,7 +309,7 @@ export function ScheduledActionItem({
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex-1 min-w-0 overflow-hidden max-w-full">
               <p 
                 className={cn(
                   "font-medium text-sm min-w-0 cursor-pointer",
@@ -374,7 +374,7 @@ export function ScheduledActionItem({
             {/* Toggle switch (only when not in selection mode) */}
             {!isSelectionMode && (
               <div 
-                className="flex items-center relative z-10 pt-2" 
+                className="flex items-center shrink-0 relative z-10 pt-2 ms-2" 
                 onClick={handleToggleSwitch}
               >
                 <Switch

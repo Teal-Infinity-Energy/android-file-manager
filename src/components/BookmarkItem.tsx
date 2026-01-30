@@ -304,7 +304,7 @@ export function BookmarkItem({
           onMouseDown={handleLongPressStart}
           onMouseUp={handleLongPressEnd}
           onMouseLeave={handleLongPressEnd}
-          className="flex-1 flex items-start gap-3 text-start active:scale-[0.99] transition-transform select-none cursor-pointer"
+          className="flex-1 flex items-start gap-3 min-w-0 overflow-hidden text-start active:scale-[0.99] transition-transform select-none cursor-pointer"
         >
           {/* Platform icon or Favicon */}
           {platform ? (
@@ -330,7 +330,7 @@ export function BookmarkItem({
           <div className="flex-1 min-w-0 overflow-hidden">
             <p 
               className={cn(
-                "font-medium text-foreground cursor-pointer",
+                "font-medium text-foreground cursor-pointer min-w-0",
                 isTitleExpanded ? "break-all" : "truncate"
               )}
               onClick={(e) => {
