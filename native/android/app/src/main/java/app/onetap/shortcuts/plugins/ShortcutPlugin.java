@@ -1352,7 +1352,18 @@ public class ShortcutPlugin extends Plugin {
             return createPlatformIcon(platformIcon);
         }
         
-        // Priority 3: Icon URI (data URL or file URI)
+        // Priority 3: Favicon URL (for unrecognized URLs)
+        String faviconUrl = call.getString("iconFaviconUrl");
+        if (faviconUrl != null && !faviconUrl.isEmpty()) {
+            android.util.Log.d("ShortcutPlugin", "Creating icon from favicon URL: " + faviconUrl);
+            Icon icon = createFaviconIcon(faviconUrl);
+            if (icon != null) {
+                return icon;
+            }
+            // Fall through to emoji fallback if favicon fetch fails
+        }
+        
+        // Priority 4: Icon URI (data URL or file URI)
         String iconUri = call.getString("iconUri");
         if (iconUri != null && !iconUri.isEmpty()) {
             android.util.Log.d("ShortcutPlugin", "Creating icon from URI: " + iconUri.substring(0, Math.min(50, iconUri.length())));
@@ -1384,21 +1395,21 @@ public class ShortcutPlugin extends Plugin {
             }
         }
         
-        // Priority 4: Emoji icon
+        // Priority 5: Emoji icon
         String emoji = call.getString("iconEmoji");
         if (emoji != null) {
             android.util.Log.d("ShortcutPlugin", "Creating emoji icon: " + emoji);
             return createEmojiIcon(emoji);
         }
 
-        // Priority 5: Text icon
+        // Priority 6: Text icon
         String text = call.getString("iconText");
         if (text != null) {
             android.util.Log.d("ShortcutPlugin", "Creating text icon: " + text);
             return createTextIcon(text);
         }
 
-        // Priority 6: Auto-generate video thumbnail if this is a video file
+        // Priority 7: Auto-generate video thumbnail if this is a video file
         String intentType = call.getString("intentType");
         String intentData = call.getString("intentData");
         if (intentType != null && intentType.startsWith("video/") && intentData != null) {
@@ -1417,6 +1428,59 @@ public class ShortcutPlugin extends Plugin {
 
         android.util.Log.d("ShortcutPlugin", "Using default icon");
         return Icon.createWithResource(getContext(), android.R.drawable.ic_menu_add);
+    }
+    
+    // Create icon from favicon URL - fetches the favicon and renders it centered on adaptive icon background
+    private Icon createFaviconIcon(String faviconUrl) {
+        try {
+            // Fetch favicon image from URL
+            java.net.URL url = new java.net.URL(faviconUrl);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; OneTapBot/1.0)");
+            
+            InputStream inputStream = connection.getInputStream();
+            Bitmap faviconBitmap = BitmapFactory.decodeStream(inputStream);
+            inputStream.close();
+            connection.disconnect();
+            
+            if (faviconBitmap == null) {
+                android.util.Log.w("ShortcutPlugin", "Failed to decode favicon bitmap");
+                return null;
+            }
+            
+            // Create adaptive icon canvas
+            int adaptiveSize = 216;
+            Bitmap bitmap = Bitmap.createBitmap(adaptiveSize, adaptiveSize, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            
+            // Fill background with a neutral color (light blue matching link theme)
+            Paint bgPaint = new Paint();
+            bgPaint.setColor(Color.parseColor("#3B82F6")); // Blue-500
+            bgPaint.setStyle(Paint.Style.FILL);
+            canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
+            
+            // Scale and center the favicon (use 45% of the icon size for safe zone)
+            float iconSize = adaptiveSize * 0.45f;
+            float scale = iconSize / Math.max(faviconBitmap.getWidth(), faviconBitmap.getHeight());
+            int scaledWidth = (int) (faviconBitmap.getWidth() * scale);
+            int scaledHeight = (int) (faviconBitmap.getHeight() * scale);
+            
+            Bitmap scaledFavicon = Bitmap.createScaledBitmap(faviconBitmap, scaledWidth, scaledHeight, true);
+            
+            // Center the favicon
+            float left = (adaptiveSize - scaledWidth) / 2f;
+            float top = (adaptiveSize - scaledHeight) / 2f;
+            
+            canvas.drawBitmap(scaledFavicon, left, top, null);
+            
+            android.util.Log.d("ShortcutPlugin", "Created favicon icon from URL");
+            return Icon.createWithAdaptiveBitmap(bitmap);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Failed to create favicon icon: " + e.getMessage());
+            return null;
+        }
     }
     
     // Create branded platform icon with platform-specific colors and actual logo paths

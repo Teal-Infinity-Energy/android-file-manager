@@ -505,6 +505,7 @@
     "image": "Image",
     "emoji": "Emoji",
     "text": "Text",
+    "website": "Website",
     "textPlaceholder": "1-2 characters"
   },
   "toasts": {

@@ -12,6 +12,7 @@ import { PlatformIcon } from '@/components/PlatformIcon';
 import { getContentName, generateThumbnail, getPlatformEmoji, getFileTypeEmoji, getDetectedPlatform } from '@/lib/contentResolver';
 import { buildImageSources } from '@/lib/imageUtils';
 import { detectPlatform } from '@/lib/platformIcons';
+import { useUrlMetadata } from '@/hooks/useUrlMetadata';
 import type { ContentSource, ShortcutIcon } from '@/types/shortcut';
 import { FILE_SIZE_THRESHOLD } from '@/types/shortcut';
 
@@ -53,6 +54,11 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
     return null;
   }, [source.type, source.uri]);
   
+  // Fetch favicon for unrecognized URLs
+  const isUrlSource = source.type === 'url' || source.type === 'share';
+  const shouldFetchFavicon = isUrlSource && !detectedPlatform;
+  const { metadata: urlMetadata } = useUrlMetadata(shouldFetchFavicon ? source.uri : null);
+  
   // Get initial icon based on source type - prefer platform icons for recognized URLs
   const getInitialIcon = (): ShortcutIcon => {
     if (source.type === 'url' || source.type === 'share') {
@@ -60,7 +66,7 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
       if (detectedPlatform?.icon) {
         return { type: 'platform', value: detectedPlatform.icon };
       }
-      // Fallback to emoji for unrecognized URLs
+      // Will update to favicon when metadata loads - start with emoji fallback
       return { type: 'emoji', value: getPlatformEmoji(source.uri) };
     }
     // For files, use file-type specific emoji
@@ -77,6 +83,14 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
     if (icon.type !== 'thumbnail') return [];
     return buildImageSources(icon.value, thumbnail);
   }, [icon.type, icon.value, thumbnail]);
+  
+  // Update icon to favicon when metadata loads for unrecognized URLs
+  useEffect(() => {
+    if (shouldFetchFavicon && urlMetadata?.favicon && icon.type === 'emoji') {
+      // Switch to favicon icon when metadata loads
+      setIcon({ type: 'favicon', value: urlMetadata.favicon });
+    }
+  }, [shouldFetchFavicon, urlMetadata?.favicon, icon.type]);
   
   useEffect(() => {
     setIsLoadingThumbnail(true);
@@ -201,6 +215,7 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
             <IconPicker
               thumbnail={thumbnail || undefined}
               platformIcon={detectedPlatform?.icon || undefined}
+              faviconUrl={shouldFetchFavicon ? urlMetadata?.favicon || undefined : undefined}
               selectedIcon={icon}
               onSelect={setIcon}
             />
@@ -265,6 +280,17 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
               )}
               {!isLoadingThumbnail && icon.type === 'platform' && detectedPlatform && (
                 <PlatformIcon platform={detectedPlatform} size="md" />
+              )}
+              {!isLoadingThumbnail && icon.type === 'favicon' && (
+                <img 
+                  src={icon.value} 
+                  alt="" 
+                  className="h-8 w-8 object-contain"
+                  onError={(e) => {
+                    // Fallback to emoji if favicon fails to load
+                    setIcon({ type: 'emoji', value: getPlatformEmoji(source.uri) });
+                  }}
+                />
               )}
             </div>
             <span className="text-xs text-foreground max-w-[72px] text-center truncate">
