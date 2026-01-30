@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image as ImageIcon, Type, Smile, X, ImageOff, Globe, ChevronDown, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { triggerSelectionFeedback } from '@/lib/haptics';
 import { Input } from '@/components/ui/input';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { PlatformIcon } from '@/components/PlatformIcon';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { isValidImageSource, buildImageSources } from '@/lib/imageUtils';
 import { detectPlatform, type PlatformInfo } from '@/lib/platformIcons';
 import { getPlatformColor } from '@/lib/platformColors';
@@ -166,48 +166,74 @@ export function IconPicker({ thumbnail, platformIcon, faviconUrl, selectedIcon, 
 
   return (
     <div className="space-y-3">
-      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-        {/* Collapsed state for recognized platforms - shows auto-detected badge */}
+      {/* Collapsed state for recognized platforms - shows auto-detected badge */}
+      <AnimatePresence mode="wait">
         {hasAutoDetectedIcon && !isExpanded && (
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-left">
-              <div className="flex items-center gap-3">
-                {/* Mini platform icon preview */}
-                <div className="h-10 w-10 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center shadow-sm overflow-hidden">
-                  <PlatformIcon platform={platformInfo} size="md" brandColored />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-foreground">{t('iconPicker.icon')}</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Check className="h-3 w-3 text-primary" />
-                    {t('iconPicker.autoDetected', { platform: platformInfo.name })}
-                  </span>
-                </div>
+          <motion.button
+            key="collapsed"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onClick={() => setIsExpanded(true)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              {/* Mini platform icon preview */}
+              <div className="h-10 w-10 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center shadow-sm overflow-hidden">
+                <PlatformIcon platform={platformInfo} size="md" brandColored />
               </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">{t('iconPicker.icon')}</span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Check className="h-3 w-3 text-primary" />
+                  {t('iconPicker.autoDetected', { platform: platformInfo.name })}
+                </span>
+              </div>
+            </div>
+            <motion.div
+              animate={{ rotate: 0 }}
+              transition={{ duration: 0.2 }}
+            >
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </button>
-          </CollapsibleTrigger>
+            </motion.div>
+          </motion.button>
         )}
+      </AnimatePresence>
 
-        {/* Expanded state header for recognized platforms */}
-        {hasAutoDetectedIcon && isExpanded && (
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between gap-2 py-1 text-left">
-              <p className="text-sm font-medium text-foreground">{t('iconPicker.icon')}</p>
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                {t('iconPicker.collapse')}
-                <ChevronDown className="h-3 w-3 rotate-180 transition-transform" />
-              </span>
-            </button>
-          </CollapsibleTrigger>
-        )}
-
-        {/* Regular header for non-platform icons */}
-        {!hasAutoDetectedIcon && (
+      {/* Expanded state header for recognized platforms */}
+      {hasAutoDetectedIcon && isExpanded && (
+        <button 
+          onClick={() => setIsExpanded(false)}
+          className="w-full flex items-center justify-between gap-2 py-1 text-left"
+        >
           <p className="text-sm font-medium text-foreground">{t('iconPicker.icon')}</p>
-        )}
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            {t('iconPicker.collapse')}
+            <motion.div
+              animate={{ rotate: 180 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </motion.div>
+          </span>
+        </button>
+      )}
 
-        <CollapsibleContent className="space-y-4 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
+      {/* Regular header for non-platform icons */}
+      {!hasAutoDetectedIcon && (
+        <p className="text-sm font-medium text-foreground">{t('iconPicker.icon')}</p>
+      )}
+
+      <AnimatePresence>
+        {(isExpanded || !hasAutoDetectedIcon) && (
+          <motion.div
+            initial={hasAutoDetectedIcon ? { opacity: 0, height: 0 } : false}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="space-y-4 overflow-hidden"
+          >
           {/* Icon type selector */}
           <div className="flex gap-2 pt-2">
             {iconTypes.map(({ type, icon, label }) => (
@@ -351,8 +377,9 @@ export function IconPicker({ thumbnail, platformIcon, faviconUrl, selectedIcon, 
               )}
             </div>
           )}
-        </CollapsibleContent>
-      </Collapsible>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
