@@ -16,6 +16,8 @@ import type { ScheduledActionDestination } from '@/types/scheduledAction';
 
 export interface MyShortcutsContentProps {
   onCreateReminder: (destination: ScheduledActionDestination) => void;
+  onRefresh?: () => void;
+  isSyncing?: boolean;
 }
 
 type TypeFilter = 'all' | 'link' | 'file' | 'whatsapp' | 'contact';
@@ -279,12 +281,15 @@ function SortButton({
   );
 }
 
-export function MyShortcutsContent({ onCreateReminder }: MyShortcutsContentProps) {
+export function MyShortcutsContent({ onCreateReminder, onRefresh, isSyncing: externalSyncing }: MyShortcutsContentProps) {
   const { t } = useTranslation();
   const { shortcuts, deleteShortcut, updateShortcut, incrementUsage, syncWithHomeScreen, refreshFromStorage } = useShortcuts();
   const [selectedShortcut, setSelectedShortcut] = useState<ShortcutData | null>(null);
   const [editingShortcut, setEditingShortcut] = useState<ShortcutData | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [internalSyncing, setInternalSyncing] = useState(false);
+  
+  // Use external syncing state if provided, otherwise use internal
+  const isSyncing = externalSyncing !== undefined ? externalSyncing : internalSyncing;
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -360,18 +365,20 @@ export function MyShortcutsContent({ onCreateReminder }: MyShortcutsContentProps
   // Check if filters are active
   const hasActiveFilters = searchQuery.trim() !== '' || typeFilter !== 'all';
   
-  // Manual refresh handler
+  // Manual refresh handler - exposed for parent to call
   const handleManualRefresh = useCallback(async () => {
-    setIsSyncing(true);
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
+    setInternalSyncing(true);
     try {
-      // First refresh from localStorage to pick up any new shortcuts from other components
       refreshFromStorage();
-      // Then sync with home screen to remove orphans
       await syncWithHomeScreen();
     } finally {
-      setTimeout(() => setIsSyncing(false), 500);
+      setTimeout(() => setInternalSyncing(false), 500);
     }
-  }, [refreshFromStorage, syncWithHomeScreen]);
+  }, [onRefresh, refreshFromStorage, syncWithHomeScreen]);
   
   const handleClearFilters = useCallback(() => {
     setSearchQuery('');
@@ -450,28 +457,6 @@ export function MyShortcutsContent({ onCreateReminder }: MyShortcutsContentProps
   return (
     <>
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header with refresh button */}
-        <div className="px-4 py-3 border-b flex items-center justify-end">
-          <TooltipProvider delayDuration={0}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleManualRefresh}
-                  disabled={isSyncing}
-                  className="h-8 w-8"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>{t('shortcuts.syncTooltip')}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-        
         {/* Search and Filter Controls */}
         {shortcuts.length > 0 && (
           <div className="px-4 py-3 space-y-3 border-b">
