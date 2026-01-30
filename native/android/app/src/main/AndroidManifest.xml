@@ -230,6 +230,14 @@
             android:noHistory="true"
             android:excludeFromRecents="true" />
 
+        <!-- File Proxy Activity - tracks generic file shortcut taps (audio, documents, etc.) -->
+        <activity
+            android:name=".FileProxyActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false"
+            android:noHistory="true"
+            android:excludeFromRecents="true" />
+
         <!-- Scheduled Actions: Alarm Receiver -->
         <receiver
             android:name=".ScheduledActionReceiver"

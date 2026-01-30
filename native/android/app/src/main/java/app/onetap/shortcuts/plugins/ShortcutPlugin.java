@@ -62,6 +62,7 @@ import app.onetap.shortcuts.WhatsAppProxyActivity;
 import app.onetap.shortcuts.ShortcutEditProxyActivity;
 import app.onetap.shortcuts.LinkProxyActivity;
 import app.onetap.shortcuts.MessageProxyActivity;
+import app.onetap.shortcuts.FileProxyActivity;
 import app.onetap.shortcuts.ScheduledActionReceiver;
 import app.onetap.shortcuts.NotificationHelper;
 import app.onetap.shortcuts.NotificationClickActivity;
@@ -350,7 +351,20 @@ public class ShortcutPlugin extends Plugin {
                     intent.putExtra(MessageProxyActivity.EXTRA_SHORTCUT_ID, finalId);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 } else {
-                    intent = createCompatibleIntent(context, finalIntentAction, finalDataUri, finalIntentType);
+                    // Generic file shortcuts (audio, documents, etc.) - route through FileProxyActivity
+                    // This ensures tap tracking works for all file types
+                    android.util.Log.d("ShortcutPlugin", "Using FileProxyActivity for generic file shortcut");
+                    intent = new Intent(context, FileProxyActivity.class);
+                    intent.setAction("app.onetap.OPEN_FILE");
+                    intent.setDataAndType(finalDataUri, finalIntentType != null ? finalIntentType : "*/*");
+                    // Pass shortcut ID for usage tracking
+                    intent.putExtra(FileProxyActivity.EXTRA_SHORTCUT_ID, finalId);
+                    // Pass MIME type for external app resolution
+                    intent.putExtra(FileProxyActivity.EXTRA_MIME_TYPE, finalIntentType);
+                    // Pass shortcut title for display
+                    intent.putExtra(FileProxyActivity.EXTRA_SHORTCUT_TITLE, finalLabel);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }
 
                 // Create icon (this may also be slow for video thumbnails)
@@ -3323,6 +3337,18 @@ public class ShortcutPlugin extends Plugin {
             intent.putExtra("shortcut_title", label);
             // Add shortcut_id for tap tracking
             intent.putExtra("shortcut_id", shortcutId);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+        } else if ("file".equals(shortcutType) && contentUri != null) {
+            // Generic file (audio, documents, etc.) - route through FileProxyActivity
+            android.util.Log.d("ShortcutPlugin", "Building generic file intent for update, mimeType=" + mimeType);
+            intent = new Intent(context, FileProxyActivity.class);
+            intent.setAction("app.onetap.OPEN_FILE");
+            intent.setDataAndType(Uri.parse(contentUri), mimeType != null ? mimeType : "*/*");
+            intent.putExtra(FileProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
+            intent.putExtra(FileProxyActivity.EXTRA_MIME_TYPE, mimeType);
+            intent.putExtra(FileProxyActivity.EXTRA_SHORTCUT_TITLE, label);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         }
