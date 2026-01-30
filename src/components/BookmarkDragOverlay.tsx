@@ -45,6 +45,11 @@ export function BookmarkDragOverlay({ link }: BookmarkDragOverlayProps) {
             src={faviconUrl} 
             alt="" 
             className="h-6 w-6 object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const sibling = e.currentTarget.nextElementSibling;
+              if (sibling) sibling.classList.remove('hidden');
+            }}
           />
         ) : null}
         <Globe className={cn("h-5 w-5 text-muted-foreground", faviconUrl && "hidden")} />

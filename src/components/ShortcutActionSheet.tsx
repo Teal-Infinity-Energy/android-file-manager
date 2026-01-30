@@ -40,6 +40,12 @@ export function ShortcutActionSheet({
   const { t } = useTranslation();
   const { registerSheet, unregisterSheet } = useSheetRegistry();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [iconError, setIconError] = useState(false);
+
+  // Reset icon error when shortcut changes
+  useEffect(() => {
+    setIconError(false);
+  }, [shortcut?.id]);
 
   // Register with sheet registry for back button handling
   useEffect(() => {
@@ -127,11 +133,12 @@ export function ShortcutActionSheet({
                   shortcut.icon.value
                 ) : shortcut.icon.type === 'text' ? (
                   <span className="text-sm font-bold">{shortcut.icon.value.slice(0, 2)}</span>
-                ) : shortcut.thumbnailData || shortcut.icon.value ? (
+                ) : (shortcut.thumbnailData || shortcut.icon.value) && !iconError ? (
                   <img 
                     src={shortcut.thumbnailData || shortcut.icon.value} 
                     alt="" 
                     className="w-full h-full object-cover"
+                    onError={() => setIconError(true)}
                   />
                 ) : (
                   getShortcutIcon()

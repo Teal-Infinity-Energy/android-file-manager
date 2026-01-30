@@ -13,6 +13,7 @@ export function CloudBackupSection() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [isRecoveryAction, setIsRecoveryAction] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const handleSignIn = async () => {
     try {
@@ -210,11 +211,12 @@ export function CloudBackupSection() {
       <div className="px-3 py-2 mb-2">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-            {user?.user_metadata?.avatar_url ? (
+            {user?.user_metadata?.avatar_url && !avatarError ? (
               <img 
                 src={user.user_metadata.avatar_url} 
                 alt="Profile" 
                 className="h-full w-full object-cover"
+                onError={() => setAvatarError(true)}
               />
             ) : (
               <Cloud className="h-4 w-4 text-primary" />
