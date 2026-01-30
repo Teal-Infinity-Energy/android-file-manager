@@ -1,191 +1,194 @@
 
+# Plan: Implement Chevron-Based Expandable Text Throughout App
 
-# Plan: Fix Shortcut List Item Overflow for Portrait and Landscape
+## Overview
 
-## Problem Analysis
+Replace all "tap-to-expand" text patterns with a consistent chevron icon approach. Text will be truncated after 30 characters with a visible chevron indicator that users tap to expand/collapse.
 
-The shortcut list items overflow the screen in both portrait and landscape modes. The "Type + Target" metadata row continues to push content beyond the visible area. This happens due to a broken constraint chain in the flex hierarchy.
+## Solution: Create Reusable ExpandableText Component
 
-## Root Causes
+Create a single reusable component that handles:
+- Character limit (30 chars default)
+- Chevron visibility logic
+- Expand/collapse animation
+- Overflow protection
 
-### 1. ScrollArea Viewport Gap
-The `ScrollAreaPrimitive.Viewport` component only has `w-full` but lacks `overflow-x-hidden`. This allows child content to expand beyond the intended width.
+## Component Design
 
-### 2. Incomplete Flex Constraint Inheritance  
-While `min-w-0` and `overflow-hidden` are applied at some levels, the constraint chain breaks at key points:
-- The outer `button` container needs explicit width clamping
-- The metadata row's `flex-1` element doesn't properly truncate because parent constraints are incomplete
+```text
++------------------------------------------+
+| This is a long title that... ▼           |  (collapsed, >30 chars)
++------------------------------------------+
 
-### 3. Landscape Mode Width
-In landscape orientation, the sheet can span the full viewport width without constraint, amplifying any overflow issues.
++------------------------------------------+
+| This is a long title that exceeds        |  (expanded)
+| thirty characters and wraps nicely    ▲  |
++------------------------------------------+
 
-## Solution
-
-Apply a comprehensive constraint strategy at every level of the hierarchy:
-
-```
-SheetContent [flex flex-col, overflow-hidden, max-w-full]
-  -> ScrollArea [flex-1, w-full, overflow-hidden]
-       -> Inner div [p-2, w-full, overflow-hidden]
-            -> button [w-full, max-w-full, overflow-hidden]
-                 -> Icon [shrink-0, w-12]
-                 -> Content [flex-1, min-w-0, overflow-hidden, max-w-[calc(100%-theme(spacing.16))]]
-                      -> Title [truncate/break-all, w-full]
-                      -> Metadata Row [flex, w-full, overflow-hidden]
-                           -> Type+Target [truncate, flex-1, min-w-0]
-                           -> Badge [shrink-0, whitespace-nowrap]
-                 -> Chevron [shrink-0, w-4]
++------------------------------------------+
+| Short title                              |  (no chevron, ≤30 chars)
++------------------------------------------+
 ```
 
 ## File Changes
 
-### File: `src/components/ShortcutsList.tsx`
+### 1. NEW FILE: `src/components/ui/expandable-text.tsx`
 
-#### Change 1: Add overflow constraint to SheetContent (Line 443)
-
-Add `overflow-hidden` to prevent any content from escaping the sheet boundaries.
+Create a reusable component with these props:
+- `text`: The text content
+- `charLimit`: Number of characters before truncation (default: 30)
+- `className`: Additional styling
+- `expandedClassName`: Styling when expanded (e.g., `break-all`)
+- `disabled`: Disable expansion (for selection mode)
 
 ```tsx
-<SheetContent side="bottom" className="h-[85vh] p-0 flex flex-col overflow-hidden">
+interface ExpandableTextProps {
+  text: string;
+  charLimit?: number;
+  className?: string;
+  expandedClassName?: string;
+  disabled?: boolean;
+  onClick?: () => void; // Haptic feedback hook
+}
 ```
 
-#### Change 2: Constrain ScrollArea and its container (Lines 569-580)
+The component will:
+1. Check if text length exceeds `charLimit`
+2. If yes: show truncated text + chevron icon
+3. If no: show full text, no chevron
+4. Chevron rotates 180° on expand (spring animation)
+5. Use `overflow-hidden` to prevent any overflow
 
-Add explicit width constraints and overflow control to the scroll container hierarchy.
+### 2. UPDATE: `src/components/ShortcutsList.tsx`
+
+Replace the title expansion logic in `ShortcutListItem`:
+
+| Before | After |
+|--------|-------|
+| Entire title tappable | Only chevron triggers expand |
+| No visual indicator | ChevronDown icon after 30 chars |
+| `truncate` class toggle | ExpandableText component |
+
+### 3. UPDATE: `src/components/BookmarkItem.tsx`
+
+Replace title expansion:
+- Use `ExpandableText` for title
+- Keep existing URL expansion (already has chevron)
+- Add `disabled` prop when in selection mode
+
+### 4. UPDATE: `src/components/ScheduledActionItem.tsx`
+
+Replace title expansion:
+- Use `ExpandableText` for action name
+- Keep existing description expansion (already has chevron pattern)
+- Add `disabled` prop when in selection mode
+
+### 5. UPDATE: `src/components/TrashItem.tsx`
+
+Replace title expansion:
+- Use `ExpandableText` for title
+- Keep existing URL expansion (already has chevron)
+
+## Technical Implementation
+
+### ExpandableText Component Structure
 
 ```tsx
-<ScrollArea className="flex-1 w-full overflow-hidden">
-  <div className="p-2 w-full max-w-full overflow-hidden">
-    {filteredShortcuts.map((shortcut) => (
-      <ShortcutListItem
-        key={shortcut.id}
-        shortcut={shortcut}
-        onTap={handleShortcutTap}
-        t={t}
-      />
-    ))}
-  </div>
-</ScrollArea>
-```
+export function ExpandableText({
+  text,
+  charLimit = 30,
+  className,
+  expandedClassName = "break-all whitespace-normal",
+  disabled = false,
+  onClick,
+}: ExpandableTextProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldTruncate = text.length > charLimit;
 
-#### Change 3: Redesign ShortcutListItem layout (Lines 133-174)
+  const handleToggle = (e: React.MouseEvent) => {
+    if (disabled || !shouldTruncate) return;
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
+    onClick?.(); // For haptic feedback
+  };
 
-Apply a strict constraint pattern to the entire item:
+  if (!shouldTruncate) {
+    return <span className={cn("truncate", className)}>{text}</span>;
+  }
 
-```tsx
-function ShortcutListItem({ 
-  shortcut, 
-  onTap, 
-  t 
-}: { 
-  shortcut: ShortcutData; 
-  onTap: (shortcut: ShortcutData) => void;
-  t: (key: string) => string;
-}) {
-  const [isTitleExpanded, setIsTitleExpanded] = useState(false);
-  const typeLabel = getShortcutTypeLabel(shortcut, t);
-  const target = getShortcutTarget(shortcut);
-  const usageCount = shortcut.usageCount || 0;
-  
   return (
-    <button
-      onClick={() => onTap(shortcut)}
-      className="w-full max-w-full flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card mb-2 hover:bg-muted/50 active:bg-muted transition-colors text-start shadow-sm box-border"
+    <div 
+      className={cn("flex items-start gap-1 cursor-pointer min-w-0 overflow-hidden", className)}
+      onClick={handleToggle}
     >
-      {/* Icon - fixed size, never shrinks */}
-      <div className="shrink-0 w-12 h-12">
-        <ShortcutIcon shortcut={shortcut} />
-      </div>
-      
-      {/* Text content - takes remaining space, strictly constrained */}
-      <div className="flex-1 min-w-0 overflow-hidden">
-        {/* Title row */}
-        <p 
-          className={cn(
-            "font-medium w-full",
-            isTitleExpanded ? "break-all whitespace-normal" : "truncate"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsTitleExpanded(!isTitleExpanded);
-          }}
-        >
-          {shortcut.name}
-        </p>
-        
-        {/* Metadata row - type, target, and badge */}
-        <div className="flex items-center gap-2 mt-0.5 w-full overflow-hidden">
-          <span className="text-xs text-muted-foreground truncate min-w-0 flex-shrink">
-            {typeLabel}
-            {target && ` · ${target}`}
-          </span>
-          <Badge 
-            variant="outline" 
-            className="shrink-0 text-[10px] px-1.5 py-0 h-5 font-semibold bg-primary/5 border-primary/20 text-primary whitespace-nowrap ml-auto"
-          >
-            {usageCount} {usageCount === 1 ? t('shortcuts.tap') : t('shortcuts.taps')}
-          </Badge>
-        </div>
-      </div>
-      
-      {/* Chevron - fixed size, never shrinks */}
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-    </button>
+      <span className={cn(
+        "flex-1 min-w-0",
+        isExpanded ? expandedClassName : "truncate"
+      )}>
+        {text}
+      </span>
+      <motion.div
+        animate={{ rotate: isExpanded ? 180 : 0 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        className="shrink-0"
+      >
+        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+      </motion.div>
+    </div>
   );
 }
 ```
 
-Key changes in the item layout:
-- `max-w-full` and `box-border` on the button to ensure it respects parent width including padding
-- Removed redundant `flex-none` from icon (using explicit `w-12 h-12`)
-- Changed metadata text from `flex-1` to `flex-shrink` with `min-w-0` - this allows it to shrink to fit
-- Added `ml-auto` to the badge to push it to the right edge
-- Added `w-full` to both title and metadata row for explicit width binding
-- Added `overflow-hidden` to metadata row
-
-### File: `src/components/ui/scroll-area.tsx`
-
-#### Change: Add overflow-x constraint to Viewport (Line 11)
-
-This is the critical fix - the viewport must prevent horizontal overflow:
+### Usage Example (ShortcutListItem)
 
 ```tsx
-<ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] overflow-x-hidden">
+// Before
+<p 
+  className={cn(
+    "font-medium w-full cursor-pointer",
+    isTitleExpanded ? "break-all whitespace-normal" : "truncate"
+  )}
+  onClick={(e) => {
+    e.stopPropagation();
+    setIsTitleExpanded(!isTitleExpanded);
+  }}
+>
+  {shortcut.name}
+</p>
+
+// After
+<ExpandableText
+  text={shortcut.name}
+  charLimit={30}
+  className="font-medium w-full"
+  onClick={() => triggerHaptic('light')}
+/>
 ```
 
-## Summary of Changes
+## Benefits
 
-| File | Location | Change |
-|------|----------|--------|
-| `ShortcutsList.tsx` | Line 443 | Add `overflow-hidden` to SheetContent |
-| `ShortcutsList.tsx` | Line 569 | Add `w-full overflow-hidden` to ScrollArea |
-| `ShortcutsList.tsx` | Line 570 | Add `w-full max-w-full` to inner div |
-| `ShortcutsList.tsx` | Lines 133-174 | Redesign ShortcutListItem with strict constraints |
-| `scroll-area.tsx` | Line 11 | Add `overflow-x-hidden` to Viewport |
+1. **Consistent UX**: Same expand pattern across all list items
+2. **Clear affordance**: Chevron shows text is expandable
+3. **Overflow prevention**: Guaranteed no horizontal scroll
+4. **Maintainability**: Single component to update
+5. **Accessibility**: Visible indicator for interaction
 
-## Visual Representation
+## Files to Change
 
-```text
-Portrait Mode (360px)                  Landscape Mode (800px)
-+----------------------------------+   +----------------------------------------+
-| SheetContent [overflow-hidden]   |   | SheetContent [overflow-hidden]         |
-| +------------------------------+ |   | +------------------------------------+ |
-| | ScrollArea [w-full]          | |   | | ScrollArea [w-full]                | |
-| | +---------------------------+| |   | | +--------------------------------+ | |
-| | | [Icon] [Title...] [>]     || |   | | | [Icon] [Title truncates...] [>]| | |
-| | |        Link · domain [5]  || |   | | |        Link · longer.domain [5]| | |
-| | +---------------------------+| |   | | +--------------------------------+ | |
-| +------------------------------+ |   | +------------------------------------+ |
-+----------------------------------+   +----------------------------------------+
-```
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/components/ui/expandable-text.tsx` | Create | New reusable component |
+| `src/components/ShortcutsList.tsx` | Modify | Use ExpandableText for title |
+| `src/components/BookmarkItem.tsx` | Modify | Use ExpandableText for title |
+| `src/components/ScheduledActionItem.tsx` | Modify | Use ExpandableText for action name |
+| `src/components/TrashItem.tsx` | Modify | Use ExpandableText for title |
 
 ## Testing Checklist
 
-- Test in portrait mode (360px width) - items should not overflow horizontally
-- Test in landscape mode (800px+ width) - items should stay within bounds
-- Verify long titles truncate with ellipsis when collapsed
-- Verify tapping title expands it to wrap without horizontal scroll
-- Verify long domain names in metadata truncate properly
-- Verify badge and chevron always remain visible on the right edge
-- Test with extremely long titles (100+ characters with no spaces)
-
+- Create items with titles exactly 30 characters - no chevron should appear
+- Create items with 31+ character titles - chevron should appear
+- Tap chevron to expand - text wraps, chevron rotates 180°
+- Tap again to collapse - text truncates, chevron rotates back
+- In selection mode - expansion should be disabled
+- Landscape mode - no horizontal overflow
+- RTL mode - chevron position and layout correct
