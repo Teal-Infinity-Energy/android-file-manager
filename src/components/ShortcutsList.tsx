@@ -134,28 +134,32 @@ function ShortcutListItem({
     <button
       key={shortcut.id}
       onClick={() => onTap(shortcut)}
-      className="w-full max-w-full overflow-hidden flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card mb-2 hover:bg-muted/50 active:bg-muted transition-colors text-start shadow-sm"
+      className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card mb-2 hover:bg-muted/50 active:bg-muted transition-colors text-start shadow-sm overflow-hidden"
     >
-      <div className="shrink-0">
+      <div className="shrink-0 flex-none">
         <ShortcutIcon shortcut={shortcut} />
       </div>
       
       {/* Text content - strictly constrained to prevent overflow */}
       <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-start gap-2 max-w-full min-w-0">
-          <p 
-            className={cn(
-              "font-medium flex-1 min-w-0 cursor-pointer",
-              isTitleExpanded ? "break-all" : "truncate"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsTitleExpanded(!isTitleExpanded);
-            }}
-          >
-            {shortcut.name}
+        <p 
+          className={cn(
+            "font-medium min-w-0 cursor-pointer",
+            isTitleExpanded ? "break-all" : "truncate"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsTitleExpanded(!isTitleExpanded);
+          }}
+        >
+          {shortcut.name}
+        </p>
+        {/* Metadata row with badge - on second line to protect title space */}
+        <div className="flex items-center gap-2 mt-0.5 min-w-0">
+          <p className="text-xs text-muted-foreground truncate min-w-0 flex-1">
+            {typeLabel}
+            {target && ` · ${target}`}
           </p>
-          {/* Tap count badge - inline with name for visibility */}
           <Badge 
             variant="outline" 
             className="shrink-0 flex-none text-[10px] px-1.5 py-0 h-5 font-semibold bg-primary/5 border-primary/20 text-primary whitespace-nowrap"
@@ -163,10 +167,6 @@ function ShortcutListItem({
             {usageCount} {usageCount === 1 ? t('shortcuts.tap') : t('shortcuts.taps')}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground truncate">
-          {typeLabel}
-          {target && ` · ${target}`}
-        </p>
       </div>
       
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 flex-none rtl:rotate-180" />

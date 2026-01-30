@@ -159,7 +159,7 @@ export function TrashItem({ link, onRestore, onDelete }: TrashItemProps) {
 
       {/* Main content */}
       <div
-        className="flex items-start gap-3 p-3 bg-muted/50 border border-border/50"
+        className="flex items-start gap-3 p-3 bg-muted/50 border border-border/50 min-w-0 overflow-hidden"
         style={{
           transform: `translateX(${swipeX}px)`,
           transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
@@ -189,7 +189,7 @@ export function TrashItem({ link, onRestore, onDelete }: TrashItemProps) {
         <div className="flex-1 min-w-0 overflow-hidden">
           <p 
             className={cn(
-              "text-sm font-medium text-foreground cursor-pointer",
+              "text-sm font-medium text-foreground cursor-pointer min-w-0",
               isTitleExpanded ? "break-all" : "truncate"
             )}
             onClick={(e) => {
@@ -239,7 +239,7 @@ export function TrashItem({ link, onRestore, onDelete }: TrashItemProps) {
         </div>
 
         {/* Actions (fallback for non-touch) */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 flex-none ms-2">
           <Button
             variant="ghost"
             size="icon"
