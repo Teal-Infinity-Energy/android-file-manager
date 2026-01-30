@@ -563,8 +563,8 @@ export function ShortcutsList({ isOpen, onClose, onCreateReminder }: ShortcutsLi
               </Button>
             </div>
           ) : (
-            <ScrollArea className="flex-1">
-              <div className="p-2">
+          <ScrollArea className="flex-1 min-w-0">
+              <div className="p-2 overflow-hidden min-w-0">
                 {filteredShortcuts.map((shortcut) => (
                   <ShortcutListItem
                     key={shortcut.id}
