@@ -26,66 +26,36 @@ export function buildContentIntent(shortcut: ShortcutData): ShortcutIntent {
     };
   }
 
-  // Message shortcuts - ALL route through MessageProxyActivity for tap tracking
+  // Message shortcuts - WhatsApp only
+  // Routes through MessageProxyActivity for tap tracking
   // Exception: WhatsApp with 2+ messages uses WhatsAppProxyActivity for message chooser
-  if (shortcut.type === 'message' && shortcut.messageApp) {
+  if (shortcut.type === 'message' && shortcut.messageApp === 'whatsapp') {
     const phoneNumber = shortcut.phoneNumber?.replace(/[^0-9]/g, '') || '';
+    const messages = shortcut.quickMessages || [];
     
-    switch (shortcut.messageApp) {
-      case 'whatsapp': {
-        const messages = shortcut.quickMessages || [];
-        
-        if (messages.length >= 2) {
-          // Multiple messages - route through WhatsApp proxy for chooser UI
-          return {
-            action: 'app.onetap.WHATSAPP_MESSAGE',
-            data: `whatsapp://${phoneNumber}`,
-            extras: {
-              phone_number: phoneNumber,
-              quick_messages: JSON.stringify(messages),
-              contact_name: shortcut.contactName || shortcut.name,
-            },
-          };
-        }
-        
-        // 0 or 1 message - use MessageProxyActivity for tap tracking
-        const url = messages.length === 1
-          ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(messages[0])}`
-          : `https://wa.me/${phoneNumber}`;
-        
-        return {
-          action: 'app.onetap.OPEN_MESSAGE',
-          data: url,
-          extras: { url },
-        };
-      }
-      case 'telegram': {
-        const url = `tg://resolve?phone=${phoneNumber}`;
-        return {
-          action: 'app.onetap.OPEN_MESSAGE',
-          data: url,
-          extras: { url },
-        };
-      }
-      case 'signal': {
-        const url = `sgnl://signal.me/#p/+${phoneNumber}`;
-        return {
-          action: 'app.onetap.OPEN_MESSAGE',
-          data: url,
-          extras: { url },
-        };
-      }
-      case 'slack': {
-        const url = shortcut.slackTeamId && shortcut.slackUserId
-          ? `slack://user?team=${shortcut.slackTeamId}&id=${shortcut.slackUserId}`
-          : 'slack://';
-        return {
-          action: 'app.onetap.OPEN_MESSAGE',
-          data: url,
-          extras: { url },
-        };
-      }
+    if (messages.length >= 2) {
+      // Multiple messages - route through WhatsApp proxy for chooser UI
+      return {
+        action: 'app.onetap.WHATSAPP_MESSAGE',
+        data: `whatsapp://${phoneNumber}`,
+        extras: {
+          phone_number: phoneNumber,
+          quick_messages: JSON.stringify(messages),
+          contact_name: shortcut.contactName || shortcut.name,
+        },
+      };
     }
+    
+    // 0 or 1 message - use MessageProxyActivity for tap tracking
+    const url = messages.length === 1
+      ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(messages[0])}`
+      : `https://wa.me/${phoneNumber}`;
+    
+    return {
+      action: 'app.onetap.OPEN_MESSAGE',
+      data: url,
+      extras: { url },
+    };
   }
 
   // Link shortcuts - route through LinkProxyActivity for tap tracking

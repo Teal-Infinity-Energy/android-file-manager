@@ -462,11 +462,11 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     iconEmoji?: string;
     iconText?: string;
     iconData?: string;
-    // Intent-affecting properties
+    // Intent-affecting properties (WhatsApp only for messaging)
     shortcutType?: 'file' | 'link' | 'contact' | 'message';
     phoneNumber?: string;
     quickMessages?: string[];
-    messageApp?: string;
+    messageApp?: string; // 'whatsapp' only
     resumeEnabled?: boolean;
     contentUri?: string;
     mimeType?: string;

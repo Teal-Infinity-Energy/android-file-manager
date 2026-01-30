@@ -107,10 +107,7 @@ export function ShortcutActionSheet({
     if (!shortcut) return '';
     
     if (shortcut.type === 'contact') return t('shortcutAction.typeContact');
-    if (shortcut.type === 'message') {
-      if (shortcut.messageApp === 'whatsapp') return t('shortcutAction.typeWhatsApp');
-      return t('shortcutAction.typeMessage');
-    }
+    if (shortcut.type === 'message') return t('shortcutAction.typeWhatsApp');
     if (shortcut.type === 'link') return t('shortcutAction.typeLink');
     
     switch (shortcut.fileType) {

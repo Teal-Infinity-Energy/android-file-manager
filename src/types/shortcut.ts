@@ -4,7 +4,7 @@ export type FileType = 'image' | 'video' | 'pdf' | 'document' | 'audio';
 
 export type IconType = 'thumbnail' | 'emoji' | 'text' | 'platform' | 'favicon';
 
-export type MessageApp = 'whatsapp' | 'telegram' | 'signal' | 'slack';
+export type MessageApp = 'whatsapp';
 
 export interface ShortcutIcon {
   type: IconType;
@@ -29,12 +29,10 @@ export interface ShortcutData {
   // PDF Resume Support
   resumeEnabled?: boolean; // Whether "Resume where I left off" is enabled for PDFs
   // Contact/Message shortcut fields
-  phoneNumber?: string;        // For dial and WhatsApp/Telegram/Signal
+  phoneNumber?: string;        // For dial and WhatsApp
   contactName?: string;        // Display name from contacts
   contactPhotoUri?: string;    // Contact photo for icon
-  messageApp?: MessageApp;     // Which messaging app to use
-  slackUserId?: string;        // For Slack DM shortcuts
-  slackTeamId?: string;        // For Slack workspace
+  messageApp?: MessageApp;     // Always 'whatsapp' for message shortcuts
   // WhatsApp Quick Messages - optional message templates for WhatsApp shortcuts
   // Messages are drafts that open in WhatsApp for user to review and send
   // Empty array or undefined = open chat only

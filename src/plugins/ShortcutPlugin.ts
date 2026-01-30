@@ -270,14 +270,11 @@ export interface ShortcutPluginInterface {
     shortcutType?: 'file' | 'link' | 'contact' | 'message';
     phoneNumber?: string;
     quickMessages?: string[];  // WhatsApp quick messages
-    messageApp?: string;       // 'whatsapp' | 'telegram' | 'signal' | 'slack'
+    messageApp?: string;       // 'whatsapp' only
     resumeEnabled?: boolean;   // PDF resume
     contentUri?: string;       // For file/link shortcuts
     mimeType?: string;
     contactName?: string;      // Contact display name for WhatsApp
-    // Slack-specific properties
-    slackTeamId?: string;      // Slack team ID for deep linking
-    slackUserId?: string;      // Slack user ID for deep linking
   }): Promise<{ success: boolean; error?: string }>;
 
   // ========== Native Usage Tracking ==========
