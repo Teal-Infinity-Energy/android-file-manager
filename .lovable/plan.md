@@ -1,219 +1,262 @@
 
 
-## Goal
-Elevate the WhatsApp message picker dialog to match the app's premium aesthetic with refined styling, subtle animations, and ensure tap tracking works correctly across all shortcut types.
+# Tap Tracking Analysis - Issues and Fixes
 
-## Current State Analysis
+## Executive Summary
 
-### Dialog Styling Issues
-The current `WhatsAppProxyActivity` builds the dialog programmatically with basic styling:
-- Simple gray backgrounds (`#f5f5f5`)
-- Basic rounded corners
-- No elevation/shadow effects
-- No touch feedback animations
-- Static emoji icons instead of proper iconography
-- Plain divider styling
+The tap tracking system has gaps where certain shortcut types are not properly recording usage events when tapped from the home screen. This analysis identifies **5 specific issues** that need to be fixed.
 
-### Tap Tracking Verification
-All proxy activities correctly implement tap tracking:
-1. **VideoProxyActivity** - Records tap at line 51-54
-2. **PDFProxyActivity** - Records tap at line 65-66
-3. **ContactProxyActivity** - Records tap at line 53-56
-4. **LinkProxyActivity** - Records tap at line 62-65
-5. **MessageProxyActivity** - Records tap at line 53-58
-6. **WhatsAppProxyActivity** - Records tap at line 62-65
+## How Tap Tracking Works
 
-The flow is complete: Proxy activities call `NativeUsageTracker.recordTap()`, which stores events in SharedPreferences. On app startup/resume, `syncNativeUsageEvents()` in `useShortcuts.ts` retrieves and processes these events.
+```text
+Home Screen Tap
+      │
+      ▼
+┌─────────────────┐
+│  Proxy Activity │ ← Records tap via NativeUsageTracker.recordTap()
+└─────────────────┘
+      │
+      ▼
+┌─────────────────┐
+│  Target Action  │ ← Opens browser, calls phone, launches WhatsApp, etc.
+└─────────────────┘
+      │
+      ▼ (On next app launch)
+┌─────────────────┐
+│  JS Syncs       │ ← getNativeUsageEvents() retrieves and clears stored events
+│  Usage Events   │
+└─────────────────┘
+```
 
-## Design Changes
+## Current Proxy Coverage
 
-### Premium Dialog Aesthetic
-Based on the app's design system from `index.css`:
-- **Primary color**: HSL 211, 100%, 50% (Material Blue - `#0080FF`)
-- **Background**: Clean whites and subtle grays
-- **Elevation**: Material Design surface levels
-- **Typography**: Bold headers, muted subtitles
+| Shortcut Type | Proxy Activity | Tracking Status |
+|---------------|----------------|-----------------|
+| Video | VideoProxyActivity | Working |
+| PDF | PDFProxyActivity | Working |
+| Contact (Call) | ContactProxyActivity | Working |
+| WhatsApp (2+ messages) | WhatsAppProxyActivity | Working |
+| WhatsApp (0-1 message) | MessageProxyActivity | Working |
+| Telegram | MessageProxyActivity | Working |
+| Signal | MessageProxyActivity | Working |
+| Slack | MessageProxyActivity | Working |
+| Link (URL) | LinkProxyActivity | Working |
 
-### Enhanced UI Elements
+## Issues Identified
 
-1. **Dialog Container**
-   - Pure white background with elevated shadow
-   - Larger corner radius (20dp) for modern feel
-   - Subtle border for definition
+### Issue 1: Missing `shortcut_id` in `buildIntentForUpdate` for Several Proxy Types
 
-2. **Header Section**
-   - WhatsApp green accent indicator bar at top
-   - Centered title with refined typography
-   - Contact name as prominent heading
-   - Subtle "Choose an option" subtitle
+**Severity: High**
 
-3. **Open Chat Card (Primary Action)**
-   - Light blue tinted background matching primary color
-   - Subtle border with primary color
-   - Arrow/chevron icon instead of emoji
-   - Proper ripple effect on press
+When shortcuts are updated via `updatePinnedShortcut()`, the `buildIntentForUpdate()` method rebuilds the intent but **fails to include `shortcut_id`** for several proxy types:
 
-4. **Divider**
-   - Thinner, more elegant styling
-   - Lighter gray color
-   - Text in matching muted color
+**Affected proxies:**
+- `WhatsAppProxyActivity` - Missing `EXTRA_SHORTCUT_ID`
+- `ContactProxyActivity` - Missing `EXTRA_SHORTCUT_ID`
+- `VideoProxyActivity` - Missing `shortcut_id` extra
 
-5. **Message Cards**
-   - Clean white cards with subtle border
-   - Left accent bar in primary color
-   - Proper quote styling
-   - Hover/press state with color shift
-   - Message number badge
+**Impact:** Shortcuts that are edited (name, icon, phone number changes) lose their tap tracking capability. The proxy activity receives the tap but `shortcutId` is null, so `NativeUsageTracker.recordTap()` is not called.
 
-6. **Cancel Button**
-   - Text-only style, not a standard dialog button
-   - Centered at bottom with padding
-   - Muted color that's still tappable
+**Root Cause:** Lines 3188-3237 in `ShortcutPlugin.java` - the `buildIntentForUpdate()` method builds intents but doesn't pass the shortcut ID to all proxies.
 
-7. **Animations**
-   - Fade-in on dialog open
-   - Scale animation on card press
-   - Subtle haptic feedback
+### Issue 2: `buildIntentForUpdate` Always Routes WhatsApp to Multi-Message Proxy
 
-## Technical Implementation
+**Severity: Medium**
 
-### File Changes
+The `buildIntentForUpdate()` method at line 3188 routes ALL WhatsApp shortcuts (type="message" + messageApp="whatsapp") to `WhatsAppProxyActivity`, regardless of message count:
 
-#### Modified Files:
-
-1. **`native/android/app/src/main/java/app/onetap/shortcuts/WhatsAppProxyActivity.java`**
-   - Redesign `showMessageChooserDialog()` with premium styling
-   - Add `createPremiumOptionCard()` for Open Chat button
-   - Add `createPremiumMessageCard()` for message options
-   - Implement ripple effects via `RippleDrawable`
-   - Add haptic feedback on selections
-   - Use Material Design color palette from app
-
-2. **`native/android/app/src/main/res/drawable/dialog_rounded_bg.xml`**
-   - Add elevation/shadow effect
-   - Increase corner radius
-
-3. **`native/android/app/src/main/res/drawable/message_option_bg.xml`**
-   - Update pressed state colors
-   - Add border styling
-
-4. **`native/android/app/src/main/res/values/styles.xml`**
-   - Refine dialog theme
-   - Add animation styles
-
-#### New Files:
-
-5. **`native/android/app/src/main/res/drawable/primary_option_bg.xml`**
-   - Background for the "Open chat" primary action card
-   - Uses primary blue accent color
-
-6. **`native/android/app/src/main/res/drawable/message_card_bg.xml`**
-   - Refined card background with border
-
-## Detailed Implementation
-
-### Color Palette (from app's design system)
 ```java
-// Primary Blue (Material Blue)
-private static final String COLOR_PRIMARY = "#0080FF";      // HSL 211, 100%, 50%
-private static final String COLOR_PRIMARY_LIGHT = "#E6F2FF"; // Light blue tint
-
-// WhatsApp Green (for accent bar)
-private static final String COLOR_WHATSAPP = "#25D366";
-
-// Neutrals
-private static final String COLOR_BG = "#FFFFFF";
-private static final String COLOR_SURFACE = "#FAFAFA";
-private static final String COLOR_BORDER = "#E5E5E5";
-private static final String COLOR_TEXT = "#1A1A1A";
-private static final String COLOR_TEXT_MUTED = "#6B7280";
-private static final String COLOR_DIVIDER = "#E0E0E0";
+if ("message".equals(shortcutType) && "whatsapp".equals(messageApp)) {
+    // Always goes to WhatsAppProxyActivity
+}
 ```
 
-### Premium Dialog Layout (Programmatic)
+**Problem:** WhatsApp shortcuts with 0-1 messages should route through `MessageProxyActivity` (as they do during creation), but after an update they're incorrectly routed to `WhatsAppProxyActivity`.
+
+**Impact:** Behavior inconsistency after editing a WhatsApp shortcut. The multi-message dialog may appear unexpectedly for single-message shortcuts.
+
+### Issue 3: `buildIntentForUpdate` Missing Link Shortcut Support
+
+**Severity: High**
+
+The `buildIntentForUpdate()` method has no case for `type="link"` shortcuts. It only handles:
+- message + whatsapp
+- contact
+- file (PDF)
+- file (video)
+
+**Problem:** When a link shortcut is edited, `buildIntentForUpdate()` returns `null`, so the shortcut's intent is not updated. The next tap may still work (original intent preserved), but the shortcut_id won't be refreshed if it was somehow lost.
+
+More importantly, line 3238's comment says "For link/file types that don't need special handling, we don't rebuild the intent" - but this is wrong because link shortcuts DO need their proxy activity with shortcut_id.
+
+### Issue 4: `buildIntentForUpdate` Missing Non-WhatsApp Message Support
+
+**Severity: High**
+
+The `buildIntentForUpdate()` method only handles WhatsApp message shortcuts. Other messaging apps (Telegram, Signal, Slack) are not handled:
+
+**Current logic:**
+```java
+if ("message".equals(shortcutType) && "whatsapp".equals(messageApp)) {
+    // Only handles WhatsApp
+}
 ```
-┌────────────────────────────────────────┐
-│ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │  ← WhatsApp green accent bar (4dp)
-│                                        │
-│         Message John Smith             │  ← Bold title, 20sp
-│          Choose an option              │  ← Muted subtitle, 14sp
-│                                        │
-│  ┌──────────────────────────────────┐  │
-│  │  ○  Open chat                 ➔  │  │  ← Primary blue bg, white icon
-│  │     Start typing a new message   │  │
-│  └──────────────────────────────────┘  │
-│                                        │
-│  ─────── Quick messages ───────        │  ← Elegant divider
-│                                        │
-│  ┌──────────────────────────────────┐  │
-│  │  ▎ "Hey! Are you free today?"    │  │  ← Blue left accent bar
-│  └──────────────────────────────────┘  │
-│                                        │
-│  ┌──────────────────────────────────┐  │
-│  │  ▎ "On my way!"                  │  │
-│  └──────────────────────────────────┘  │
-│                                        │
-│  ┌──────────────────────────────────┐  │
-│  │  ▎ "Running late, 10 mins"       │  │
-│  └──────────────────────────────────┘  │
-│                                        │
-│              Cancel                    │  ← Muted text button
-│                                        │
-└────────────────────────────────────────┘
+
+**Missing cases:**
+- Telegram (`messageApp="telegram"`)
+- Signal (`messageApp="signal"`)  
+- Slack (`messageApp="slack"`)
+
+**Impact:** Editing a Telegram/Signal/Slack shortcut results in `null` intent, breaking the proxy routing and losing tap tracking.
+
+### Issue 5: JS `useShortcuts.updateShortcut` Doesn't Pass `slackTeamId`/`slackUserId`
+
+**Severity: Low**
+
+The `updateShortcut` function in `useShortcuts.ts` doesn't pass Slack-specific fields to `updatePinnedShortcut`:
+
+```typescript
+// Current code (line 322-338)
+const result = await ShortcutPlugin.updatePinnedShortcut({
+  id,
+  label: shortcut.name,
+  // ...
+  phoneNumber: shortcut.phoneNumber,
+  quickMessages: shortcut.quickMessages,
+  messageApp: shortcut.messageApp,
+  // Missing: slackTeamId, slackUserId
+});
 ```
 
-### Key Code Changes for WhatsAppProxyActivity
+**Impact:** Slack shortcuts can't be properly updated because the team/user IDs aren't passed to the native layer for intent rebuilding.
 
-1. **Color Constants**: Add Material Design palette as static final strings
+## Recommended Fixes
 
-2. **Header with Accent Bar**: Add WhatsApp green bar at top for brand recognition
+### Fix 1: Add `shortcut_id` to All Proxies in `buildIntentForUpdate`
 
-3. **Premium Open Chat Card**: 
-   - Blue-tinted background
-   - Circular icon container
-   - Chevron arrow indicating action
-   - RippleDrawable for touch feedback
+Add the shortcut ID extra to each proxy intent:
 
-4. **Refined Message Cards**:
-   - White background with subtle border
-   - Primary color accent bar on left (3dp)
-   - Better typography hierarchy
-   - Proper ellipsization for long messages
-   - Scale animation on press
+```java
+// For WhatsAppProxyActivity
+intent.putExtra(WhatsAppProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
 
-5. **Haptic Feedback**: Add `performHapticFeedback()` on selections
+// For ContactProxyActivity  
+intent.putExtra(ContactProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
 
-6. **Dialog Window Styling**:
-   - Larger corner radius
-   - Proper elevation shadow
-   - Smooth fade animation
+// For VideoProxyActivity
+intent.putExtra("shortcut_id", shortcutId);
+```
 
-## Testing Checklist
+### Fix 2: Add Logic to Route WhatsApp Based on Message Count
 
-### Tap Tracking Verification
-After implementation, verify all shortcut types record taps correctly:
-- [ ] Video shortcuts (VideoProxyActivity)
-- [ ] PDF shortcuts (PDFProxyActivity)  
-- [ ] Contact call shortcuts (ContactProxyActivity)
-- [ ] Link shortcuts (LinkProxyActivity)
-- [ ] Messaging shortcuts with 0-1 messages (MessageProxyActivity)
-  - WhatsApp (0 messages)
-  - WhatsApp (1 message)
-  - Telegram
-  - Signal
-  - Slack
-- [ ] WhatsApp shortcuts with 2+ messages (WhatsAppProxyActivity)
+Update the WhatsApp handling in `buildIntentForUpdate()` to check the number of messages:
 
-### Dialog UI Testing
-- [ ] Dialog appears with premium styling
-- [ ] WhatsApp green accent bar visible at top
-- [ ] "Open chat" has blue-tinted background
-- [ ] Message cards have left accent bar
-- [ ] Touch feedback (ripple) works on all interactive elements
-- [ ] Haptic feedback on tap
-- [ ] Long messages truncate properly with ellipsis
-- [ ] Cancel button dismisses and returns to home screen
-- [ ] Dialog dismisses on outside tap
-- [ ] Selecting "Open chat" opens WhatsApp without message
-- [ ] Selecting a message opens WhatsApp with that message pre-filled
+```java
+if ("message".equals(shortcutType) && "whatsapp".equals(messageApp)) {
+    int messageCount = 0;
+    if (quickMessagesJson != null) {
+        try {
+            JSONArray arr = new JSONArray(quickMessagesJson);
+            messageCount = arr.length();
+        } catch (Exception e) {}
+    }
+    
+    if (messageCount >= 2) {
+        // Multi-message: use WhatsAppProxyActivity
+        intent = new Intent(context, WhatsAppProxyActivity.class);
+        // ... existing code
+    } else {
+        // 0-1 message: use MessageProxyActivity
+        intent = new Intent(context, MessageProxyActivity.class);
+        intent.setAction("app.onetap.OPEN_MESSAGE");
+        String url = buildWhatsAppUrl(phoneNumber, quickMessagesJson);
+        intent.setData(Uri.parse(url));
+        intent.putExtra(MessageProxyActivity.EXTRA_URL, url);
+        intent.putExtra(MessageProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
+    }
+}
+```
+
+### Fix 3: Add Link Shortcut Support
+
+Add a case for link shortcuts:
+
+```java
+else if ("link".equals(shortcutType) && contentUri != null) {
+    intent = new Intent(context, LinkProxyActivity.class);
+    intent.setAction("app.onetap.OPEN_LINK");
+    intent.setData(Uri.parse(contentUri));
+    intent.putExtra(LinkProxyActivity.EXTRA_URL, contentUri);
+    intent.putExtra(LinkProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+}
+```
+
+### Fix 4: Add Non-WhatsApp Message Shortcut Support
+
+Add cases for Telegram, Signal, and Slack:
+
+```java
+else if ("message".equals(shortcutType) && messageApp != null) {
+    String url = null;
+    switch (messageApp) {
+        case "telegram":
+            url = "tg://resolve?phone=" + phoneNumber;
+            break;
+        case "signal":
+            url = "sgnl://signal.me/#p/+" + phoneNumber;
+            break;
+        case "slack":
+            if (slackTeamId != null && slackUserId != null) {
+                url = "slack://user?team=" + slackTeamId + "&id=" + slackUserId;
+            }
+            break;
+    }
+    
+    if (url != null) {
+        intent = new Intent(context, MessageProxyActivity.class);
+        intent.setAction("app.onetap.OPEN_MESSAGE");
+        intent.setData(Uri.parse(url));
+        intent.putExtra(MessageProxyActivity.EXTRA_URL, url);
+        intent.putExtra(MessageProxyActivity.EXTRA_SHORTCUT_ID, shortcutId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
+}
+```
+
+### Fix 5: Pass Slack Details from JS Layer
+
+Update `useShortcuts.ts` to include Slack fields:
+
+```typescript
+const result = await ShortcutPlugin.updatePinnedShortcut({
+  // ... existing fields
+  slackTeamId: shortcut.slackTeamId,
+  slackUserId: shortcut.slackUserId,
+});
+```
+
+And update the `ShortcutPlugin.ts` interface and native `updatePinnedShortcut` method to accept these parameters.
+
+## Files to Modify
+
+1. **`native/android/app/src/main/java/app/onetap/shortcuts/plugins/ShortcutPlugin.java`**
+   - `buildIntentForUpdate()` method (lines 3177-3242)
+   - `updatePinnedShortcut()` method to accept new parameters
+
+2. **`src/plugins/ShortcutPlugin.ts`**
+   - Add `slackTeamId` and `slackUserId` to `updatePinnedShortcut` options interface
+
+3. **`src/hooks/useShortcuts.ts`**
+   - Pass `slackTeamId` and `slackUserId` in `updateShortcut()` function
+
+## Summary
+
+The tap tracking infrastructure is solid, but the `buildIntentForUpdate()` method in `ShortcutPlugin.java` has several gaps that cause tracking to fail for edited shortcuts. The main issues are:
+
+1. Missing `shortcut_id` extras in rebuilt intents
+2. Incorrect routing logic for WhatsApp based on message count
+3. Missing handlers for link shortcuts
+4. Missing handlers for non-WhatsApp message shortcuts (Telegram, Signal, Slack)
+5. Missing Slack-specific parameters in the JS-to-native bridge
 
