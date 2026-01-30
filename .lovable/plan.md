@@ -1,109 +1,56 @@
 
-# Fix: Back Button Not Properly Closing Shortcut Creation Journeys
 
-## Problem Summary
+# Fix: Inline Picker Hidden Behind My Shortcuts Button
 
-When the back button is pressed during shortcut creation journeys (URL input → customize → success), the bottom navigation bar appears but the shortcut creation screens remain visible. This creates a confusing broken state.
+## Problem
+
+When clicking "Browse all files" or "Saved bookmarks" in the General Options section, the expanded inline action picker (showing "Create Shortcut" and "Create Reminder" options) gets hidden beneath the fixed "My Shortcuts" button at the bottom of the screen.
 
 ## Root Cause
 
-There's a **state synchronization issue** between `Index.tsx` and `AccessFlow.tsx`:
+The component structure:
+- Main container: `pb-28` (accounts for fixed button + bottom nav)
+- Card with "More Options" section: `pb-4` at the bottom
+- When secondary picker expands, it renders inside this section
+- The fixed button position: `bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)]`
 
-| Component | State Variable | Who Controls It |
-|-----------|---------------|-----------------|
-| `Index.tsx` | `accessStep` | Index itself |
-| `AccessFlow.tsx` | `step` | AccessFlow itself |
-
-The data flow is **one-directional**:
-- AccessFlow notifies Index of step changes via `onStepChange` callback
-- Index changes its `accessStep` on back button press
-- But AccessFlow never receives this change - it only sends, never receives
-
-When back is pressed:
-1. Index sets `accessStep = 'source'`
-2. `showBottomNav` becomes true (bottom nav appears)
-3. AccessFlow still has `step = 'customize'` (shortcut creator stays visible)
+The `pb-28` padding on the outer container provides clearance, but it's static. When the inline picker expands within the card, the content grows but the card's bottom edge gets too close to (or under) the fixed button.
 
 ## Solution
 
-Register each sub-step of the shortcut creation journey with `useSheetBackHandler` inside `AccessFlow.tsx`. This ensures the back button properly navigates through the flow before Index.tsx's fallback logic is triggered.
+Add dynamic bottom margin to the card when the secondary picker is active. This will push the card content up so the expanded picker remains fully visible above the fixed "My Shortcuts" button.
 
 ## Technical Changes
 
-### 1. Update `AccessFlow.tsx`
+### File: `src/components/ContentSourcePicker.tsx`
 
-Register each journey step with the sheet back handler:
+**Change 1: Add dynamic margin to the main card when secondary picker is open**
+
+At line 104, update the card's className to include conditional bottom margin:
 
 ```tsx
-// Import at top
-import { useSheetBackHandler } from '@/hooks/useSheetBackHandler';
+// Current (line 104):
+<div className="rounded-2xl bg-card elevation-1 p-4">
 
-// Register each step with back handler (priority 10 to intercept before Index)
-useSheetBackHandler(
-  'access-url-step',
-  step === 'url',
-  handleGoBack,
-  10
-);
-
-useSheetBackHandler(
-  'access-customize-step',
-  step === 'customize',
-  handleGoBack,
-  10
-);
-
-useSheetBackHandler(
-  'access-contact-step',
-  step === 'contact',
-  handleGoBack,
-  10
-);
-
-useSheetBackHandler(
-  'access-success-step',
-  step === 'success',
-  handleReset,
-  10
-);
+// Change to:
+<div className={cn(
+  "rounded-2xl bg-card elevation-1 p-4",
+  activeSecondaryPicker && "mb-24"
+)}>
 ```
 
-This ensures:
-- When user is on `customize` step and presses back → `handleGoBack()` is called → navigates to `url` or `source`
-- When user is on `url` step and presses back → `handleGoBack()` is called → navigates to `source`
-- When user is on `success` step and presses back → `handleReset()` is called → full reset
-- When user is on `contact` step and presses back → `handleGoBack()` is called → navigates to `source`
+This adds `mb-24` (6rem / 96px) margin to the bottom of the card when the secondary picker is expanded, pushing the entire card content up and ensuring the inline picker options remain visible above the fixed button.
 
-### 2. Remove Redundant Logic from `Index.tsx`
+## Visual Result
 
-After AccessFlow handles its own back navigation, the fallback logic in Index.tsx (lines 340-355) becomes redundant. However, keeping it as a fallback is harmless and provides defense-in-depth.
-
-Optionally, we can simplify or remove the access flow back navigation in Index.tsx since AccessFlow now handles it internally.
-
-## Flow After Fix
-
-```
-User on Customize Step → Presses Back
-├─ SheetRegistry checks for registered handlers
-├─ Finds 'access-customize-step' registered (priority 10)
-├─ Calls handleGoBack()
-├─ AccessFlow.step changes to 'url' or 'source'
-├─ AccessFlow notifies Index via onStepChange
-└─ Index.accessStep updates → showBottomNav updates correctly
-```
+| State | Before | After |
+|-------|--------|-------|
+| Secondary picker closed | Card ends normally | No change |
+| Secondary picker open | Picker hidden under fixed button | Card gets extra bottom margin, picker fully visible |
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/AccessFlow.tsx` | Add 4 `useSheetBackHandler` calls for each journey step |
+| File | Change |
+|------|--------|
+| `src/components/ContentSourcePicker.tsx` | Add conditional `mb-24` class when `activeSecondaryPicker` is not null |
 
-## Priority Hierarchy After Fix
-
-| Priority | Handler | Purpose |
-|----------|---------|---------|
-| 30 | Confirmation dialogs | Close confirmations first |
-| 20 | Sub-flow steps (creators/editors) | Close editing forms |
-| 10 | **AccessFlow steps (NEW)** | Navigate back in shortcut journey |
-| 0 | Sheets (trash, settings, etc.) | Close overlay sheets |
-| -1 | Index fallback | Selection modes, exit confirmation |
