@@ -255,7 +255,7 @@ function SortButton({
 
 export function ShortcutsList({ isOpen, onClose, onCreateReminder }: ShortcutsListProps) {
   const { t } = useTranslation();
-  const { shortcuts, deleteShortcut, updateShortcut, incrementUsage, syncWithHomeScreen } = useShortcuts();
+  const { shortcuts, deleteShortcut, updateShortcut, incrementUsage, syncWithHomeScreen, refreshFromStorage } = useShortcuts();
   const [selectedShortcut, setSelectedShortcut] = useState<ShortcutData | null>(null);
   const [editingShortcut, setEditingShortcut] = useState<ShortcutData | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -351,11 +351,14 @@ export function ShortcutsList({ isOpen, onClose, onCreateReminder }: ShortcutsLi
   const handleManualRefresh = useCallback(async () => {
     setIsSyncing(true);
     try {
+      // First refresh from localStorage to pick up any new shortcuts from other components
+      refreshFromStorage();
+      // Then sync with home screen to remove orphans
       await syncWithHomeScreen();
     } finally {
       setTimeout(() => setIsSyncing(false), 500);
     }
-  }, [syncWithHomeScreen]);
+  }, [refreshFromStorage, syncWithHomeScreen]);
   
   const handleClearFilters = useCallback(() => {
     setSearchQuery('');
