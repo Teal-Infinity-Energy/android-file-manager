@@ -124,6 +124,9 @@ export function useShortcuts() {
           // Sync to widgets
           syncToWidgets(updated);
           
+          // Broadcast usage update for stats recalculation
+          window.dispatchEvent(new CustomEvent('usage-updated'));
+          
           console.log(`[useShortcuts] Updated usage counts for ${shortcutUpdates.size} shortcuts`);
           
           return updated;
@@ -300,6 +303,9 @@ export function useShortcuts() {
       s.id === id ? { ...s, usageCount: s.usageCount + 1 } : s
     );
     saveShortcuts(updated);
+    
+    // Broadcast usage update for stats recalculation
+    window.dispatchEvent(new CustomEvent('usage-updated'));
   }, [shortcuts, saveShortcuts]);
 
   const updateShortcut = useCallback(async (
