@@ -1450,16 +1450,19 @@ public class ShortcutPlugin extends Plugin {
                 return null;
             }
             
-            // Create adaptive icon canvas with transparency support
+            // Create adaptive icon canvas
             int adaptiveSize = 216;
             Bitmap bitmap = Bitmap.createBitmap(adaptiveSize, adaptiveSize, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             
-            // Transparent background - no fill needed
-            // ARGB_8888 supports transparency, launcher will show its default shape behind
+            // Fill background with a neutral color (light blue matching link theme)
+            Paint bgPaint = new Paint();
+            bgPaint.setColor(Color.parseColor("#3B82F6")); // Blue-500
+            bgPaint.setStyle(Paint.Style.FILL);
+            canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
             
-            // Scale and center the favicon (use 80% of the icon size to fill safe zone)
-            float iconSize = adaptiveSize * 0.80f;
+            // Scale and center the favicon (use 45% of the icon size for safe zone)
+            float iconSize = adaptiveSize * 0.45f;
             float scale = iconSize / Math.max(faviconBitmap.getWidth(), faviconBitmap.getHeight());
             int scaledWidth = (int) (faviconBitmap.getWidth() * scale);
             int scaledHeight = (int) (faviconBitmap.getHeight() * scale);
@@ -1487,27 +1490,31 @@ public class ShortcutPlugin extends Plugin {
         Bitmap bitmap = Bitmap.createBitmap(adaptiveSize, adaptiveSize, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         
-        // Get platform-specific color (used for the icon itself, not background)
-        int brandColor = getPlatformColor(platformKey);
+        // Get platform-specific color
+        int bgColor = getPlatformColor(platformKey);
+        boolean useWhiteIcon = shouldUseWhiteText(platformKey);
         
-        // Transparent background - no fill needed
-        // ARGB_8888 supports transparency, launcher will show its default shape behind
+        // Fill entire canvas with platform brand color
+        Paint bgPaint = new Paint();
+        bgPaint.setColor(bgColor);
+        bgPaint.setStyle(Paint.Style.FILL);
+        canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
         
         // Try to get platform SVG path
         Path iconPath = getPlatformPath(platformKey);
         
         if (iconPath != null) {
-            // Draw the actual logo path in brand color (on transparent background)
+            // Draw the actual logo path
             Paint iconPaint = new Paint();
-            iconPaint.setColor(brandColor); // Use brand color for the icon itself
+            iconPaint.setColor(useWhiteIcon ? Color.WHITE : Color.BLACK);
             iconPaint.setAntiAlias(true);
             iconPaint.setStyle(Paint.Style.FILL);
             
-            // Scale and center the path (use 80% of icon size to fill safe zone)
+            // Scale and center the path
             RectF pathBounds = new RectF();
             iconPath.computeBounds(pathBounds, true);
             
-            float iconSize = adaptiveSize * 0.80f;
+            float iconSize = adaptiveSize * 0.45f;
             float scaleX = iconSize / pathBounds.width();
             float scaleY = iconSize / pathBounds.height();
             float scale = Math.min(scaleX, scaleY);
@@ -1524,7 +1531,7 @@ public class ShortcutPlugin extends Plugin {
             android.util.Log.d("ShortcutPlugin", "Created platform icon with SVG path for: " + platformKey);
         } else {
             // Fallback to letter/symbol for unsupported platforms
-            drawPlatformLetter(canvas, platformKey, adaptiveSize, brandColor);
+            drawPlatformLetter(canvas, platformKey, adaptiveSize, useWhiteIcon);
             android.util.Log.d("ShortcutPlugin", "Created platform icon with letter for: " + platformKey);
         }
         
@@ -1532,11 +1539,11 @@ public class ShortcutPlugin extends Plugin {
     }
     
     // Draw fallback letter/symbol for platforms without SVG paths
-    private void drawPlatformLetter(Canvas canvas, String platformKey, int size, int brandColor) {
+    private void drawPlatformLetter(Canvas canvas, String platformKey, int size, boolean useWhite) {
         String letter = getPlatformLetter(platformKey);
         Paint textPaint = new Paint();
-        textPaint.setColor(brandColor); // Use brand color for the letter (on transparent bg)
-        textPaint.setTextSize(size * 0.6f); // Larger text to fill more of the safe zone
+        textPaint.setColor(useWhite ? Color.WHITE : Color.BLACK);
+        textPaint.setTextSize(size * 0.4f);
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setAntiAlias(true);
         textPaint.setFakeBoldText(true);
