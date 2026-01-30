@@ -1,54 +1,121 @@
 
 
 ## Goal
-Remove the excessive gap between the type label (e.g., "Link") and the target (e.g., "· jiobppulsecharg...") in the shortcuts list metadata row.
+Convert the My Shortcuts sheet into a full-fledged page (single source of truth) and add a dedicated button in the Access tab to open it, positioned near the navigation bar for easy access.
 
-## Problem
-The current grid layout uses:
-- `minmax(0,40%)` for the type column - reserves up to 40% width even when type is short like "Link"
-- `gap-2` (8px) between all columns - creates visible separation
+## Current State Analysis
+- **ShortcutsList.tsx** is currently a sheet component (`<Sheet>`) that opens from:
+  - AppMenu (hamburger menu) via `onOpenShortcuts` callback
+  - Deep link event `onetap:manage-shortcuts`
+- **Index.tsx** manages the `shortcutsListOpen` state and renders the `<ShortcutsList>` sheet
+- The component contains all the UI logic: search, type filters, sort controls, list rendering, action sheet, and edit sheet
 
-## Solution
-Change the metadata row from a 3-column grid to a simpler flex layout where:
-- Type label uses `shrink-0` (fixed width based on content)
-- Target uses `flex-1 min-w-0 truncate` (fills remaining space, truncates)
-- Badge uses `shrink-0` (fixed width)
-- Use `gap-1.5` (6px) for tighter spacing between type and target
+## Architecture Changes
 
-## File Change
+### 1. Create New Page: `src/pages/MyShortcuts.tsx`
+- A new route `/my-shortcuts` for the dedicated page
+- This page will use `useNavigate` for back navigation
+- Contains a header with back button and title
+- Wraps the core shortcuts content
 
-**`src/components/ShortcutsList.tsx`** (line 151-158)
+### 2. Refactor `ShortcutsList.tsx` into `MyShortcutsContent.tsx`
+- Extract the core content (search, filters, list, empty states) into a reusable component
+- Remove the `<Sheet>` wrapper - the component becomes a pure content component
+- Accept props for reminder creation callback and navigation-aware back handling
+- Both the new page and any future inline usage can import this single source
 
-Change:
-```tsx
-<div className="mt-0.5 min-w-0 overflow-hidden grid grid-cols-[minmax(0,40%)_minmax(0,1fr)_auto] items-center gap-2">
-  <span className="text-xs text-muted-foreground truncate">
-    {typeLabel}
-  </span>
+### 3. Update Routing in `App.tsx`
+- Add new route `/my-shortcuts` pointing to the new page (lazy-loaded)
 
-  <span className="text-xs text-muted-foreground truncate">
-    {target ? `· ${target}` : ''}
-  </span>
+### 4. Add Dedicated Button in Access Tab
+- Add a floating action button (FAB) or fixed button near the bottom nav in `ContentSourcePicker.tsx`
+- Positioned above the nav bar, distinct from other content
+- Shows the Zap icon and shortcuts count badge
+- Uses prominent styling to be distinguished from other options
+
+### 5. Update Navigation Flow
+- **From Access Tab**: Tapping the new button navigates to `/my-shortcuts`
+- **From AppMenu**: Keep the existing menu item but navigate to the route instead of opening a sheet
+- **Deep link**: Update to navigate to the route
+- **Back navigation**: Return to the previous screen via router
+
+## File Changes
+
+### New Files
+1. **`src/pages/MyShortcuts.tsx`** - New page component with header and content
+2. **`src/components/MyShortcutsContent.tsx`** - Extracted core content (renamed from sheet logic)
+
+### Modified Files
+1. **`src/App.tsx`** - Add route `/my-shortcuts`
+2. **`src/components/AccessFlow.tsx`** - Change `onOpenShortcuts` to use navigation
+3. **`src/pages/Index.tsx`** - Remove sheet state, update handlers to use navigation
+4. **`src/components/AppMenu.tsx`** - Update to use navigation
+5. **`src/components/ContentSourcePicker.tsx`** - Add dedicated "My Shortcuts" button near bottom
+6. **`src/components/ShortcutsList.tsx`** - Refactor to extract content, then delete or keep as thin wrapper if needed
+
+### Deleted Files
+- **`src/components/ShortcutsList.tsx`** - After extracting content to new component
+
+## UI Design for Access Tab Button
+
+The button will be placed in a fixed position at the bottom of the Access tab content, above the bottom navigation bar:
+
+```
+┌─────────────────────────────────┐
+│  Access Tab Header              │
+├─────────────────────────────────┤
+│                                 │
+│  Content Source Picker Grid     │
+│  (Photo, Video, Audio, etc.)    │
+│                                 │
+│  Secondary Options              │
+│  (Browse Files, Saved Bookmarks)│
+│                                 │
+├─────────────────────────────────┤
+│  ⚡ My Shortcuts [badge]   →    │  <-- Distinguished button
+├─────────────────────────────────┤
+│  BottomNav (Tabs)               │
+└─────────────────────────────────┘
 ```
 
-To:
-```tsx
-<div className="mt-0.5 min-w-0 overflow-hidden flex items-center gap-1.5">
-  <span className="text-xs text-muted-foreground shrink-0">
-    {typeLabel}
-  </span>
+Button styling:
+- Full-width card with gradient background
+- Primary accent color
+- Zap icon + "My Shortcuts" label + count badge + chevron
+- Elevated with shadow to stand out
 
-  <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-    {target ? `· ${target}` : ''}
-  </span>
+## Technical Details
+
+### MyShortcutsContent Props
+```typescript
+interface MyShortcutsContentProps {
+  onCreateReminder: (destination: ScheduledActionDestination) => void;
+  onNavigateBack?: () => void; // For page back button
+  showHeader?: boolean; // Page provides its own header
+}
 ```
 
-## Why This Works
-- `shrink-0` on type label means it takes exactly the width of "Link", "Photo", etc. - no extra space
-- `gap-1.5` reduces the gap from 8px to 6px for tighter visual grouping
-- `flex-1 min-w-0 truncate` on target ensures it fills remaining space and truncates properly
-- Badge keeps `shrink-0` so it's always visible
+### Navigation Updates
+- Replace `setShortcutsListOpen(true)` with `navigate('/my-shortcuts')`
+- Pass reminder callback via route state or context
+- Use `useNavigate` for back button in the new page
 
-## Result
-The type and target will appear close together like: `Link · jiobppulsecharg...` instead of `Link          · jiobppulsecharg...`
+### State Management for Reminders
+When creating a reminder from shortcuts:
+1. Navigate back to Index
+2. Set `pendingReminderDestination` state
+3. Switch to reminders tab
+This can be achieved via:
+- Route state: `navigate('/', { state: { reminder: destination, tab: 'reminders' } })`
+- Or use a global context/store
+
+## Implementation Order
+1. Create `MyShortcutsContent.tsx` by extracting content from `ShortcutsList.tsx`
+2. Create `MyShortcuts.tsx` page using the new content component
+3. Add route to `App.tsx`
+4. Add the dedicated button to `ContentSourcePicker.tsx`
+5. Update `AccessFlow.tsx` to pass navigation callback
+6. Update `Index.tsx` to handle incoming state and remove sheet
+7. Update `AppMenu.tsx` to use navigation
+8. Delete the old `ShortcutsList.tsx`
 
