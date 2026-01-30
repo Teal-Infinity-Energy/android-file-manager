@@ -1,17 +1,21 @@
+import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Zap } from 'lucide-react';
+import { ArrowLeft, Zap, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MyShortcutsContent } from '@/components/MyShortcutsContent';
+import { useShortcuts } from '@/hooks/useShortcuts';
 import type { ScheduledActionDestination } from '@/types/scheduledAction';
 
 export default function MyShortcuts() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { syncWithHomeScreen, refreshFromStorage } = useShortcuts();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const handleBack = () => {
-    // Check if we came from somewhere in the app
     if (location.key !== 'default') {
       navigate(-1);
     } else {
@@ -20,7 +24,6 @@ export default function MyShortcuts() {
   };
 
   const handleCreateReminder = (destination: ScheduledActionDestination) => {
-    // Navigate back to Index with reminder state
     navigate('/', { 
       state: { 
         pendingReminder: destination,
@@ -28,6 +31,16 @@ export default function MyShortcuts() {
       } 
     });
   };
+
+  const handleRefresh = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      refreshFromStorage();
+      await syncWithHomeScreen();
+    } finally {
+      setTimeout(() => setIsSyncing(false), 500);
+    }
+  }, [refreshFromStorage, syncWithHomeScreen]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -48,11 +61,33 @@ export default function MyShortcuts() {
               {t('shortcuts.title')}
             </h1>
           </div>
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={isSyncing}
+                  className="h-9 w-9 shrink-0"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{t('shortcuts.syncTooltip')}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </header>
 
       {/* Content */}
-      <MyShortcutsContent onCreateReminder={handleCreateReminder} />
+      <MyShortcutsContent 
+        onCreateReminder={handleCreateReminder}
+        onRefresh={handleRefresh}
+        isSyncing={isSyncing}
+      />
     </div>
   );
 }
