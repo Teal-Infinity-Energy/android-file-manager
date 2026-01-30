@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { ShortcutData } from '@/types/shortcut';
 import { usageHistoryManager } from '@/lib/usageHistoryManager';
 
@@ -14,6 +14,24 @@ export interface UsageStats {
 }
 
 export function useUsageStats(): UsageStats {
+  // Use a version counter to force recalculation when shortcuts change
+  const [version, setVersion] = useState(0);
+  
+  // Listen for shortcuts-changed and usage-updated events
+  useEffect(() => {
+    const handleUpdate = () => {
+      setVersion(v => v + 1);
+    };
+    
+    window.addEventListener('shortcuts-changed', handleUpdate);
+    window.addEventListener('usage-updated', handleUpdate);
+    
+    return () => {
+      window.removeEventListener('shortcuts-changed', handleUpdate);
+      window.removeEventListener('usage-updated', handleUpdate);
+    };
+  }, []);
+  
   return useMemo(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -72,5 +90,5 @@ export function useUsageStats(): UsageStats {
         averageTapsPerDay: 0
       };
     }
-  }, []);
+  }, [version]); // Recalculate when version changes
 }
