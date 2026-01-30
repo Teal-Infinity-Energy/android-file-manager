@@ -1430,7 +1430,8 @@ public class ShortcutPlugin extends Plugin {
         return Icon.createWithResource(getContext(), android.R.drawable.ic_menu_add);
     }
     
-    // Create icon from favicon URL - fetches the favicon and renders it centered on adaptive icon background
+    // Create icon from favicon URL - fetches the favicon and renders it centered on neutral background
+    // Favicons are displayed at 70% scale on white background to match native app icon appearance
     private Icon createFaviconIcon(String faviconUrl) {
         try {
             // Fetch favicon image from URL
@@ -1455,14 +1456,15 @@ public class ShortcutPlugin extends Plugin {
             Bitmap bitmap = Bitmap.createBitmap(adaptiveSize, adaptiveSize, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             
-            // Fill background with a neutral color (light blue matching link theme)
+            // Fill background with white for adaptive icon mask compatibility
+            // The launcher will apply its own mask shape (circle, squircle, etc.)
             Paint bgPaint = new Paint();
-            bgPaint.setColor(Color.parseColor("#3B82F6")); // Blue-500
+            bgPaint.setColor(Color.WHITE);
             bgPaint.setStyle(Paint.Style.FILL);
             canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
             
-            // Scale and center the favicon (use 45% of the icon size for safe zone)
-            float iconSize = adaptiveSize * 0.45f;
+            // Scale favicon to 70% of the icon size for larger, more visible appearance
+            float iconSize = adaptiveSize * 0.70f;
             float scale = iconSize / Math.max(faviconBitmap.getWidth(), faviconBitmap.getHeight());
             int scaledWidth = (int) (faviconBitmap.getWidth() * scale);
             int scaledHeight = (int) (faviconBitmap.getHeight() * scale);
@@ -1475,7 +1477,7 @@ public class ShortcutPlugin extends Plugin {
             
             canvas.drawBitmap(scaledFavicon, left, top, null);
             
-            android.util.Log.d("ShortcutPlugin", "Created favicon icon from URL");
+            android.util.Log.d("ShortcutPlugin", "Created favicon icon from URL (white bg, 70% scale)");
             return Icon.createWithAdaptiveBitmap(bitmap);
         } catch (Exception e) {
             android.util.Log.e("ShortcutPlugin", "Failed to create favicon icon: " + e.getMessage());
@@ -1483,20 +1485,21 @@ public class ShortcutPlugin extends Plugin {
         }
     }
     
-    // Create branded platform icon with platform-specific colors and actual logo paths
+    // Create branded platform icon with brand-colored logo on white background
+    // Icons are displayed at 70% scale with their original brand colors for authentic native app appearance
     private Icon createPlatformIcon(String platformKey) {
         // Adaptive icon size: 108dp * 2 = 216px for foreground layer
         int adaptiveSize = 216;
         Bitmap bitmap = Bitmap.createBitmap(adaptiveSize, adaptiveSize, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         
-        // Get platform-specific color
-        int bgColor = getPlatformColor(platformKey);
-        boolean useWhiteIcon = shouldUseWhiteText(platformKey);
+        // Get platform-specific brand color (used for the icon fill, not background)
+        int brandColor = getPlatformColor(platformKey);
         
-        // Fill entire canvas with platform brand color
+        // Fill background with white for adaptive icon mask compatibility
+        // The launcher will apply its own mask shape (circle, squircle, etc.)
         Paint bgPaint = new Paint();
-        bgPaint.setColor(bgColor);
+        bgPaint.setColor(Color.WHITE);
         bgPaint.setStyle(Paint.Style.FILL);
         canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
         
@@ -1504,17 +1507,17 @@ public class ShortcutPlugin extends Plugin {
         Path iconPath = getPlatformPath(platformKey);
         
         if (iconPath != null) {
-            // Draw the actual logo path
+            // Draw the actual logo path with brand color (not white/black)
             Paint iconPaint = new Paint();
-            iconPaint.setColor(useWhiteIcon ? Color.WHITE : Color.BLACK);
+            iconPaint.setColor(brandColor); // Use brand color for the icon itself
             iconPaint.setAntiAlias(true);
             iconPaint.setStyle(Paint.Style.FILL);
             
-            // Scale and center the path
+            // Scale and center the path at 70% for larger, more prominent appearance
             RectF pathBounds = new RectF();
             iconPath.computeBounds(pathBounds, true);
             
-            float iconSize = adaptiveSize * 0.45f;
+            float iconSize = adaptiveSize * 0.70f; // Larger icon (was 0.45)
             float scaleX = iconSize / pathBounds.width();
             float scaleY = iconSize / pathBounds.height();
             float scale = Math.min(scaleX, scaleY);
@@ -1528,22 +1531,35 @@ public class ShortcutPlugin extends Plugin {
             iconPath.transform(matrix);
             
             canvas.drawPath(iconPath, iconPaint);
-            android.util.Log.d("ShortcutPlugin", "Created platform icon with SVG path for: " + platformKey);
+            android.util.Log.d("ShortcutPlugin", "Created platform icon with SVG path (white bg, brand color) for: " + platformKey);
         } else {
-            // Fallback to letter/symbol for unsupported platforms
-            drawPlatformLetter(canvas, platformKey, adaptiveSize, useWhiteIcon);
-            android.util.Log.d("ShortcutPlugin", "Created platform icon with letter for: " + platformKey);
+            // Fallback to letter/symbol for unsupported platforms - use brand color
+            drawPlatformLetterWithColor(canvas, platformKey, adaptiveSize, brandColor);
+            android.util.Log.d("ShortcutPlugin", "Created platform icon with letter (white bg, brand color) for: " + platformKey);
         }
         
         return Icon.createWithAdaptiveBitmap(bitmap);
     }
     
-    // Draw fallback letter/symbol for platforms without SVG paths
+    // Draw fallback letter/symbol for platforms without SVG paths (legacy, uses white/black)
     private void drawPlatformLetter(Canvas canvas, String platformKey, int size, boolean useWhite) {
         String letter = getPlatformLetter(platformKey);
         Paint textPaint = new Paint();
         textPaint.setColor(useWhite ? Color.WHITE : Color.BLACK);
         textPaint.setTextSize(size * 0.4f);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setAntiAlias(true);
+        textPaint.setFakeBoldText(true);
+        float y = (size / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2);
+        canvas.drawText(letter, size / 2f, y, textPaint);
+    }
+    
+    // Draw fallback letter/symbol for platforms without SVG paths using brand color
+    private void drawPlatformLetterWithColor(Canvas canvas, String platformKey, int size, int color) {
+        String letter = getPlatformLetter(platformKey);
+        Paint textPaint = new Paint();
+        textPaint.setColor(color);
+        textPaint.setTextSize(size * 0.5f); // Larger text at 50% (was 40%)
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setAntiAlias(true);
         textPaint.setFakeBoldText(true);

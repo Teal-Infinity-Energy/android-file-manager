@@ -202,8 +202,10 @@ export function IconPicker({ thumbnail, platformIcon, faviconUrl, selectedIcon, 
             className={cn(
               "h-16 w-16 rounded-2xl flex items-center justify-center elevation-2 overflow-hidden",
               selectedIcon.type === 'thumbnail' ? 'p-0' : '',
-              // Only thumbnail and text get bg-primary, platform/favicon have no background
-              selectedIcon.type !== 'platform' && selectedIcon.type !== 'favicon' && 'bg-primary'
+              // Platform and favicon get white/neutral background to match native adaptive icons
+              (selectedIcon.type === 'platform' || selectedIcon.type === 'favicon') && 'bg-white dark:bg-gray-100 shadow-sm',
+              // Thumbnail and text get bg-primary
+              (selectedIcon.type === 'thumbnail' || selectedIcon.type === 'text') && 'bg-primary'
             )}
           >
             {selectedIcon.type === 'platform' && platformInfo && (
@@ -213,7 +215,7 @@ export function IconPicker({ thumbnail, platformIcon, faviconUrl, selectedIcon, 
               <img 
                 src={selectedIcon.value} 
                 alt="Website icon" 
-                className="h-full w-full object-contain"
+                className="h-[70%] w-[70%] object-contain"
               />
             )}
             {selectedIcon.type === 'thumbnail' && thumbnailSources.length > 0 && (
