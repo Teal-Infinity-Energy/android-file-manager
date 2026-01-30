@@ -1,158 +1,148 @@
 
-
-# Remove Background Colors from Home Screen Shortcut Icons
+# Remove Telegram, Signal, and Slack Support
 
 ## Summary
 
-Update the native Android shortcut icon rendering to display platform logos and favicons **without colored backgrounds** - just the authentic branded icons filling the entire icon space, like real native app icons.
+Remove all code related to Telegram, Signal, and Slack messaging shortcuts since the app specializes in WhatsApp. This cleanup simplifies the codebase and focuses on the core functionality.
 
-## Current vs Expected Behavior
+## Code to Remove/Modify
 
-| Icon Type | Current (Home Screen) | Expected (Home Screen) |
-|-----------|----------------------|------------------------|
-| YouTube | White play icon on red square | Full YouTube logo (red + white) |
-| Netflix | White 'N' on red square | Full Netflix 'N' with red color |
-| Favicon | Small favicon on blue square | Favicon filling icon space |
+### 1. TypeScript Types
 
-## Technical Implementation
+**File: `src/types/shortcut.ts`**
 
-### 1. Native Android: `ShortcutPlugin.java`
+| Change | Before | After |
+|--------|--------|-------|
+| `MessageApp` type | `'whatsapp' \| 'telegram' \| 'signal' \| 'slack'` | `'whatsapp'` |
+| `slackUserId` field | Present | **Remove** |
+| `slackTeamId` field | Present | **Remove** |
+| Comment update | "For dial and WhatsApp/Telegram/Signal" | "For dial and WhatsApp" |
 
-#### A. Update `createPlatformIcon()` method
+### 2. Platform Icons
 
-**Current behavior (lines 1486-1539):**
-- Fills canvas with platform brand color
-- Draws white/black icon at 45% size centered
+**File: `src/lib/platformIcons.ts`**
 
-**New behavior:**
-- Transparent background (or white for adaptive icon mask compatibility)
-- Draw platform SVG with its **native colors** at full size (using fill color directly)
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Remove `telegram` from icon type | Line 8 | Remove from union type |
+| Remove `slack` from icon type | Line 8 | Remove from union type |
+| Remove Telegram pattern | Lines 70-72 | Remove platform detection |
+| Remove Slack pattern | Lines 97-100 | Remove platform detection |
 
-```java
-private Icon createPlatformIcon(String platformKey) {
-    int adaptiveSize = 216;
-    Bitmap bitmap = Bitmap.createBitmap(adaptiveSize, adaptiveSize, Bitmap.Config.ARGB_8888);
-    Canvas canvas = new Canvas(bitmap);
-    
-    // White background for adaptive icon compatibility (masked by launcher)
-    Paint bgPaint = new Paint();
-    bgPaint.setColor(Color.WHITE);
-    bgPaint.setStyle(Paint.Style.FILL);
-    canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
-    
-    // Get platform-specific fill color (the brand color, not white)
-    int iconColor = getPlatformColor(platformKey); // Use brand color as fill
-    
-    Path iconPath = getPlatformPath(platformKey);
-    
-    if (iconPath != null) {
-        Paint iconPaint = new Paint();
-        iconPaint.setColor(iconColor); // Brand color (red for YouTube, etc.)
-        iconPaint.setAntiAlias(true);
-        iconPaint.setStyle(Paint.Style.FILL);
-        
-        // Scale to fill ~80% of canvas (larger than before)
-        float iconSize = adaptiveSize * 0.7f;  // Was 0.45
-        // ... scale and center logic
-        
-        canvas.drawPath(iconPath, iconPaint);
-    }
-    
-    return Icon.createWithAdaptiveBitmap(bitmap);
-}
-```
+### 3. Shortcut Manager
 
-#### B. Update `createFaviconIcon()` method
+**File: `src/lib/shortcutManager.ts`**
 
-**Current behavior (lines 1434-1483):**
-- Blue `#3B82F6` background
-- Favicon at 45% size centered
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Remove Telegram case | Lines 62-68 | Remove switch case |
+| Remove Signal case | Lines 70-76 | Remove switch case |
+| Remove Slack case | Lines 78-86 | Remove switch case |
 
-**New behavior:**
-- White background (for adaptive icon mask)
-- Favicon scaled to fill most of the icon space
+### 4. Hooks
 
-```java
-private Icon createFaviconIcon(String faviconUrl) {
-    // ... fetch favicon ...
-    
-    // White background instead of blue
-    Paint bgPaint = new Paint();
-    bgPaint.setColor(Color.WHITE);
-    bgPaint.setStyle(Paint.Style.FILL);
-    canvas.drawRect(0, 0, adaptiveSize, adaptiveSize, bgPaint);
-    
-    // Scale favicon to ~70% of canvas (larger than 45%)
-    float iconSize = adaptiveSize * 0.7f;
-    // ... scale and center logic
-    
-    return Icon.createWithAdaptiveBitmap(bitmap);
-}
-```
+**File: `src/hooks/useShortcuts.ts`**
 
-### 2. React In-App: Already Correct
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Remove `slackDetails` parameter | Line 225 | Remove from `createMessageShortcut` |
+| Remove `slackTeamId`/`slackUserId` assignments | Lines 238-239 | Remove fields |
+| Remove from `updateShortcut` updates type | Line 313 | Remove Slack fields |
+| Remove from update call | Lines 345-346 | Remove Slack data passing |
 
-The in-app rendering in `MyShortcutsContent.tsx` and `IconPicker.tsx` already uses `noBg` mode which renders icons without backgrounds. This matches the new native behavior.
+### 5. Access Flow Component
 
-**Current in-app code (correct):**
-```tsx
-// MyShortcutsContent.tsx - platform icon
-<PlatformIcon platform={platform} size="lg" noBg />
+**File: `src/components/AccessFlow.tsx`**
 
-// MyShortcutsContent.tsx - favicon
-<img src={icon.value} className="h-full w-full object-contain" />
-```
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Remove `slackTeamId`/`slackUserId` from handler params | Lines 276-277 | Remove fields |
+| Remove Slack details passing | Lines 302-304 | Remove conditional |
 
-### 3. React: Add Neutral Background Container
+### 6. Plugin Interfaces
 
-For visual consistency, the in-app containers should have a subtle neutral background (white/light gray) to match the adaptive icon appearance:
+**File: `src/plugins/ShortcutPlugin.ts`**
 
-**Update MyShortcutsContent.tsx:**
-```tsx
-// Platform icons
-if (icon.type === 'platform') {
-  const platform = detectPlatform(`https://${icon.value}.com`);
-  if (platform) {
-    return (
-      <div className="h-12 w-12 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm">
-        <PlatformIcon platform={platform} size="lg" noBg />
-      </div>
-    );
-  }
-}
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Update `messageApp` comment | Line 273 | Change to just `'whatsapp'` |
+| Remove `slackTeamId` property | Line 279 | Remove |
+| Remove `slackUserId` property | Line 280 | Remove |
 
-// Favicons
-if (icon.type === 'favicon') {
-  return (
-    <div className="h-12 w-12 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm">
-      <img src={icon.value} className="h-[70%] w-[70%] object-contain" />
-    </div>
-  );
-}
-```
+**File: `src/plugins/shortcutPluginWeb.ts`**
 
-**Update IconPicker.tsx preview similarly.**
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Remove `messageApp` optional param | Line 469 | Remove (or keep for WhatsApp only) |
+| Clean up unused properties | ~Lines 465-475 | Simplify interface |
 
-## Files to Modify
+### 7. Native Android Code
 
-| File | Changes |
-|------|---------|
-| `native/android/.../ShortcutPlugin.java` | `createPlatformIcon()`: White bg, brand-colored icon at 70% size |
-| `native/android/.../ShortcutPlugin.java` | `createFaviconIcon()`: White bg, favicon at 70% size |
-| `src/components/MyShortcutsContent.tsx` | Add white/neutral container background, match sizing |
-| `src/components/IconPicker.tsx` | Same container styling for preview consistency |
+**File: `native/android/app/src/main/java/app/onetap/shortcuts/plugins/ShortcutPlugin.java`**
 
-## Visual Result
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Update comment | Line 346 | Remove Telegram/Signal/Slack mentions |
+| Remove Telegram icon path | Lines 1714-1716+ | Remove from `getPlatformPath()` |
+| Remove Telegram color | Line 1960 | Remove from `getPlatformColor()` |
+| Remove Slack color | Line 1967 | Remove from `getPlatformColor()` |
+| Remove Telegram fallback | Line 1999 | Remove from `getPlatformFallback()` |
+| Remove Slack fallback | Line 2006 | Remove from `getPlatformFallback()` |
+| Remove `slackTeamId`/`slackUserId` handling | Lines 3706-3708 | Remove variables |
+| Remove from `buildIntentForUpdate` signature | Lines 3821-3822 | Remove params |
+| Remove Telegram/Signal/Slack cases | Lines 3892-3906 | Remove switch cases |
 
-| Location | Platform Icons | Favicons |
-|----------|---------------|----------|
-| Android Home Screen | Branded logo (YouTube red play icon) on white adaptive mask | Favicon on white adaptive mask |
-| IconPicker Preview | Branded logo on white/neutral container | Favicon on white/neutral container |
-| My Shortcuts List | Branded logo on white/neutral container | Favicon on white/neutral container |
+**File: `native/android/app/src/main/java/app/onetap/shortcuts/MessageProxyActivity.java`**
 
-## Important Notes
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Update JavaDoc | Lines 10-13 | Remove Telegram/Signal/Slack mentions |
 
-1. **Adaptive Icons**: Android's adaptive icon system will still apply the launcher's mask shape (circle, squircle, etc.) to the white background
-2. **Brand Recognition**: Icons like YouTube will show the full red+white logo instead of just a white play button
-3. **Favicon Quality**: Some favicons may appear small - the 70% scaling ensures they're visible but not stretched
+### 8. Action Sheet Labels
 
+**File: `src/components/ShortcutActionSheet.tsx`**
+
+| Change | Lines | Description |
+|--------|-------|-------------|
+| Remove generic "Message" label fallback | Lines 112 | Since only WhatsApp is supported |
+
+### 9. Translation Keys (optional cleanup)
+
+**File: `src/i18n/locales/en.json`**
+
+| Change | Description |
+|--------|-------------|
+| `typeMessage` key | Could remove if no longer needed (only WhatsApp remains) |
+
+## Files Summary
+
+| File | Action |
+|------|--------|
+| `src/types/shortcut.ts` | Simplify `MessageApp` type, remove Slack fields |
+| `src/lib/platformIcons.ts` | Remove Telegram/Slack from platform detection |
+| `src/lib/shortcutManager.ts` | Remove Telegram/Signal/Slack cases |
+| `src/hooks/useShortcuts.ts` | Remove Slack-related parameters and fields |
+| `src/components/AccessFlow.tsx` | Remove Slack handling |
+| `src/plugins/ShortcutPlugin.ts` | Remove Slack properties |
+| `src/plugins/shortcutPluginWeb.ts` | Simplify interface |
+| `native/.../ShortcutPlugin.java` | Remove messaging platform code |
+| `native/.../MessageProxyActivity.java` | Update documentation |
+| `src/components/ShortcutActionSheet.tsx` | Simplify type label logic |
+
+## What Stays
+
+- **WhatsApp shortcuts**: Full support with quick messages
+- **Contact dial shortcuts**: Direct call functionality  
+- **Platform icons for Telegram/Slack URLs**: Keep these in `platformIcons.ts` since users may still bookmark Telegram/Slack **websites** - this is different from messaging integration
+- **MessageProxyActivity**: Still needed for WhatsApp 0-1 message shortcuts
+
+## Impact
+
+- **Reduced code complexity**: ~100 lines removed
+- **Cleaner type definitions**: No unused optional fields
+- **Focused product**: Clear WhatsApp specialization
+- **No user-facing changes**: These features were never exposed in the UI
+
+## Notes
+
+The platform icon detection for Telegram and Slack **websites** (telegram.org, slack.com) will be preserved in `platformIcons.ts` since users may still create URL shortcuts to these sites. The removal only affects the **messaging integration** code paths.
