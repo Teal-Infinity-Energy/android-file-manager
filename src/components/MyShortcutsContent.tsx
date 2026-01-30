@@ -97,7 +97,7 @@ function ShortcutIcon({ shortcut }: { shortcut: ShortcutData }) {
     const platform = detectPlatform(`https://${icon.value}.com`);
     if (platform) {
       return (
-        <div className="h-12 w-12 rounded-xl flex items-center justify-center overflow-hidden">
+        <div className="h-12 w-12 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm">
           <PlatformIcon platform={platform} size="lg" noBg />
         </div>
       );
@@ -108,11 +108,11 @@ function ShortcutIcon({ shortcut }: { shortcut: ShortcutData }) {
   
   if (icon.type === 'favicon') {
     return (
-      <div className="h-12 w-12 rounded-xl flex items-center justify-center overflow-hidden">
+      <div className="h-12 w-12 rounded-xl bg-white dark:bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm">
         <img 
           src={icon.value} 
           alt="" 
-          className="h-full w-full object-contain"
+          className="h-[70%] w-[70%] object-contain"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
