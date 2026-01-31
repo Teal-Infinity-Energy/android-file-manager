@@ -108,16 +108,6 @@ export function ScheduledActionItem({
         }
         return <Link className="h-5 w-5" />;
       case 'contact':
-        // Show WhatsApp icon for WhatsApp reminders
-        if (action.destination.isWhatsApp) {
-          return (
-            <PlatformIcon 
-              platform={{ name: 'WhatsApp', bgColor: 'bg-green-500', textColor: 'text-white', icon: 'whatsapp' }}
-              size="md"
-              className="h-full w-full"
-            />
-          );
-        }
         // Contact avatar handles its own background
         return (
           <ContactAvatar
@@ -130,9 +120,8 @@ export function ScheduledActionItem({
     }
   };
   
-  // Check if contact destination has photo or name (for initials) - but NOT if it's WhatsApp
+  // Check if contact destination has photo or name (for initials)
   const isContactWithAvatar = action.destination.type === 'contact' && 
-    !action.destination.isWhatsApp &&
     (action.destination.photoUri || action.destination.contactName);
 
   const getRecurrenceIcon = (recurrence: RecurrenceType) => {
