@@ -1,164 +1,196 @@
 
-# Landscape-Optimized Form Layouts
+# Landscape Optimization for Remaining Components
 
 ## Overview
-Implement landscape-specific layout optimizations for `UrlInput`, `ShortcutCustomizer`, and `ContactShortcutCustomizer` to maximize usable screen space when the device is rotated. The changes will leverage the existing `useOrientation` hook and Tailwind's `landscape:` variant.
+Complete the landscape optimization across all remaining form components, sheets, dialogs, and overlays to ensure consistent horizontal space utilization and reduced vertical footprint throughout the app.
 
 ---
 
-## Components to Update
+## Components to Optimize
 
-### 1. UrlInput.tsx
-**Current Issues:**
-- Full vertical stacking wastes horizontal space
-- Header takes disproportionate height
-- Bottom button padding is excessive
-- "Save to Library" section expands vertically
+### Category 1: Form Components & Dialogs
 
+#### 1. AddBookmarkForm.tsx
+**Current state:** Vertical stack of URL, title, description, tag selector, and save button
 **Changes:**
-- Reduce header padding in landscape (`landscape:pt-2 landscape:pb-2`)
-- Reduce content padding (`landscape:p-3`)
-- Reduce bottom button height (`landscape:h-10`)
-- Two-column layout for "Save to Library" expanded options in landscape
+- Reduce padding in landscape (`landscape:p-3`)
+- Two-column layout for title + description in landscape
+- Compact tag selector with smaller buttons (`landscape:py-0.5 landscape:px-2 landscape:text-[10px]`)
+- Smaller save button (`landscape:h-9`)
 
-### 2. ShortcutCustomizer.tsx  
-**Current Issues:**
-- Vertical stacking of all sections
-- Large spacing between elements (`space-y-8`)
-- Preview section takes significant vertical space
-- Large button padding at bottom
-
+#### 2. CreateFolderDialog.tsx
+**Current state:** Single column with name input and icon picker
 **Changes:**
-- Reduce section spacing in landscape (`landscape:space-y-4`)
-- Two-column grid layout in landscape: left column for name/icon picker, right column for preview
-- Compact header padding (`landscape:pt-2`)
-- Smaller bottom button (`landscape:h-10`)
-- Reduce preview icon size in landscape
+- Add `landscape:max-h-[90vh]` to DialogContent
+- Two-column grid: name input (left) + icon picker (right) in landscape
+- Reduce footer button sizes (`landscape:h-9`)
 
-### 3. ContactShortcutCustomizer.tsx
-**Current Issues:**
-- All form fields stacked vertically
-- Large gaps between sections (`gap-6`)
-- Contact info display takes full width
-- Icon picker and quick messages stacked below
-
+#### 3. EditFolderDialog.tsx
+**Current state:** Same as CreateFolderDialog
 **Changes:**
-- Reduce section gaps in landscape (`landscape:gap-3`)
-- Two-column layout: left for phone/name inputs, right for icon picker
-- Compact header padding
-- Smaller confirm button in landscape
+- Mirror CreateFolderDialog optimizations
+- Two-column layout in landscape
+
+#### 4. FolderIconPicker.tsx
+**Current state:** 6-column grid of icons
+**Changes:**
+- Expand to 9 columns in landscape (`landscape:grid-cols-9`)
+- Smaller icon buttons (`landscape:p-2`)
+- Compact icon size (`landscape:h-4 landscape:w-4`)
+
+#### 5. BulkMoveDialog.tsx
+**Current state:** Single column folder list
+**Changes:**
+- Two-column folder list in landscape (`landscape:grid-cols-2`)
+- Reduce scroll area height (`landscape:h-[200px]`)
+- Smaller buttons
 
 ---
 
-## Implementation Details
+### Category 2: Bottom Sheets
 
-### UrlInput.tsx Changes
-```tsx
-// Header - reduced padding in landscape
-<header className="flex items-center gap-3 p-4 pt-header-safe-compact landscape:p-3 landscape:pt-2 border-b">
+#### 6. BookmarkActionSheet.tsx
+**Current state:** Full-width edit form with vertical stacking
+**Changes:**
+- Reduce header padding (`landscape:pb-2`)
+- Two-column form layout in edit mode: URL + title (left), description + tags (right)
+- Smaller action buttons (`landscape:h-10`)
+- Compact tag pills (`landscape:px-2 landscape:py-0.5`)
 
-// Content area - reduced padding
-<div className="flex-1 p-4 landscape:p-3 overflow-y-auto">
+#### 7. MessageChooserSheet.tsx
+**Current state:** Vertical list of message options
+**Changes:**
+- Two-column message grid in landscape (`landscape:grid-cols-2`)
+- Smaller message button icons (`landscape:h-8 landscape:w-8`)
+- Reduced padding (`landscape:p-3`)
+- Compact cancel button (`landscape:h-9`)
 
-// Save to Library options - two column in landscape
-<div className="p-4 rounded-xl bg-muted/20 space-y-3 animate-fade-in 
-               landscape:grid landscape:grid-cols-2 landscape:gap-4 landscape:space-y-0">
+#### 8. ShortcutActionSheet.tsx
+**Current state:** Already has `landscape:max-h-[95vh]` - minimal changes needed
+**Changes:**
+- Reduce button heights (`landscape:h-10`)
+- Compact icon preview (`landscape:w-10 landscape:h-10`)
+- Smaller separator margins
 
-// Button container and button - compact in landscape
-<div className="p-4 landscape:p-3 safe-bottom">
-  <Button className="w-full h-12 landscape:h-10 text-base font-medium">
-```
+#### 9. ScheduledActionActionSheet.tsx
+**Current state:** Vertical action list
+**Changes:**
+- Reduce header padding (`landscape:px-4 landscape:pb-3`)
+- Smaller action header icon (`landscape:w-10 landscape:h-10`)
+- Compact button heights (`landscape:h-10`)
+- Reduced section padding
 
-### ShortcutCustomizer.tsx Changes
-```tsx
-// Header - compact in landscape
-<header className="flex items-center gap-3 p-4 pt-header-safe-compact landscape:p-3 landscape:pt-2 border-b">
+#### 10. TrashSheet.tsx
+**Current state:** Full-height sheet with scrollable list
+**Changes:**
+- Reduce sheet height in landscape (`landscape:h-[75vh]`)
+- Two-column action buttons in header (`landscape:flex-row`)
+- Compact header icon (`landscape:h-8 landscape:w-8`)
+- Smaller empty state illustration
 
-// Content wrapper - two column grid in landscape
-<div className="flex-1 p-4 landscape:p-3 overflow-auto animate-fade-in">
-  <div className="space-y-8 landscape:space-y-4 landscape:grid landscape:grid-cols-2 landscape:gap-6">
-    
-    {/* Left column in landscape: Content preview, name input, icon picker */}
-    <div className="space-y-4 landscape:space-y-3">
-      <ContentPreview source={source} />
-      {/* Name input */}
-      {/* Icon picker */}
-    </div>
-    
-    {/* Right column in landscape: Preview, PDF toggle */}
-    <div className="space-y-4 landscape:space-y-3">
-      {/* Preview section */}
-      {/* PDF resume toggle if applicable */}
-    </div>
-  </div>
-</div>
-
-// Preview icon - smaller in landscape
-<div className="h-14 w-14 landscape:h-12 landscape:w-12 rounded-2xl ...">
-
-// Bottom button - compact
-<Button className="w-full h-12 landscape:h-10 text-base font-medium">
-```
-
-### ContactShortcutCustomizer.tsx Changes
-```tsx
-// Header - compact in landscape
-<header className="px-5 pt-header-safe-compact pb-4 landscape:px-4 landscape:pt-2 landscape:pb-2 flex items-center gap-4">
-
-// Content area - two column layout in landscape
-<div className="flex-1 px-5 pb-6 landscape:px-4 landscape:pb-4 flex flex-col gap-6 landscape:gap-3 overflow-y-auto">
-  <div className="landscape:grid landscape:grid-cols-2 landscape:gap-6">
-    
-    {/* Left column: Contact info, phone input, name input */}
-    <div className="space-y-4 landscape:space-y-3">
-      {/* Contact info display */}
-      {/* Phone number input */}
-      {/* Shortcut name */}
-    </div>
-    
-    {/* Right column: Icon picker */}
-    <div>
-      <IconPicker ... />
-    </div>
-  </div>
-  
-  {/* Quick messages - full width below grid in WhatsApp mode */}
-  {mode === 'message' && <QuickMessagesEditor ... />}
-</div>
-
-// Confirm button - compact
-<Button className="w-full h-14 landscape:h-10 text-lg landscape:text-base font-semibold">
-```
+#### 11. SavedLinksSheet.tsx
+**Current state:** Large form area with vertical stacking
+**Changes:**
+- Reduce form padding (`landscape:p-3`)
+- Two-column layout for add/edit form in landscape
+- Compact link list items (`landscape:p-2`)
+- Smaller search input height (`landscape:h-9`)
 
 ---
 
-## Technical Notes
+### Category 3: Floating UI Components
 
-### Tailwind Landscape Variant
-The `landscape:` variant is built into Tailwind and applies styles when `@media (orientation: landscape)` is true. No configuration changes needed.
+#### 12. SharedUrlActionSheet.tsx
+**Current state:** Modal overlay with vertical form
+**Changes:**
+- Wider card in landscape (`landscape:max-w-lg`)
+- Two-column action grid already exists - reduce button padding (`landscape:py-2`)
+- Compact video thumbnail in landscape (`landscape:aspect-[2/1]`)
+- Smaller form inputs in edit mode (`landscape:h-9`)
+- Reduced spacing throughout (`landscape:space-y-3`)
 
-### Grid Layout Strategy
-- Use `landscape:grid landscape:grid-cols-2` to create side-by-side columns
-- Pair with `landscape:space-y-0` to remove vertical spacing that conflicts with grid
-- Use `landscape:gap-x` for horizontal gaps between columns
+#### 13. ClipboardSuggestion.tsx
+**Current state:** Floating card with 2x2 action grid
+**Changes:**
+- Wider card in landscape (`landscape:max-w-lg`)
+- Compact URL preview section (`landscape:p-2`)
+- Smaller action buttons (`landscape:py-2`)
+- Reduced form spacing in edit mode (`landscape:space-y-3`)
+- Compact folder picker chips
 
-### Maintaining Portrait Behavior
-All changes are additive using the `landscape:` prefix, ensuring portrait mode remains unchanged.
+---
+
+### Category 4: Content Display
+
+#### 14. ContentPreview.tsx
+**Current state:** Horizontal layout with icon + text
+**Changes:**
+- Reduce padding (`landscape:p-2`)
+- Smaller icon container (`landscape:h-10 landscape:w-10`)
+- Compact text sizes (`landscape:text-xs` for sublabel)
+
+---
+
+### Category 5: Page Components
+
+#### 15. OnboardingFlow.tsx
+**Already has landscape optimization** - verify and enhance:
+- Already uses `landscape:flex-row` for layout
+- Already reduces icon sizes and padding
+- No changes needed
+
+#### 16. ContentSourcePicker.tsx
+**Current state:** Already has some landscape optimization (6-column grid)
+**Changes:**
+- Compact action mode picker buttons (`landscape:p-2`)
+- Smaller contact mode toggle (`landscape:py-2`)
+- Reduce section padding (`landscape:p-3`)
+
+---
+
+## Implementation Pattern
+
+All changes follow the established pattern:
+```tsx
+// Reduce spacing
+className="space-y-6 landscape:space-y-3"
+
+// Two-column layouts
+className="landscape:grid landscape:grid-cols-2 landscape:gap-4"
+
+// Compact elements
+className="h-12 landscape:h-10"
+className="p-4 landscape:p-3"
+className="text-sm landscape:text-xs"
+```
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/UrlInput.tsx` | Compact padding, two-column save options, smaller button |
-| `src/components/ShortcutCustomizer.tsx` | Two-column layout, reduced spacing, compact preview |
-| `src/components/ContactShortcutCustomizer.tsx` | Two-column layout, reduced gaps, compact button |
+| Priority | File | Complexity |
+|----------|------|------------|
+| High | `src/components/AddBookmarkForm.tsx` | Low |
+| High | `src/components/BookmarkActionSheet.tsx` | Medium |
+| High | `src/components/SharedUrlActionSheet.tsx` | Medium |
+| High | `src/components/ClipboardSuggestion.tsx` | Medium |
+| Medium | `src/components/CreateFolderDialog.tsx` | Low |
+| Medium | `src/components/EditFolderDialog.tsx` | Low |
+| Medium | `src/components/FolderIconPicker.tsx` | Low |
+| Medium | `src/components/MessageChooserSheet.tsx` | Low |
+| Medium | `src/components/TrashSheet.tsx` | Medium |
+| Medium | `src/components/SavedLinksSheet.tsx` | Medium |
+| Low | `src/components/ShortcutActionSheet.tsx` | Low |
+| Low | `src/components/ScheduledActionActionSheet.tsx` | Low |
+| Low | `src/components/BulkMoveDialog.tsx` | Low |
+| Low | `src/components/ContentPreview.tsx` | Low |
+| Low | `src/components/ContentSourcePicker.tsx` | Low |
 
 ---
 
 ## Expected Outcomes
-- **40-50% more visible content** in landscape during form entry
-- **Reduced virtual keyboard overlap** issues
-- **Better use of horizontal space** for side-by-side form fields
-- **Faster form completion** with all inputs visible simultaneously
+- Consistent landscape experience across all interactive components
+- Reduced virtual keyboard overlap in form-based components
+- Better utilization of horizontal space in sheets and dialogs
+- Faster form completion with more fields visible simultaneously
+- No changes to portrait mode behavior (all optimizations use `landscape:` prefix)
