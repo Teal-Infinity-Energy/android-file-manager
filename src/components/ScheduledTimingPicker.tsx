@@ -50,7 +50,7 @@ function QuickPreset({ icon, label, sublabel, onClick, selected }: QuickPresetPr
         onClick();
       }}
       className={cn(
-        "flex flex-col items-start gap-1.5 rounded-2xl p-4 text-left transition-all",
+        "flex flex-col items-start gap-1.5 landscape:gap-1 rounded-2xl p-4 landscape:p-3 text-left transition-all",
         "bg-gradient-to-br from-muted/60 to-muted/30 border border-border/50",
         "hover:from-primary/15 hover:to-primary/5 hover:border-primary/30",
         "active:scale-[0.98]",
@@ -58,14 +58,14 @@ function QuickPreset({ icon, label, sublabel, onClick, selected }: QuickPresetPr
       )}
     >
       <div className={cn(
-        "p-2 rounded-xl",
+        "p-2 landscape:p-1.5 rounded-xl",
         selected ? "bg-primary text-primary-foreground" : "bg-background/80 text-muted-foreground"
       )}>
         {icon}
       </div>
       <div>
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        <p className="text-xs text-muted-foreground">{sublabel}</p>
+        <p className="text-sm landscape:text-xs font-semibold text-foreground">{label}</p>
+        <p className="text-xs landscape:text-[10px] text-muted-foreground">{sublabel}</p>
       </div>
     </motion.button>
   );
@@ -236,7 +236,7 @@ function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCa
       <div className="absolute inset-0 bg-gradient-to-t from-muted/30 to-transparent" />
       
       {/* Content */}
-      <div className="relative p-5 space-y-5">
+      <div className="relative p-5 landscape:p-3 space-y-5 landscape:space-y-3">
         {/* Month header with navigation */}
         <div className="flex items-center justify-between">
           <motion.button
@@ -323,7 +323,7 @@ function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCa
                     }}
                     disabled={isPast}
                     className={cn(
-                      "flex flex-col items-center justify-center gap-1.5 rounded-2xl py-3.5 transition-all relative aspect-square",
+                      "flex flex-col items-center justify-center gap-1.5 landscape:gap-1 rounded-2xl py-3.5 landscape:py-2.5 transition-all relative aspect-square",
                       "backdrop-blur-sm",
                       isPast && "opacity-30 pointer-events-none",
                       isSelected
@@ -346,7 +346,7 @@ function WeekCalendar({ selectedDate, onDateSelect, onOpenFullCalendar }: WeekCa
                     </span>
                     {/* Date number */}
                     <span className={cn(
-                      "text-xl font-bold tabular-nums leading-none",
+                      "text-xl landscape:text-lg font-bold tabular-nums leading-none",
                       isSelected 
                         ? "text-primary-foreground" 
                         : isToday
@@ -460,7 +460,7 @@ function RecurrenceControl({ value, onChange }: RecurrenceControlProps) {
             onChange(type);
           }}
           className={cn(
-            "flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all",
+            "flex-1 py-2 landscape:py-1.5 px-3 landscape:px-2 rounded-xl text-sm landscape:text-xs font-medium transition-all",
             value === type
               ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -655,7 +655,7 @@ export function ScheduledTimingPicker({
   return (
     <div className="flex flex-col h-full animate-fade-in bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 border-b border-border/50">
+      <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 landscape:px-4 landscape:pt-2 landscape:pb-2 border-b border-border/50">
         <button
           onClick={onBack}
           className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-all"
@@ -668,7 +668,7 @@ export function ScheduledTimingPicker({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-5 py-6 space-y-6">
+        <div className="px-5 py-6 landscape:px-4 landscape:py-4 space-y-6 landscape:space-y-4">
           {/* Quick presets - collapse when custom is open */}
           <AnimatePresence mode="wait">
             {!showCustom && (
@@ -678,13 +678,13 @@ export function ScheduledTimingPicker({
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3 landscape:mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {t('scheduledTiming.quickOptions')}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 landscape:grid-cols-4 gap-3 landscape:gap-2">
                   {quickPresets.map((preset) => (
                     <QuickPreset
                       key={preset.id}
@@ -698,7 +698,7 @@ export function ScheduledTimingPicker({
                 </div>
 
                 {/* Divider */}
-                <div className="flex items-center gap-3 mt-6">
+                <div className="flex items-center gap-3 mt-6 landscape:mt-4">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-xs text-muted-foreground">{t('scheduledTiming.orCustom')}</span>
                   <div className="flex-1 h-px bg-border" />
@@ -711,12 +711,12 @@ export function ScheduledTimingPicker({
           <Collapsible open={showCustom} onOpenChange={handleCustomToggle}>
             <CollapsibleTrigger asChild>
               <button className={cn(
-                "w-full flex items-center justify-between p-4 rounded-2xl transition-all",
+                "w-full flex items-center justify-between p-4 landscape:p-3 rounded-2xl transition-all",
                 "bg-muted/30 hover:bg-muted/50 border border-border/50",
                 showCustom && "bg-muted/50 border-primary/30"
               )}>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-background">
+                <div className="flex items-center gap-3 landscape:gap-2">
+                  <div className="p-2 landscape:p-1.5 rounded-xl bg-background">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <span className="font-medium">{t('scheduledTiming.customTime')}</span>
@@ -732,87 +732,92 @@ export function ScheduledTimingPicker({
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="pt-4 space-y-6"
+                className="pt-4 landscape:pt-3"
               >
-                {/* Recurrence selector */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Repeat className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t('scheduledTiming.repeat')}
-                    </span>
-                  </div>
-                  <RecurrenceControl value={recurrence} onChange={setRecurrence} />
-                </div>
-
-                {/* Date picker (for once/weekly/yearly) */}
-                <AnimatePresence mode="wait">
-                  {recurrence !== 'daily' && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                    >
-                      <div className="flex items-center gap-2 mb-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                {/* Landscape: two-column layout for recurrence/date and time picker */}
+                <div className="space-y-6 landscape:space-y-0 landscape:grid landscape:grid-cols-2 landscape:gap-4">
+                  {/* Left column: Recurrence and Date picker */}
+                  <div className="space-y-6 landscape:space-y-4">
+                    {/* Recurrence selector */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 landscape:mb-2">
+                        <Repeat className="h-4 w-4 text-muted-foreground" />
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          {recurrence === 'once' 
-                            ? t('scheduledTiming.date') 
-                            : recurrence === 'weekly' 
-                              ? t('scheduledTiming.starting') 
-                              : t('scheduledTiming.thisYearOn')}
+                          {t('scheduledTiming.repeat')}
                         </span>
                       </div>
-                      <WeekCalendar 
-                        selectedDate={selectedDate} 
-                        onDateSelect={setSelectedDate}
-                        onOpenFullCalendar={() => setShowFullCalendar(true)}
+                      <RecurrenceControl value={recurrence} onChange={setRecurrence} />
+                    </div>
+
+                    {/* Date picker (for once/weekly/yearly) */}
+                    <AnimatePresence mode="wait">
+                      {recurrence !== 'daily' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                        >
+                          <div className="flex items-center gap-2 mb-3 landscape:mb-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              {recurrence === 'once' 
+                                ? t('scheduledTiming.date') 
+                                : recurrence === 'weekly' 
+                                  ? t('scheduledTiming.starting') 
+                                  : t('scheduledTiming.thisYearOn')}
+                            </span>
+                          </div>
+                          <WeekCalendar 
+                            selectedDate={selectedDate} 
+                            onDateSelect={setSelectedDate}
+                            onOpenFullCalendar={() => setShowFullCalendar(true)}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Right column: Time picker */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3 landscape:mb-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t('scheduledTiming.time')}
+                      </span>
+                    </div>
+                    <motion.div 
+                      className="bg-muted/30 rounded-2xl p-4 landscape:p-3 border border-border/50"
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                    >
+                      <TimeWheelPicker
+                        hour={hour}
+                        minute={minute}
+                        period={period}
+                        onHourChange={setHour}
+                        onMinuteChange={setMinute}
+                        onPeriodChange={setPeriod}
                       />
                     </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Time picker */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t('scheduledTiming.time')}
-                    </span>
                   </div>
-                  <motion.div 
-                    className="bg-muted/30 rounded-2xl p-4 border border-border/50"
-                    initial={{ scale: 0.95, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    <TimeWheelPicker
-                      hour={hour}
-                      minute={minute}
-                      period={period}
-                      onHourChange={setHour}
-                      onMinuteChange={setMinute}
-                      onPeriodChange={setPeriod}
-                    />
-                  </motion.div>
                 </div>
               </motion.div>
             </CollapsibleContent>
           </Collapsible>
         </div>
       </div>
-
       {/* Footer with preview and confirm */}
-      <div className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom)+4rem)] pt-3 border-t border-border/50 bg-background">
+      <div className="px-5 landscape:px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom)+4rem)] landscape:pb-[calc(0.75rem+env(safe-area-inset-bottom)+3rem)] pt-3 landscape:pt-2 border-t border-border/50 bg-background">
         {/* Live preview */}
         <motion.div 
           key={triggerTime}
           initial={{ opacity: 0.5, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4 mb-4"
+          className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4 landscape:p-3 mb-4 landscape:mb-3"
         >
           <p className="text-xs text-muted-foreground mb-1">{t('scheduledTiming.scheduledFor')}</p>
-          <p className="text-lg font-semibold text-foreground">
+          <p className="text-lg landscape:text-base font-semibold text-foreground">
             {new Date(triggerTime).toLocaleString(undefined, {
               weekday: 'short',
               month: 'short',
@@ -832,7 +837,7 @@ export function ScheduledTimingPicker({
 
         <Button 
           onClick={handleConfirm}
-          className="w-full h-12 rounded-2xl text-base font-semibold"
+          className="w-full h-12 landscape:h-10 rounded-2xl text-base font-semibold"
         >
           {t('common.continue')}
         </Button>
