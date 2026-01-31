@@ -365,9 +365,9 @@ export function ScheduledActionEditor({
     if (urlSubStep === 'input') {
       return (
         <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0">
+          <SheetContent side="bottom" className="h-[85vh] landscape:h-[95vh] rounded-t-3xl px-0 pb-0">
             <div className="flex flex-col h-full animate-fade-in">
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-3 px-5 py-4 landscape:px-4 landscape:py-2 border-b border-border">
                 <button
                   onClick={() => setUrlSubStep(null)}
                   className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -377,7 +377,7 @@ export function ScheduledActionEditor({
                 <h2 className="text-lg font-semibold">{t('scheduledEditor.enterUrl')}</h2>
               </div>
 
-              <div className="flex-1 px-5 py-6 space-y-4">
+              <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4 space-y-4 landscape:space-y-3">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Globe className="absolute start-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -388,7 +388,7 @@ export function ScheduledActionEditor({
                         setUrlError('');
                       }}
                       placeholder="example.com"
-                      className="h-12 ps-10 rounded-xl text-base"
+                      className="h-12 landscape:h-10 ps-10 rounded-xl text-base"
                       autoFocus
                       onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                     />
@@ -397,7 +397,7 @@ export function ScheduledActionEditor({
                     variant="outline"
                     size="icon"
                     onClick={handlePasteUrl}
-                    className="h-12 w-12 rounded-xl shrink-0"
+                    className="h-12 w-12 landscape:h-10 landscape:w-10 rounded-xl shrink-0"
                   >
                     <Clipboard className="h-5 w-5" />
                   </Button>
@@ -408,11 +408,11 @@ export function ScheduledActionEditor({
                 )}
               </div>
 
-              <div className="p-5 border-t border-border">
+              <div className="p-5 landscape:p-3 border-t border-border">
                 <Button
                   onClick={handleUrlSubmit}
                   disabled={!urlInput.trim()}
-                  className="w-full h-12 rounded-2xl text-base"
+                  className="w-full h-12 landscape:h-10 rounded-2xl text-base"
                 >
                   {t('scheduledEditor.useThisUrl')}
                 </Button>
@@ -427,9 +427,9 @@ export function ScheduledActionEditor({
     if (urlSubStep === 'choose') {
       return (
         <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0">
+          <SheetContent side="bottom" className="h-[85vh] landscape:h-[95vh] rounded-t-3xl px-0 pb-0">
             <div className="flex flex-col h-full animate-fade-in">
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-3 px-5 py-4 landscape:px-4 landscape:py-2 border-b border-border">
                 <button
                   onClick={() => setUrlSubStep(null)}
                   className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -439,8 +439,8 @@ export function ScheduledActionEditor({
                 <h2 className="text-lg font-semibold">{t('scheduledEditor.changeLink')}</h2>
               </div>
 
-              <div className="flex-1 px-5 py-6">
-                <div className="space-y-3">
+              <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4">
+                <div className="space-y-3 landscape:grid landscape:grid-cols-2 landscape:gap-3 landscape:space-y-0">
                   <DestinationOption
                     icon={<Globe className="h-5 w-5" />}
                     label={t('scheduledEditor.enterUrl')}
@@ -470,9 +470,9 @@ export function ScheduledActionEditor({
     // Main destination selection
     return (
       <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0">
+        <SheetContent side="bottom" className="h-[85vh] landscape:h-[95vh] rounded-t-3xl px-0 pb-0">
             <div className="flex flex-col h-full animate-fade-in">
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-3 px-5 py-4 landscape:px-4 landscape:py-2 border-b border-border">
                 <button
                   onClick={() => setStep('main')}
                   className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -482,12 +482,12 @@ export function ScheduledActionEditor({
                   <h2 className="text-lg font-semibold">{t('scheduledEditor.changeDestination')}</h2>
                 </div>
 
-              <div className="flex-1 px-5 py-6">
-                <p className="text-sm text-muted-foreground mb-6">
+              <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4">
+                <p className="text-sm text-muted-foreground mb-6 landscape:mb-4">
                   {t('scheduledEditor.selectDestDesc')}
               </p>
 
-                <div className="space-y-3">
+                <div className="space-y-3 landscape:grid landscape:grid-cols-3 landscape:gap-3 landscape:space-y-0">
                   <DestinationOption
                     icon={<FileText className="h-5 w-5" />}
                     label={t('scheduledEditor.localFile')}
@@ -518,7 +518,7 @@ export function ScheduledActionEditor({
   if (step === 'timing') {
     return (
       <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0">
+        <SheetContent side="bottom" className="h-[85vh] landscape:h-[95vh] rounded-t-3xl px-0 pb-0">
           <ScheduledTimingPicker
             onConfirm={handleTimingConfirm}
             onBack={() => setStep('main')}
@@ -534,113 +534,121 @@ export function ScheduledActionEditor({
   // Main editor view
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0">
+      <SheetContent side="bottom" className="h-[85vh] landscape:h-[95vh] rounded-t-3xl px-0 pb-0">
         {/* Grab handle */}
-        <div className="flex justify-center pt-2 pb-4">
+        <div className="flex justify-center pt-2 pb-4 landscape:pb-2">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 
         <div className="flex flex-col h-full">
-          <div className="flex items-center gap-3 px-5 pb-4 border-b border-border">
+          <div className="flex items-center gap-3 px-5 pb-4 landscape:px-4 landscape:pb-2 border-b border-border">
             <h2 className="text-lg font-semibold">{t('scheduledEditor.editAction')}</h2>
           </div>
 
-          <div className="flex-1 px-5 py-6 space-y-6 overflow-y-auto">
-            {/* Name input */}
-            <div>
-              <Label htmlFor="edit-action-name" className="text-sm font-medium mb-2 block">
-                {t('scheduledEditor.name')}
-              </Label>
-              <Input
-                id="edit-action-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t('scheduledEditor.actionName')}
-                className="h-12 rounded-xl text-base"
-              />
-            </div>
-
-            {/* Description input */}
-            <div>
-              <Label htmlFor="edit-action-description" className="text-sm font-medium mb-2 block">
-                {t('scheduledActions.descriptionLabel')}
-              </Label>
-              <Textarea
-                id="edit-action-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={t('scheduledActions.descriptionPlaceholder')}
-                className="rounded-xl text-base resize-none"
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                {t('scheduledActions.descriptionHint')}
-              </p>
-            </div>
-
-            {/* Destination */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                {t('scheduledEditor.destination')}
-              </Label>
-              <button
-                onClick={() => setStep('destination')}
-                className={cn(
-                  "w-full flex items-center gap-3 rounded-xl bg-card border border-border p-4",
-                  "active:scale-[0.98] transition-all",
-                  "focus:outline-none focus:ring-2 focus:ring-ring"
-                )}
-              >
-                <div className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-xl shrink-0 overflow-hidden",
-                  !hasContactAvatar(destination) && "bg-primary/10 text-primary"
-                )}>
-                  {getDestinationIcon(destination.type, destination)}
+          <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4 overflow-y-auto">
+            <div className="space-y-6 landscape:space-y-0 landscape:grid landscape:grid-cols-2 landscape:gap-6">
+              {/* Left column: Name and description */}
+              <div className="space-y-6 landscape:space-y-4">
+                {/* Name input */}
+                <div>
+                  <Label htmlFor="edit-action-name" className="text-sm font-medium mb-2 block">
+                    {t('scheduledEditor.name')}
+                  </Label>
+                  <Input
+                    id="edit-action-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t('scheduledEditor.actionName')}
+                    className="h-12 landscape:h-10 rounded-xl text-base"
+                  />
                 </div>
-                <div className="flex-1 min-w-0 text-start">
-                  <p className="text-sm font-medium truncate">
-                    {getDestinationTypeLabel(destination.type)}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {getDestinationLabel(destination)}
+
+                {/* Description input */}
+                <div>
+                  <Label htmlFor="edit-action-description" className="text-sm font-medium mb-2 block">
+                    {t('scheduledActions.descriptionLabel')}
+                  </Label>
+                  <Textarea
+                    id="edit-action-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={t('scheduledActions.descriptionPlaceholder')}
+                    className="rounded-xl text-base resize-none"
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {t('scheduledActions.descriptionHint')}
                   </p>
                 </div>
-                <ChevronLeft className="h-5 w-5 text-muted-foreground rotate-180 rtl:rotate-0" />
-              </button>
-            </div>
+              </div>
 
-            {/* Timing */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                {t('scheduledEditor.schedule')}
-              </Label>
-              <button
-                onClick={() => setStep('timing')}
-                className={cn(
-                  "w-full flex items-center gap-3 rounded-xl bg-card border border-border p-4",
-                  "active:scale-[0.98] transition-all",
-                  "focus:outline-none focus:ring-2 focus:ring-ring"
-                )}
-              >
-                <div className="flex-1 min-w-0 text-start">
-                  <p className="text-sm font-medium">
-                    {formatTime(triggerTime)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatRecurrenceLabel(recurrence)}
-                  </p>
+              {/* Right column: Destination and timing */}
+              <div className="space-y-6 landscape:space-y-4">
+                {/* Destination */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">
+                    {t('scheduledEditor.destination')}
+                  </Label>
+                  <button
+                    onClick={() => setStep('destination')}
+                    className={cn(
+                      "w-full flex items-center gap-3 rounded-xl bg-card border border-border p-4 landscape:p-3",
+                      "active:scale-[0.98] transition-all",
+                      "focus:outline-none focus:ring-2 focus:ring-ring"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-10 w-10 landscape:h-9 landscape:w-9 items-center justify-center rounded-xl shrink-0 overflow-hidden",
+                      !hasContactAvatar(destination) && "bg-primary/10 text-primary"
+                    )}>
+                      {getDestinationIcon(destination.type, destination)}
+                    </div>
+                    <div className="flex-1 min-w-0 text-start">
+                      <p className="text-sm font-medium truncate">
+                        {getDestinationTypeLabel(destination.type)}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {getDestinationLabel(destination)}
+                      </p>
+                    </div>
+                    <ChevronLeft className="h-5 w-5 text-muted-foreground rotate-180 rtl:rotate-0" />
+                  </button>
                 </div>
-                <ChevronLeft className="h-5 w-5 text-muted-foreground rotate-180 rtl:rotate-0" />
-              </button>
+
+                {/* Timing */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">
+                    {t('scheduledEditor.schedule')}
+                  </Label>
+                  <button
+                    onClick={() => setStep('timing')}
+                    className={cn(
+                      "w-full flex items-center gap-3 rounded-xl bg-card border border-border p-4 landscape:p-3",
+                      "active:scale-[0.98] transition-all",
+                      "focus:outline-none focus:ring-2 focus:ring-ring"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0 text-start">
+                      <p className="text-sm font-medium">
+                        {formatTime(triggerTime)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatRecurrenceLabel(recurrence)}
+                      </p>
+                    </div>
+                    <ChevronLeft className="h-5 w-5 text-muted-foreground rotate-180 rtl:rotate-0" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Save button */}
-          <div className="p-5 border-t border-border">
+          <div className="p-5 landscape:p-3 border-t border-border">
             <Button
               onClick={handleSave}
               disabled={isSaving || !hasChanges}
-              className="w-full h-12 rounded-2xl text-base gap-2"
+              className="w-full h-12 landscape:h-10 rounded-2xl text-base gap-2"
             >
             {isSaving ? (
               t('scheduledEditor.saving')

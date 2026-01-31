@@ -340,7 +340,7 @@ export function ScheduledActionCreator({
     if (urlSubStep === 'input') {
       return (
         <div className="flex flex-col h-full animate-fade-in">
-          <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 border-b border-border">
+          <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 landscape:px-4 landscape:pt-2 landscape:pb-2 border-b border-border">
             <button
               onClick={handleBack}
               className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -350,7 +350,7 @@ export function ScheduledActionCreator({
             <h2 className="text-lg font-semibold">Enter URL</h2>
           </div>
 
-          <div className="flex-1 px-5 py-6 space-y-4">
+          <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4 space-y-4 landscape:space-y-3">
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Globe className="absolute start-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -361,7 +361,7 @@ export function ScheduledActionCreator({
                     setUrlError('');
                   }}
                   placeholder="example.com"
-                  className="h-12 ps-10 rounded-xl text-base"
+                  className="h-12 landscape:h-10 ps-10 rounded-xl text-base"
                   autoFocus
                   onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                 />
@@ -370,7 +370,7 @@ export function ScheduledActionCreator({
                 variant="outline"
                 size="icon"
                 onClick={handlePasteUrl}
-                className="h-12 w-12 rounded-xl shrink-0"
+                className="h-12 w-12 landscape:h-10 landscape:w-10 rounded-xl shrink-0"
               >
                 <Clipboard className="h-5 w-5" />
               </Button>
@@ -381,11 +381,11 @@ export function ScheduledActionCreator({
             )}
           </div>
 
-          <div className="p-5 border-t border-border">
+          <div className="p-5 landscape:p-3 border-t border-border">
             <Button
               onClick={handleUrlSubmit}
               disabled={!urlInput.trim()}
-              className="w-full h-12 rounded-2xl text-base"
+              className="w-full h-12 landscape:h-10 rounded-2xl text-base"
             >
               Continue
             </Button>
@@ -398,7 +398,7 @@ export function ScheduledActionCreator({
     if (urlSubStep === 'choose') {
       return (
         <div className="flex flex-col h-full animate-fade-in">
-          <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 border-b border-border">
+          <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 landscape:px-4 landscape:pt-2 landscape:pb-2 border-b border-border">
             <button
               onClick={handleBack}
               className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -408,8 +408,8 @@ export function ScheduledActionCreator({
             <h2 className="text-lg font-semibold">Add a link</h2>
           </div>
 
-          <div className="flex-1 px-5 py-6">
-            <div className="space-y-3">
+          <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4">
+            <div className="space-y-3 landscape:grid landscape:grid-cols-2 landscape:gap-3 landscape:space-y-0">
               <DestinationOption
                 icon={<Globe className="h-5 w-5" />}
                 label="Enter URL"
@@ -437,7 +437,7 @@ export function ScheduledActionCreator({
     // Main destination selection
     return (
       <div className="flex flex-col h-full animate-fade-in">
-        <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 border-b border-border">
+        <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 landscape:px-4 landscape:pt-2 landscape:pb-2 border-b border-border">
           <button
             onClick={handleBack}
             className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -447,12 +447,12 @@ export function ScheduledActionCreator({
           <h2 className="text-lg font-semibold">What to open</h2>
         </div>
 
-        <div className="flex-1 px-5 py-6">
-          <p className="text-sm text-muted-foreground mb-6">
+        <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4">
+          <p className="text-sm text-muted-foreground mb-6 landscape:mb-4">
             Select what should open when this action triggers.
           </p>
 
-          <div className="space-y-3">
+          <div className="space-y-3 landscape:grid landscape:grid-cols-3 landscape:gap-3 landscape:space-y-0">
             <DestinationOption
               icon={<FileText className="h-5 w-5" />}
               label="Local File"
@@ -493,7 +493,7 @@ export function ScheduledActionCreator({
   // Step: Confirm and name
   return (
     <div className="flex flex-col h-full animate-fade-in">
-      <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 border-b border-border">
+      <div className="flex items-center gap-3 px-5 pt-header-safe-compact pb-4 landscape:px-4 landscape:pt-2 landscape:pb-2 border-b border-border">
         <button
           onClick={handleBack}
           className="p-2 -ms-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
@@ -503,85 +503,92 @@ export function ScheduledActionCreator({
         <h2 className="text-lg font-semibold">Name this action</h2>
       </div>
 
-      <div className="flex-1 px-5 py-6 space-y-6">
-        {/* Name input */}
-        <div>
-          <Label htmlFor="action-name" className="text-sm font-medium mb-2 block">
-            {t('scheduledActions.actionName')}
-          </Label>
-          <Input
-            id="action-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={destination ? getSuggestedName(destination) : 'My action'}
-            className="h-12 rounded-xl text-base"
-            autoFocus
-          />
-          <p className="text-xs text-muted-foreground mt-2">
-            {t('scheduledActions.actionNameHint')}
-          </p>
-        </div>
+      <div className="flex-1 px-5 py-6 landscape:px-4 landscape:py-4 overflow-y-auto">
+        <div className="space-y-6 landscape:space-y-0 landscape:grid landscape:grid-cols-2 landscape:gap-6">
+          {/* Left column: Name and description inputs */}
+          <div className="space-y-6 landscape:space-y-4">
+            {/* Name input */}
+            <div>
+              <Label htmlFor="action-name" className="text-sm font-medium mb-2 block">
+                {t('scheduledActions.actionName')}
+              </Label>
+              <Input
+                id="action-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={destination ? getSuggestedName(destination) : 'My action'}
+                className="h-12 landscape:h-10 rounded-xl text-base"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {t('scheduledActions.actionNameHint')}
+              </p>
+            </div>
 
-        {/* Description input */}
-        <div>
-          <Label htmlFor="action-description" className="text-sm font-medium mb-2 block">
-            {t('scheduledActions.descriptionLabel')}
-          </Label>
-          <Textarea
-            id="action-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t('scheduledActions.descriptionPlaceholder')}
-            className="rounded-xl text-base resize-none"
-            rows={2}
-          />
-          <p className="text-xs text-muted-foreground mt-2">
-            {t('scheduledActions.descriptionHint')}
-          </p>
-        </div>
-
-        {/* Preview card */}
-        {destination && timing && (
-          <div className="rounded-2xl bg-card border border-border p-4">
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-xl shrink-0 overflow-hidden",
-                !hasContactAvatar(destination) && "bg-primary/10 text-primary"
-              )}>
-                {getDestinationIcon(destination.type, destination)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-sm truncate">
-                  {name || getSuggestedName(destination)}
-                </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {destination.type === 'file' && destination.name}
-                  {destination.type === 'url' && destination.uri}
-                  {destination.type === 'contact' && destination.contactName}
-                </p>
-                <p className="text-xs text-primary mt-1.5">
-                  {new Date(timing.triggerTime).toLocaleString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                  })}
-                  {timing.recurrence !== 'once' && ` · ${t('scheduledActions.repeats', { frequency: timing.recurrence })}`}
-                </p>
-              </div>
+            {/* Description input */}
+            <div>
+              <Label htmlFor="action-description" className="text-sm font-medium mb-2 block">
+                {t('scheduledActions.descriptionLabel')}
+              </Label>
+              <Textarea
+                id="action-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={t('scheduledActions.descriptionPlaceholder')}
+                className="rounded-xl text-base resize-none"
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {t('scheduledActions.descriptionHint')}
+              </p>
             </div>
           </div>
-        )}
+
+          {/* Right column: Preview card */}
+          <div className="landscape:pt-0">
+            {destination && timing && (
+              <div className="rounded-2xl bg-card border border-border p-4 landscape:p-3">
+                <div className="flex items-start gap-3">
+                  <div className={cn(
+                    "flex h-10 w-10 landscape:h-9 landscape:w-9 items-center justify-center rounded-xl shrink-0 overflow-hidden",
+                    !hasContactAvatar(destination) && "bg-primary/10 text-primary"
+                  )}>
+                    {getDestinationIcon(destination.type, destination)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-sm truncate">
+                      {name || getSuggestedName(destination)}
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {destination.type === 'file' && destination.name}
+                      {destination.type === 'url' && destination.uri}
+                      {destination.type === 'contact' && destination.contactName}
+                    </p>
+                    <p className="text-xs text-primary mt-1.5">
+                      {new Date(timing.triggerTime).toLocaleString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                      {timing.recurrence !== 'once' && ` · ${t('scheduledActions.repeats', { frequency: timing.recurrence })}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Create button */}
-      <div className="p-5 border-t border-border">
+      <div className="p-5 landscape:p-3 border-t border-border">
         <Button 
           onClick={handleCreate}
           disabled={isCreating}
-          className="w-full h-12 rounded-2xl text-base gap-2"
+          className="w-full h-12 landscape:h-10 rounded-2xl text-base gap-2"
         >
           {isCreating ? (
             'Scheduling...'
