@@ -73,7 +73,6 @@ export function AccessFlow({
   const [showSettings, setShowSettings] = useState(false);
   const [pendingActionMode, setPendingActionMode] = useState<ActionMode>('shortcut');
   const processedInitialUrlRef = useRef<string | null>(null);
-  const accessScrollRef = useRef<HTMLDivElement>(null);
 
   const { t } = useTranslation();
   const { createShortcut, createContactShortcut } = useShortcuts();
@@ -434,18 +433,14 @@ export function AccessFlow({
             </div>
           </header>
           
-          {/* Scrollable content area */}
-          <div 
-            ref={accessScrollRef}
-            className="flex-1 min-h-0 overflow-y-auto"
-          >
+          {/* Scrollable content area - ContentSourcePicker handles its own padding */}
+          <div className="flex-1 min-h-0 overflow-hidden">
             <ContentSourcePicker
               onSelectFile={handleSelectFile}
               onSelectContact={handleSelectContact}
               onSelectFromLibrary={handleSelectFromLibrary}
               onEnterUrl={handleEnterUrl}
               onPickerOpenChange={onPickerOpenChange}
-              scrollContainerRef={accessScrollRef}
             />
           </div>
           
