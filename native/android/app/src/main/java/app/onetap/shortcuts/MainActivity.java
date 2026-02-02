@@ -1,6 +1,7 @@
 package app.onetap.shortcuts;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import com.getcapacitor.BridgeActivity;
@@ -12,6 +13,9 @@ public class MainActivity extends BridgeActivity {
     
     // Flag to indicate app was launched from Quick Create widget
     private boolean pendingQuickCreate = false;
+    
+    // Pending slideshow ID to open (from deep link)
+    private String pendingSlideshowId = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -24,6 +28,9 @@ public class MainActivity extends BridgeActivity {
         
         // Check for Quick Create widget action
         handleQuickCreateIntent(getIntent());
+        
+        // Check for slideshow deep link
+        handleSlideshowDeepLink(getIntent());
     }
     
     @Override
@@ -39,6 +46,9 @@ public class MainActivity extends BridgeActivity {
         
         // Check for Quick Create widget action
         handleQuickCreateIntent(intent);
+        
+        // Check for slideshow deep link
+        handleSlideshowDeepLink(intent);
         
         // Notify Capacitor bridge about the new intent
         if (bridge != null) {
@@ -59,6 +69,26 @@ public class MainActivity extends BridgeActivity {
     }
     
     /**
+     * Handle slideshow deep link (onetap://slideshow/{shortcutId})
+     */
+    private void handleSlideshowDeepLink(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        
+        Uri data = intent.getData();
+        String scheme = data.getScheme();
+        String host = data.getHost();
+        
+        if ("onetap".equals(scheme) && "slideshow".equals(host)) {
+            // Extract slideshow ID from path: /shortcutId
+            String path = data.getPath();
+            if (path != null && path.length() > 1) {
+                pendingSlideshowId = path.substring(1); // Remove leading /
+                Log.d(TAG, "Slideshow deep link detected, ID: " + pendingSlideshowId);
+            }
+        }
+    }
+    
+    /**
      * Check if there's a pending Quick Create action
      */
     public boolean hasPendingQuickCreate() {
@@ -70,6 +100,20 @@ public class MainActivity extends BridgeActivity {
      */
     public void clearPendingQuickCreate() {
         pendingQuickCreate = false;
+    }
+    
+    /**
+     * Check if there's a pending slideshow to open
+     */
+    public String getPendingSlideshowId() {
+        return pendingSlideshowId;
+    }
+    
+    /**
+     * Clear the pending slideshow ID
+     */
+    public void clearPendingSlideshowId() {
+        pendingSlideshowId = null;
     }
     
     private void logIntent(Intent intent) {

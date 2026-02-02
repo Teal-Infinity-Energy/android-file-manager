@@ -79,6 +79,14 @@
                 <data android:scheme="onetap" android:host="manage-shortcuts" />
             </intent-filter>
 
+            <!-- Deep link for slideshow viewer (from home screen shortcut) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="onetap" android:host="slideshow" />
+            </intent-filter>
+
             <!-- Share Sheet: Handle shared text (URLs, etc.) -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -233,6 +241,14 @@
         <!-- File Proxy Activity - tracks generic file shortcut taps (audio, documents, etc.) -->
         <activity
             android:name=".FileProxyActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false"
+            android:noHistory="true"
+            android:excludeFromRecents="true" />
+
+        <!-- Slideshow Proxy Activity - handles slideshow shortcut taps -->
+        <activity
+            android:name=".SlideshowProxyActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:exported="false"
             android:noHistory="true"
