@@ -14,6 +14,15 @@ interface PinchZoomImageProps {
   onSwipeDown?: () => void;
 }
 
+// Use refs to avoid stale closure issues in setTimeout callbacks
+const useLatestCallback = <T extends (...args: any[]) => any>(callback: T | undefined) => {
+  const ref = useRef(callback);
+  useEffect(() => {
+    ref.current = callback;
+  }, [callback]);
+  return ref;
+};
+
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
@@ -34,6 +43,9 @@ export default function PinchZoomImage({
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isZoomed, setIsZoomed] = useState(false);
+  
+  // Use refs for callbacks to avoid stale closures in setTimeout
+  const onTapRef = useLatestCallback(onTap);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -213,15 +225,16 @@ export default function PinchZoomImage({
         const tapTime = lastTapRef.current;
         setTimeout(() => {
           // Only fire tap if no second tap occurred (not a double-tap)
+          // Use ref to get the latest callback, avoiding stale closure
           if (lastTapRef.current === tapTime) {
-            onTap?.();
+            onTapRef.current?.();
           }
         }, DOUBLE_TAP_DELAY + 50);
       }
     }
     
     isPanningRef.current = false;
-  }, [scale, onSwipeLeft, onSwipeRight, onSwipeDown, onTap]);
+  }, [scale, onSwipeLeft, onSwipeRight, onSwipeDown, onTapRef]);
 
   // Mouse wheel zoom for desktop
   const handleWheel = useCallback((e: React.WheelEvent) => {
