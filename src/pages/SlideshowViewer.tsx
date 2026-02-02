@@ -16,7 +16,7 @@ export default function SlideshowViewer() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { getShortcut, incrementUsage } = useShortcuts();
+  const { getShortcut } = useShortcuts();
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -64,10 +64,9 @@ export default function SlideshowViewer() {
         setIsPlaying(true);
       }
       
-      // Increment usage on view
-      incrementUsage(shortcutId);
+      // Usage is tracked by native SlideshowProxyActivity - no need to track here
     }
-  }, [shortcutId, getShortcut, incrementUsage]);
+  }, [shortcutId, getShortcut]);
 
   // Convert content:// URIs to WebView-accessible URLs for full-quality display
   useEffect(() => {
