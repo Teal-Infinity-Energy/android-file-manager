@@ -20,7 +20,6 @@ export async function generateGridIcon(
 
   if (!ctx) {
     console.error('[SlideshowIconGenerator] Could not get canvas context');
-    // Return first thumbnail as fallback
     return thumbnails[0] || '';
   }
 
@@ -28,20 +27,42 @@ export async function generateGridIcon(
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, 0, size, size);
 
-  // Gap between tiles
   const gap = 4;
-  const tileSize = (size - gap) / 2;
+  const count = thumbnails.length;
 
-  // Positions for 2x2 grid
-  const positions = [
-    { x: 0, y: 0 },
-    { x: tileSize + gap, y: 0 },
-    { x: 0, y: tileSize + gap },
-    { x: tileSize + gap, y: tileSize + gap },
-  ];
+  // Determine layout based on image count
+  type TilePosition = { x: number; y: number; width: number; height: number };
+  let positions: TilePosition[];
+
+  if (count === 2) {
+    // Vertical stack: two images, full width, half height each
+    const tileHeight = (size - gap) / 2;
+    positions = [
+      { x: 0, y: 0, width: size, height: tileHeight },
+      { x: 0, y: tileHeight + gap, width: size, height: tileHeight },
+    ];
+  } else if (count === 3) {
+    // 1 top (full width) + 2 bottom (split)
+    const topHeight = (size - gap) / 2;
+    const bottomTileWidth = (size - gap) / 2;
+    positions = [
+      { x: 0, y: 0, width: size, height: topHeight },
+      { x: 0, y: topHeight + gap, width: bottomTileWidth, height: topHeight },
+      { x: bottomTileWidth + gap, y: topHeight + gap, width: bottomTileWidth, height: topHeight },
+    ];
+  } else {
+    // 4+ images: standard 2x2 grid
+    const tileSize = (size - gap) / 2;
+    positions = [
+      { x: 0, y: 0, width: tileSize, height: tileSize },
+      { x: tileSize + gap, y: 0, width: tileSize, height: tileSize },
+      { x: 0, y: tileSize + gap, width: tileSize, height: tileSize },
+      { x: tileSize + gap, y: tileSize + gap, width: tileSize, height: tileSize },
+    ];
+  }
 
   // Load and draw each image
-  const drawPromises = thumbnails.slice(0, 4).map((thumbnail, index) => {
+  const drawPromises = thumbnails.slice(0, positions.length).map((thumbnail, index) => {
     return new Promise<void>((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -50,36 +71,36 @@ export async function generateGridIcon(
         const pos = positions[index];
         
         // Draw with cover-style cropping (center crop)
-        const aspectRatio = img.width / img.height;
+        const imgAspect = img.width / img.height;
+        const tileAspect = pos.width / pos.height;
         let srcX = 0;
         let srcY = 0;
         let srcWidth = img.width;
         let srcHeight = img.height;
         
-        if (aspectRatio > 1) {
-          // Wider than tall - crop sides
-          srcWidth = img.height;
+        if (imgAspect > tileAspect) {
+          // Image is wider than tile - crop sides
+          srcWidth = img.height * tileAspect;
           srcX = (img.width - srcWidth) / 2;
-        } else if (aspectRatio < 1) {
-          // Taller than wide - crop top/bottom
-          srcHeight = img.width;
+        } else if (imgAspect < tileAspect) {
+          // Image is taller than tile - crop top/bottom
+          srcHeight = img.width / tileAspect;
           srcY = (img.height - srcHeight) / 2;
         }
         
         ctx.drawImage(
           img,
           srcX, srcY, srcWidth, srcHeight,
-          pos.x, pos.y, tileSize, tileSize
+          pos.x, pos.y, pos.width, pos.height
         );
         resolve();
       };
       
       img.onerror = () => {
         console.warn('[SlideshowIconGenerator] Failed to load image:', index);
-        // Draw placeholder
         const pos = positions[index];
         ctx.fillStyle = '#2d2d44';
-        ctx.fillRect(pos.x, pos.y, tileSize, tileSize);
+        ctx.fillRect(pos.x, pos.y, pos.width, pos.height);
         resolve();
       };
       
@@ -89,20 +110,12 @@ export async function generateGridIcon(
       } else if (thumbnail.startsWith('blob:')) {
         img.src = thumbnail;
       } else {
-        // Assume raw base64
         img.src = `data:image/jpeg;base64,${thumbnail}`;
       }
     });
   });
 
   await Promise.all(drawPromises);
-
-  // If fewer than 4 images, fill remaining tiles with placeholders
-  for (let i = thumbnails.length; i < 4; i++) {
-    const pos = positions[i];
-    ctx.fillStyle = '#2d2d44';
-    ctx.fillRect(pos.x, pos.y, tileSize, tileSize);
-  }
 
   return canvas.toDataURL('image/jpeg', 0.9);
 }
