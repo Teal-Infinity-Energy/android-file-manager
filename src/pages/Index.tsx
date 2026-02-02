@@ -120,6 +120,18 @@ const Index = () => {
     return () => window.removeEventListener('onetap:manage-shortcuts', handleManageShortcuts);
   }, [navigate]);
 
+  // Handle open-slideshow deep link (from slideshow shortcut tap)
+  useEffect(() => {
+    const handleOpenSlideshow = (event: CustomEvent<{ slideshowId: string }>) => {
+      const { slideshowId } = event.detail;
+      console.log('[Index] Opening slideshow via deep link:', slideshowId);
+      navigate(`/slideshow/${slideshowId}`);
+    };
+    
+    window.addEventListener('onetap:open-slideshow', handleOpenSlideshow as EventListener);
+    return () => window.removeEventListener('onetap:open-slideshow', handleOpenSlideshow as EventListener);
+  }, [navigate]);
+
   // Handle incoming navigation state (e.g., from MyShortcuts page creating a reminder)
   useEffect(() => {
     const state = location.state as { pendingReminder?: ScheduledActionDestination; activeTab?: TabType } | null;
