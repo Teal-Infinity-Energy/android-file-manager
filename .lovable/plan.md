@@ -1,196 +1,255 @@
 
-# Landscape Optimization for Remaining Components
+# Sync for Scheduled Reminders - Implementation Plan
 
-## Overview
-Complete the landscape optimization across all remaining form components, sheets, dialogs, and overlays to ensure consistent horizontal space utilization and reduced vertical footprint throughout the app.
+## Current State Analysis
 
----
+### Existing Sync Architecture
+The app has a well-designed, "calm sync" system for bookmarks and trash:
 
-## Components to Optimize
+- **Local Sovereignty**: Local `entity_id` (UUID) is the canonical identifier, never reassigned
+- **Additive-Only**: Cloud operations only add items that don't exist locally (no overwrites)
+- **Guarded Entry Points**: All sync operations go through `guardedSync()`, `guardedUpload()`, or `guardedDownload()`
+- **Timing Constraints**: Auto-sync limited to once per 24 hours on foreground
+- **Manual Trigger**: Always available via "Sync Now" button
 
-### Category 1: Form Components & Dialogs
+### Current Cloud Tables
+- `cloud_bookmarks`: Stores bookmarks with `entity_id`, `user_id`, URL, title, description, folder
+- `cloud_trash`: Stores deleted items with retention metadata
 
-#### 1. AddBookmarkForm.tsx
-**Current state:** Vertical stack of URL, title, description, tag selector, and save button
-**Changes:**
-- Reduce padding in landscape (`landscape:p-3`)
-- Two-column layout for title + description in landscape
-- Compact tag selector with smaller buttons (`landscape:py-0.5 landscape:px-2 landscape:text-[10px]`)
-- Smaller save button (`landscape:h-9`)
-
-#### 2. CreateFolderDialog.tsx
-**Current state:** Single column with name input and icon picker
-**Changes:**
-- Add `landscape:max-h-[90vh]` to DialogContent
-- Two-column grid: name input (left) + icon picker (right) in landscape
-- Reduce footer button sizes (`landscape:h-9`)
-
-#### 3. EditFolderDialog.tsx
-**Current state:** Same as CreateFolderDialog
-**Changes:**
-- Mirror CreateFolderDialog optimizations
-- Two-column layout in landscape
-
-#### 4. FolderIconPicker.tsx
-**Current state:** 6-column grid of icons
-**Changes:**
-- Expand to 9 columns in landscape (`landscape:grid-cols-9`)
-- Smaller icon buttons (`landscape:p-2`)
-- Compact icon size (`landscape:h-4 landscape:w-4`)
-
-#### 5. BulkMoveDialog.tsx
-**Current state:** Single column folder list
-**Changes:**
-- Two-column folder list in landscape (`landscape:grid-cols-2`)
-- Reduce scroll area height (`landscape:h-[200px]`)
-- Smaller buttons
-
----
-
-### Category 2: Bottom Sheets
-
-#### 6. BookmarkActionSheet.tsx
-**Current state:** Full-width edit form with vertical stacking
-**Changes:**
-- Reduce header padding (`landscape:pb-2`)
-- Two-column form layout in edit mode: URL + title (left), description + tags (right)
-- Smaller action buttons (`landscape:h-10`)
-- Compact tag pills (`landscape:px-2 landscape:py-0.5`)
-
-#### 7. MessageChooserSheet.tsx
-**Current state:** Vertical list of message options
-**Changes:**
-- Two-column message grid in landscape (`landscape:grid-cols-2`)
-- Smaller message button icons (`landscape:h-8 landscape:w-8`)
-- Reduced padding (`landscape:p-3`)
-- Compact cancel button (`landscape:h-9`)
-
-#### 8. ShortcutActionSheet.tsx
-**Current state:** Already has `landscape:max-h-[95vh]` - minimal changes needed
-**Changes:**
-- Reduce button heights (`landscape:h-10`)
-- Compact icon preview (`landscape:w-10 landscape:h-10`)
-- Smaller separator margins
-
-#### 9. ScheduledActionActionSheet.tsx
-**Current state:** Vertical action list
-**Changes:**
-- Reduce header padding (`landscape:px-4 landscape:pb-3`)
-- Smaller action header icon (`landscape:w-10 landscape:h-10`)
-- Compact button heights (`landscape:h-10`)
-- Reduced section padding
-
-#### 10. TrashSheet.tsx
-**Current state:** Full-height sheet with scrollable list
-**Changes:**
-- Reduce sheet height in landscape (`landscape:h-[75vh]`)
-- Two-column action buttons in header (`landscape:flex-row`)
-- Compact header icon (`landscape:h-8 landscape:w-8`)
-- Smaller empty state illustration
-
-#### 11. SavedLinksSheet.tsx
-**Current state:** Large form area with vertical stacking
-**Changes:**
-- Reduce form padding (`landscape:p-3`)
-- Two-column layout for add/edit form in landscape
-- Compact link list items (`landscape:p-2`)
-- Smaller search input height (`landscape:h-9`)
-
----
-
-### Category 3: Floating UI Components
-
-#### 12. SharedUrlActionSheet.tsx
-**Current state:** Modal overlay with vertical form
-**Changes:**
-- Wider card in landscape (`landscape:max-w-lg`)
-- Two-column action grid already exists - reduce button padding (`landscape:py-2`)
-- Compact video thumbnail in landscape (`landscape:aspect-[2/1]`)
-- Smaller form inputs in edit mode (`landscape:h-9`)
-- Reduced spacing throughout (`landscape:space-y-3`)
-
-#### 13. ClipboardSuggestion.tsx
-**Current state:** Floating card with 2x2 action grid
-**Changes:**
-- Wider card in landscape (`landscape:max-w-lg`)
-- Compact URL preview section (`landscape:p-2`)
-- Smaller action buttons (`landscape:py-2`)
-- Reduced form spacing in edit mode (`landscape:space-y-3`)
-- Compact folder picker chips
-
----
-
-### Category 4: Content Display
-
-#### 14. ContentPreview.tsx
-**Current state:** Horizontal layout with icon + text
-**Changes:**
-- Reduce padding (`landscape:p-2`)
-- Smaller icon container (`landscape:h-10 landscape:w-10`)
-- Compact text sizes (`landscape:text-xs` for sublabel)
-
----
-
-### Category 5: Page Components
-
-#### 15. OnboardingFlow.tsx
-**Already has landscape optimization** - verify and enhance:
-- Already uses `landscape:flex-row` for layout
-- Already reduces icon sizes and padding
-- No changes needed
-
-#### 16. ContentSourcePicker.tsx
-**Current state:** Already has some landscape optimization (6-column grid)
-**Changes:**
-- Compact action mode picker buttons (`landscape:p-2`)
-- Smaller contact mode toggle (`landscape:py-2`)
-- Reduce section padding (`landscape:p-3`)
-
----
-
-## Implementation Pattern
-
-All changes follow the established pattern:
-```tsx
-// Reduce spacing
-className="space-y-6 landscape:space-y-3"
-
-// Two-column layouts
-className="landscape:grid landscape:grid-cols-2 landscape:gap-4"
-
-// Compact elements
-className="h-12 landscape:h-10"
-className="p-4 landscape:p-3"
-className="text-sm landscape:text-xs"
+### Scheduled Actions Data Model
+```typescript
+interface ScheduledAction {
+  id: string;                              // Local UUID
+  name: string;                            // Short, intent-based name
+  description?: string;                    // Optional description
+  destination: ScheduledActionDestination; // file | url | contact
+  triggerTime: number;                     // Unix timestamp (ms)
+  recurrence: RecurrenceType;              // once | daily | weekly | yearly
+  enabled: boolean;
+  createdAt: number;
+  recurrenceAnchor?: RecurrenceAnchor;     // For computing next trigger
+  // Notification tracking (local-only)
+  lastNotificationTime?: number;
+  notificationClicked?: boolean;
+}
 ```
+
+---
+
+## Design Decisions
+
+### What Should Sync?
+| Field | Sync? | Rationale |
+|-------|-------|-----------|
+| `id` | ✅ As `entity_id` | Identity preservation across devices |
+| `name` | ✅ | Core data |
+| `description` | ✅ | Core data |
+| `destination` | ✅ (JSONB) | Core data - stored as JSON object |
+| `triggerTime` | ✅ | Essential for reminder function |
+| `recurrence` | ✅ | Core data |
+| `enabled` | ✅ | User intent |
+| `createdAt` | ✅ | Original creation time |
+| `recurrenceAnchor` | ✅ (JSONB) | For consistent next-trigger computation |
+| `lastNotificationTime` | ❌ | Device-specific state |
+| `notificationClicked` | ❌ | Device-specific state |
+
+### Special Considerations
+
+1. **File Destinations**: URIs like `content://...` are device-specific and will not resolve on other devices. Syncing preserves the data but users should understand file reminders are device-bound.
+
+2. **Contact Photos**: `photoUri` in contact destinations is device-specific. The phone number and contact name will sync, but the photo may not appear on other devices.
+
+3. **Trigger Time**: After download, recurring actions may need recalculation if the trigger time has passed. The app's existing `computeNextTrigger()` handles this.
+
+---
+
+## Implementation Plan
+
+### Phase 1: Database Schema
+
+Create a new `cloud_scheduled_actions` table:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.cloud_scheduled_actions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  entity_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  destination JSONB NOT NULL,
+  trigger_time BIGINT NOT NULL,
+  recurrence TEXT NOT NULL DEFAULT 'once',
+  recurrence_anchor JSONB,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  original_created_at BIGINT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  
+  CONSTRAINT unique_user_action UNIQUE (user_id, entity_id)
+);
+
+-- Enable RLS
+ALTER TABLE public.cloud_scheduled_actions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies (same pattern as bookmarks)
+CREATE POLICY "Users can view own actions"
+  ON public.cloud_scheduled_actions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own actions"
+  ON public.cloud_scheduled_actions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own actions"
+  ON public.cloud_scheduled_actions FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own actions"
+  ON public.cloud_scheduled_actions FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Updated_at trigger
+CREATE TRIGGER update_cloud_scheduled_actions_updated_at
+  BEFORE UPDATE ON public.cloud_scheduled_actions
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+```
+
+### Phase 2: Extend cloudSync.ts
+
+Add internal upload/download functions for scheduled actions following the existing pattern:
+
+```text
+src/lib/cloudSync.ts changes:
+├── Add CloudScheduledAction type
+├── Add uploadScheduledActionsInternal()
+│   └── Upsert local actions → cloud (by entity_id)
+├── Add downloadScheduledActionsInternal()
+│   └── Download cloud actions, merge missing → local
+│   └── Recalculate trigger times for past-due recurring actions
+├── Update performBidirectionalSync()
+│   └── Include scheduled actions in upload phase
+│   └── Include scheduled actions in download phase
+└── Update guardedUpload/guardedDownload to include actions
+```
+
+**Key Implementation Details:**
+
+```typescript
+// Upload pattern (mirrors bookmarks)
+async function uploadScheduledActionsInternal() {
+  const localActions = getScheduledActions();
+  for (const action of localActions) {
+    await supabase.from('cloud_scheduled_actions').upsert({
+      entity_id: action.id,
+      user_id: user.id,
+      name: action.name,
+      description: action.description || null,
+      destination: action.destination, // JSONB
+      trigger_time: action.triggerTime,
+      recurrence: action.recurrence,
+      recurrence_anchor: action.recurrenceAnchor || null,
+      enabled: action.enabled,
+      original_created_at: action.createdAt,
+    }, {
+      onConflict: 'user_id,entity_id',
+    });
+  }
+}
+
+// Download pattern (mirrors bookmarks)
+async function downloadScheduledActionsInternal() {
+  const cloudActions = await supabase
+    .from('cloud_scheduled_actions')
+    .select('*')
+    .eq('user_id', user.id);
+    
+  const existingIds = new Set(getScheduledActions().map(a => a.id));
+  
+  for (const cloudAction of cloudActions) {
+    if (!existingIds.has(cloudAction.entity_id)) {
+      // Create new local action
+      // Recalculate trigger time if past-due and recurring
+    }
+  }
+}
+```
+
+### Phase 3: Update Sync Status Tracking
+
+Extend `syncStatusManager.ts` to track scheduled actions:
+
+```typescript
+interface SyncStatus {
+  lastSyncAt: number | null;
+  lastUploadCount: number;
+  lastDownloadCount: number;
+  // Add actions tracking
+  lastActionsUploadCount?: number;
+  lastActionsDownloadCount?: number;
+  hasPendingChanges: boolean;
+  pendingReason?: PendingReason;
+  lastFailedAt?: number;
+}
+```
+
+### Phase 4: UI Integration (Minimal)
+
+Following the "calm" philosophy, **no new UI elements are needed**:
+
+- The existing "Sync Now" button already triggers bidirectional sync
+- The existing sync status indicator (green/amber dot) reflects overall sync state
+- Auto-sync (daily on foreground) will automatically include scheduled actions
+
+**Optional Enhancement** (low priority):
+- Add actions count to the Profile page's sync stats display
+- Format: "X bookmarks, Y reminders" in the local/cloud counters
 
 ---
 
 ## Files to Modify
 
-| Priority | File | Complexity |
-|----------|------|------------|
-| High | `src/components/AddBookmarkForm.tsx` | Low |
-| High | `src/components/BookmarkActionSheet.tsx` | Medium |
-| High | `src/components/SharedUrlActionSheet.tsx` | Medium |
-| High | `src/components/ClipboardSuggestion.tsx` | Medium |
-| Medium | `src/components/CreateFolderDialog.tsx` | Low |
-| Medium | `src/components/EditFolderDialog.tsx` | Low |
-| Medium | `src/components/FolderIconPicker.tsx` | Low |
-| Medium | `src/components/MessageChooserSheet.tsx` | Low |
-| Medium | `src/components/TrashSheet.tsx` | Medium |
-| Medium | `src/components/SavedLinksSheet.tsx` | Medium |
-| Low | `src/components/ShortcutActionSheet.tsx` | Low |
-| Low | `src/components/ScheduledActionActionSheet.tsx` | Low |
-| Low | `src/components/BulkMoveDialog.tsx` | Low |
-| Low | `src/components/ContentPreview.tsx` | Low |
-| Low | `src/components/ContentSourcePicker.tsx` | Low |
+| File | Changes |
+|------|---------|
+| `src/lib/cloudSync.ts` | Add scheduled actions upload/download functions |
+| `src/lib/syncStatusManager.ts` | Add actions count tracking (optional) |
+| `src/lib/scheduledActionsManager.ts` | No changes - existing CRUD is sufficient |
+| `src/integrations/supabase/types.ts` | Will auto-update after migration |
+| `supabase/migrations/` | New migration for cloud_scheduled_actions table |
+
+---
+
+## Edge Cases & Error Handling
+
+1. **File URI Resolution**: File destinations will sync but may not resolve on other devices. The notification will fire but file access may fail gracefully.
+
+2. **Past-Due Recurring Actions**: On download, if a recurring action's trigger time has passed, recalculate using `computeNextTrigger()`.
+
+3. **One-Time Past Actions**: If a one-time action's trigger time has passed, download it as disabled to preserve history.
+
+4. **Destination Type Validation**: Ensure destination JSONB parses correctly; skip invalid entries with console warning.
+
+5. **Native Alarm Rescheduling**: After download, newly added actions need their native Android alarms scheduled. This happens automatically when the Reminders tab is opened (via `useScheduledActions` hook).
+
+---
+
+## Testing Checklist
+
+- [ ] Create reminder → Sync → Verify appears in cloud table
+- [ ] Sign in on second device → Sync → Verify reminders appear
+- [ ] Edit reminder → Sync → Verify update propagates
+- [ ] Delete reminder → Verify cloud entry is updated/removed
+- [ ] Recurring reminder with past trigger time → Verify time recalculated on download
+- [ ] File reminder sync → Verify data preserved (URI may not resolve)
+- [ ] Contact reminder sync → Verify phone number preserved
+- [ ] Auto-sync (24h) → Verify includes scheduled actions
 
 ---
 
 ## Expected Outcomes
-- Consistent landscape experience across all interactive components
-- Reduced virtual keyboard overlap in form-based components
-- Better utilization of horizontal space in sheets and dialogs
-- Faster form completion with more fields visible simultaneously
-- No changes to portrait mode behavior (all optimizations use `landscape:` prefix)
+
+- Scheduled reminders sync seamlessly with the existing "Sync Now" button
+- No new UI complexity - follows the calm, invisible sync philosophy
+- Local sovereignty preserved - cloud never overwrites local data
+- Device-specific state (notification tracking) remains local
+- Users on multiple devices see their reminders converge after sync
