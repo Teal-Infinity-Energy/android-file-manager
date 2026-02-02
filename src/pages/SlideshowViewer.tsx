@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ExternalLink, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
@@ -167,6 +167,12 @@ export default function SlideshowViewer() {
   }, [resetControlsTimeout]);
 
   const handleTap = useCallback(() => {
+    // Toggle play/pause on tap
+    if (autoAdvanceInterval > 0) {
+      setIsPlaying(prev => !prev);
+    }
+    
+    // Toggle controls visibility
     if (showControls) {
       setShowControls(false);
       if (controlsTimeoutRef.current) {
@@ -175,7 +181,7 @@ export default function SlideshowViewer() {
     } else {
       resetControlsTimeout();
     }
-  }, [showControls, resetControlsTimeout]);
+  }, [showControls, resetControlsTimeout, autoAdvanceInterval]);
 
   const handlePrevious = useCallback(() => {
     setCurrentIndex(prev => (prev - 1 + images.length) % images.length);
@@ -217,10 +223,6 @@ export default function SlideshowViewer() {
     navigate(-1);
   }, [navigate]);
 
-  const togglePlayPause = useCallback(() => {
-    setIsPlaying(prev => !prev);
-    resetControlsTimeout();
-  }, [resetControlsTimeout]);
 
   // Get current image source (prioritize full-quality, fallback to thumbnail)
   const currentImageSrc = getImageSource(currentIndex);
@@ -346,7 +348,14 @@ export default function SlideshowViewer() {
               transition={{ duration: 0.2 }}
               className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/60 to-transparent"
             >
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex flex-col items-center gap-2">
+                {/* Play/Pause status indicator (only show if auto-advance is configured) */}
+                {autoAdvanceInterval > 0 && (
+                  <span className="text-white/60 text-xs">
+                    {isPlaying ? t('slideshow.playing', 'Playing') : t('slideshow.paused', 'Paused')}
+                  </span>
+                )}
+                
                 {/* Dot indicators (max 10 visible) */}
                 <div className="flex items-center gap-1.5">
                   {images.slice(0, 10).map((_, index) => (
@@ -369,22 +378,6 @@ export default function SlideshowViewer() {
                     <span className="text-white/60 text-xs ml-1">+{images.length - 10}</span>
                   )}
                 </div>
-
-                {/* Play/Pause button (only show if auto-advance is configured) */}
-                {autoAdvanceInterval > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => { e.stopPropagation(); togglePlayPause(); }}
-                    className="text-white hover:bg-white/20 ml-4"
-                  >
-                    {isPlaying ? (
-                      <Pause className="h-5 w-5" />
-                    ) : (
-                      <Play className="h-5 w-5" />
-                    )}
-                  </Button>
-                )}
               </div>
             </motion.div>
           </>
