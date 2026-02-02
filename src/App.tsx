@@ -13,7 +13,6 @@ import NotFound from "./pages/NotFound";
 
 // Lazy load heavy components to reduce initial bundle size
 const VideoPlayer = lazy(() => import("./pages/VideoPlayer"));
-const PDFViewer = lazy(() => import("./pages/PDFViewer"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const MyShortcuts = lazy(() => import("./pages/MyShortcuts"));
 const SlideshowViewer = lazy(() => import("./pages/SlideshowViewer"));
@@ -44,11 +43,6 @@ const App = () => (
                 <Route path="/player" element={
                   <Suspense fallback={<PageLoader />}>
                     <VideoPlayer />
-                  </Suspense>
-                } />
-                <Route path="/pdf" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <PDFViewer />
                   </Suspense>
                 } />
                 <Route path="/auth-callback" element={
