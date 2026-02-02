@@ -104,6 +104,9 @@ public class NativePdfViewerActivity extends Activity {
     // The scale factor that pending views are currently displaying
     private float pendingVisualScale = 1.0f;
     
+    // Previous zoom level (for fallback bitmap lookup during transitions)
+    private float previousZoom = 1.0f;
+    
     // UI chrome
     private FrameLayout topBar;
     private ImageButton closeButton;
@@ -354,6 +357,10 @@ public class NativePdfViewerActivity extends Activity {
             @Override
             public void onScaleEnd(ScaleGestureDetector detector) {
                 isScaling = false;
+                
+                // Track previous zoom for fallback bitmap lookup
+                previousZoom = currentZoom;
+                
                 // Commit zoom level
                 currentZoom = pendingZoom;
                 
@@ -536,6 +543,9 @@ public class NativePdfViewerActivity extends Activity {
             public void onAnimationEnd(android.animation.Animator animation) {
                 isDoubleTapAnimating = false;
                 
+                // Track previous zoom for fallback bitmap lookup
+                previousZoom = baseZoom;
+                
                 // Commit final zoom level
                 currentZoom = endZoom;
                 pendingZoom = endZoom;
@@ -577,8 +587,12 @@ public class NativePdfViewerActivity extends Activity {
         // Increment generation to invalidate old pending renders
         renderGeneration.incrementAndGet();
         
-        // Clear cache and pending renders
-        bitmapCache.evictAll();
+        // CACHE STRATEGY FIX: Do NOT evict all bitmaps on zoom change!
+        // Instead, keep previous zoom bitmaps as visual fallback until new ones arrive.
+        // LRU will naturally evict them as new bitmaps are added.
+        // This prevents white flashes during zoom transitions.
+        
+        // Only clear pending renders (not completed bitmaps)
         pendingRenders.clear();
         
         // Track which pages need atomic swap (visible pages at gesture end)
@@ -634,7 +648,11 @@ public class NativePdfViewerActivity extends Activity {
      */
     private void invalidateCacheAndRerender() {
         renderGeneration.incrementAndGet();
-        bitmapCache.evictAll();
+        
+        // CACHE STRATEGY: Only evict all when truly needed (e.g., PDF reload)
+        // For zoom changes, keep old bitmaps as fallback
+        // bitmapCache.evictAll(); // REMOVED - let LRU handle eviction naturally
+        
         pendingRenders.clear();
         pendingZoomSwap.clear();
         pendingVisualScale = 1.0f;
@@ -937,6 +955,38 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     /**
+     * Find a fallback bitmap from a different zoom level for this page.
+     * Used to avoid white flashes when current zoom bitmaps aren't ready.
+     * 
+     * CACHE STRATEGY: Look for ANY cached bitmap for this page.
+     * The visual system will scale it (slightly blurry but better than white).
+     * LRU will naturally evict old bitmaps as memory fills.
+     * 
+     * Priority: previous zoom high-res → previous zoom low-res → 1.0x high-res → 1.0x low-res
+     */
+    private Bitmap findFallbackBitmap(int pageIndex) {
+        // Try previous zoom level first (most likely to exist after zoom change)
+        if (previousZoom != currentZoom) {
+            Bitmap fallback = bitmapCache.get(getCacheKey(pageIndex, previousZoom, false));
+            if (fallback != null) return fallback;
+            
+            fallback = bitmapCache.get(getCacheKey(pageIndex, previousZoom, true));
+            if (fallback != null) return fallback;
+        }
+        
+        // Try 1.0x zoom (common baseline)
+        if (currentZoom != 1.0f && previousZoom != 1.0f) {
+            Bitmap fallback = bitmapCache.get(getCacheKey(pageIndex, 1.0f, false));
+            if (fallback != null) return fallback;
+            
+            fallback = bitmapCache.get(getCacheKey(pageIndex, 1.0f, true));
+            if (fallback != null) return fallback;
+        }
+        
+        return null;
+    }
+    
+    /**
      * Get cached page height scaled for current zoom.
      * Uses pre-cached dimensions to avoid synchronous PDF access.
      */
@@ -1153,25 +1203,34 @@ public class NativePdfViewerActivity extends Activity {
             params.height = height;
             holder.imageView.setLayoutParams(params);
             
-            // Check cache first
+            // CACHE STRATEGY: Multi-level fallback to avoid white flashes
+            // Priority: current high-res → current low-res → previous high-res → previous low-res → white
+            
             String highKey = getCacheKey(position, currentZoom, false);
             String lowKey = getCacheKey(position, currentZoom, true);
             
             Bitmap cached = bitmapCache.get(highKey);
             if (cached != null) {
-                // High-res cached, use immediately
+                // Best case: high-res at current zoom
                 holder.imageView.setImageBitmap(cached);
                 return;
             }
             
             cached = bitmapCache.get(lowKey);
             if (cached != null) {
-                // Low-res cached, use while waiting for high-res
+                // Good: low-res at current zoom
                 holder.imageView.setImageBitmap(cached);
             } else {
-                // Show placeholder while loading - reset to white background
-                holder.imageView.setImageBitmap(null);
-                holder.imageView.setBackgroundColor(0xFFFFFFFF); // White placeholder matches page
+                // Fallback: try previous zoom level (avoids white flash during zoom transition)
+                // This bitmap will be visually scaled but better than white
+                Bitmap fallback = findFallbackBitmap(position);
+                if (fallback != null) {
+                    holder.imageView.setImageBitmap(fallback);
+                } else {
+                    // Last resort: white placeholder
+                    holder.imageView.setImageBitmap(null);
+                    holder.imageView.setBackgroundColor(0xFFFFFFFF);
+                }
             }
             
             // Trigger render if not already pending
