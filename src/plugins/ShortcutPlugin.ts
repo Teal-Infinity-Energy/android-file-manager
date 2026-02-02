@@ -50,6 +50,23 @@ export interface ShortcutPluginInterface {
     error?: string;
   }>;
 
+  // Native multi-file picker (Android): returns multiple persistent content:// URIs.
+  // Used for slideshow creation when user selects multiple images.
+  pickMultipleFiles(options?: { 
+    mimeTypes?: string[];
+    maxCount?: number;  // Default 20
+  }): Promise<{
+    success: boolean;
+    files?: Array<{
+      uri: string;
+      name?: string;
+      mimeType?: string;
+      size?: number;
+      thumbnail?: string;  // base64 thumbnail (256px)
+    }>;
+    error?: string;
+  }>;
+
   // Launch the in-app native video player (Android).
   openNativeVideoPlayer(options: { uri: string; mimeType?: string }): Promise<{ success: boolean; error?: string }>;
 
@@ -266,8 +283,8 @@ export interface ShortcutPluginInterface {
     iconEmoji?: string;
     iconText?: string;
     iconData?: string;
-    // Intent-affecting properties (for WhatsApp, Contact, PDF shortcuts)
-    shortcutType?: 'file' | 'link' | 'contact' | 'message';
+    // Intent-affecting properties (for WhatsApp, Contact, PDF, Slideshow shortcuts)
+    shortcutType?: 'file' | 'link' | 'contact' | 'message' | 'slideshow';
     phoneNumber?: string;
     quickMessages?: string[];  // WhatsApp quick messages
     messageApp?: string;       // 'whatsapp' only

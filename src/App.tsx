@@ -16,6 +16,7 @@ const VideoPlayer = lazy(() => import("./pages/VideoPlayer"));
 const PDFViewer = lazy(() => import("./pages/PDFViewer"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const MyShortcuts = lazy(() => import("./pages/MyShortcuts"));
+const SlideshowViewer = lazy(() => import("./pages/SlideshowViewer"));
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,11 @@ const App = () => (
                 <Route path="/my-shortcuts" element={
                   <Suspense fallback={<PageLoader />}>
                     <MyShortcuts />
+                  </Suspense>
+                } />
+                <Route path="/slideshow/:shortcutId" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <SlideshowViewer />
                   </Suspense>
                 } />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
