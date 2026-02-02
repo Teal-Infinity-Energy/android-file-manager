@@ -97,6 +97,11 @@ public class NativePdfViewerActivity extends Activity {
     // Track which pages are being rendered to avoid duplicates
     private final Set<String> pendingRenders = new HashSet<>();
     
+    // Track pages awaiting zoom swap (scale reset deferred until high-res arrives)
+    private final Set<Integer> pendingZoomSwap = new HashSet<>();
+    // The scale factor that pending views are currently displaying
+    private float pendingVisualScale = 1.0f;
+    
     // UI chrome
     private FrameLayout topBar;
     private ImageButton closeButton;
@@ -343,9 +348,13 @@ public class NativePdfViewerActivity extends Activity {
             @Override
             public void onScaleEnd(ScaleGestureDetector detector) {
                 isScaling = false;
-                // Commit zoom and trigger high-res re-render
+                // Commit zoom level
                 currentZoom = pendingZoom;
-                invalidateCacheAndRerender();
+                
+                // CRITICAL: Do NOT reset visual scale here - that causes the snap-back
+                // Instead, trigger high-res re-render and keep scaled bitmap visible
+                // Scale reset happens atomically when high-res bitmap arrives
+                commitZoomAndRerender();
             }
         });
         
@@ -360,6 +369,7 @@ public class NativePdfViewerActivity extends Activity {
             @Override
             public boolean onDoubleTap(MotionEvent e) {
                 // Toggle between fit and 2.5x zoom
+                float previousZoom = currentZoom;
                 if (currentZoom > 1.5f) {
                     currentZoom = 1.0f;
                 } else {
@@ -368,7 +378,10 @@ public class NativePdfViewerActivity extends Activity {
                     focalY = e.getY();
                 }
                 pendingZoom = currentZoom;
-                invalidateCacheAndRerender();
+                
+                // For double-tap, apply visual scale immediately then render
+                applyVisualZoomForDoubleTap(previousZoom);
+                commitZoomAndRerender();
                 return true;
             }
         });
@@ -427,17 +440,119 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     /**
-     * Invalidate cache and trigger full re-render at new zoom level.
-     * Called after zoom gesture ends.
+     * Apply visual scale for double-tap zoom (instant visual feedback).
+     * Similar to applyVisualZoom but calculates scale from previous zoom level.
      */
-    private void invalidateCacheAndRerender() {
-        // Increment generation to invalidate pending renders
+    private void applyVisualZoomForDoubleTap(float previousZoom) {
+        if (adapter == null) return;
+        
+        float scaleFactor = currentZoom / previousZoom;
+        pendingVisualScale = scaleFactor;
+        
+        LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+        if (layoutManager == null) return;
+        
+        int first = layoutManager.findFirstVisibleItemPosition();
+        int last = layoutManager.findLastVisibleItemPosition();
+        
+        int[] childLocation = new int[2];
+        
+        for (int i = first; i <= last; i++) {
+            View child = layoutManager.findViewByPosition(i);
+            if (child instanceof ImageView) {
+                child.getLocationOnScreen(childLocation);
+                
+                float localX = focalX - childLocation[0];
+                float localY = focalY - childLocation[1];
+                localX = Math.max(0, Math.min(localX, child.getWidth()));
+                localY = Math.max(0, Math.min(localY, child.getHeight()));
+                
+                child.setPivotX(localX);
+                child.setPivotY(localY);
+                child.setScaleX(scaleFactor);
+                child.setScaleY(scaleFactor);
+                
+                pendingZoomSwap.add(i);
+            }
+        }
+    }
+    
+    /**
+     * Commit zoom and trigger high-res re-render WITHOUT resetting visual scale.
+     * The scale reset happens atomically when high-res bitmap arrives.
+     * 
+     * This is the key to avoiding visible snap-back:
+     * 1. Keep the CSS-scaled bitmap on screen
+     * 2. Render high-res in background
+     * 3. When ready: set new bitmap AND reset scale in same frame
+     */
+    private void commitZoomAndRerender() {
+        // Increment generation to invalidate old pending renders
         renderGeneration.incrementAndGet();
         
-        // Clear cache for current zoom (keeps other zoom levels cached)
-        // In practice, just clear everything for simplicity
+        // Clear cache and pending renders
         bitmapCache.evictAll();
         pendingRenders.clear();
+        
+        // Track which pages need atomic swap (visible pages at gesture end)
+        LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+        if (layoutManager != null) {
+            int first = layoutManager.findFirstVisibleItemPosition();
+            int last = layoutManager.findLastVisibleItemPosition();
+            
+            // Store the current visual scale for these pages
+            float scaleFactor = pendingZoom / (currentZoom > 0 ? currentZoom : 1.0f);
+            // Since we just set currentZoom = pendingZoom, recalculate from actual view
+            View firstChild = layoutManager.findViewByPosition(first);
+            if (firstChild != null) {
+                pendingVisualScale = firstChild.getScaleX();
+            }
+            
+            for (int i = first; i <= last; i++) {
+                pendingZoomSwap.add(i);
+            }
+        }
+        
+        // DO NOT reset visual scale here - that's the bug we're fixing
+        // DO NOT call notifyDataSetChanged - that triggers rebind with wrong size
+        
+        // Instead, directly trigger high-res renders for visible pages
+        prerenderVisiblePages();
+    }
+    
+    /**
+     * Trigger immediate high-res rendering for all visible pages.
+     * Called after zoom commit to start the swap pipeline.
+     */
+    private void prerenderVisiblePages() {
+        if (adapter == null || pdfRenderer == null) return;
+        
+        LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+        if (layoutManager == null) return;
+        
+        int first = layoutManager.findFirstVisibleItemPosition();
+        int last = layoutManager.findLastVisibleItemPosition();
+        
+        for (int i = first; i <= last; i++) {
+            String cacheKey = getCacheKey(i, currentZoom, false);
+            if (!pendingRenders.contains(cacheKey)) {
+                final int pageIndex = i;
+                pendingRenders.add(cacheKey);
+                renderExecutor.execute(() -> renderPageAsync(pageIndex, currentZoom, false));
+            }
+        }
+    }
+    
+    /**
+     * Legacy invalidate for non-gesture zoom changes.
+     * Resets visual scale immediately (used for programmatic zoom).
+     */
+    private void invalidateCacheAndRerender() {
+        renderGeneration.incrementAndGet();
+        bitmapCache.evictAll();
+        pendingRenders.clear();
+        pendingZoomSwap.clear();
+        pendingVisualScale = 1.0f;
         
         // Reset visual scale on all visible views
         LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
@@ -889,6 +1004,12 @@ public class NativePdfViewerActivity extends Activity {
         
         /**
          * Update a specific page with a new bitmap (atomic swap).
+         * 
+         * CRITICAL FIX: When a page is in pendingZoomSwap, we perform an ATOMIC swap:
+         * 1. Set the new high-res bitmap
+         * 2. Reset visual scale to 1.0
+         * 3. Update layout height
+         * All in the SAME frame - no intermediate state visible to user.
          */
         void updatePageBitmap(int pageIndex, Bitmap bitmap, int height, boolean isLowRes) {
             LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
@@ -902,16 +1023,37 @@ public class NativePdfViewerActivity extends Activity {
                 if (child instanceof ImageView) {
                     ImageView imageView = (ImageView) child;
                     
+                    // Check if this page is awaiting atomic zoom swap
+                    boolean needsAtomicSwap = pendingZoomSwap.contains(pageIndex) && !isLowRes;
+                    
                     // Only update if we're upgrading (low→high) or this is first render
                     Bitmap current = null;
                     if (imageView.getDrawable() instanceof android.graphics.drawable.BitmapDrawable) {
                         current = ((android.graphics.drawable.BitmapDrawable) imageView.getDrawable()).getBitmap();
                     }
                     
-                    // Skip if we already have high-res
                     String highKey = getCacheKey(pageIndex, currentZoom, false);
-                    if (!isLowRes || current == null || bitmapCache.get(highKey) == null) {
+                    boolean shouldUpdate = !isLowRes || current == null || bitmapCache.get(highKey) == null;
+                    
+                    if (shouldUpdate) {
+                        // ATOMIC SWAP: Set bitmap AND reset scale in the same frame
                         imageView.setImageBitmap(bitmap);
+                        
+                        if (needsAtomicSwap) {
+                            // Reset scale now that we have the correctly-sized bitmap
+                            imageView.setScaleX(1f);
+                            imageView.setScaleY(1f);
+                            imageView.setPivotX(imageView.getWidth() / 2f);
+                            imageView.setPivotY(imageView.getHeight() / 2f);
+                            
+                            // Remove from pending set
+                            pendingZoomSwap.remove(pageIndex);
+                            
+                            // If all pending swaps complete, reset tracking state
+                            if (pendingZoomSwap.isEmpty()) {
+                                pendingVisualScale = 1.0f;
+                            }
+                        }
                         
                         ViewGroup.LayoutParams params = imageView.getLayoutParams();
                         if (params.height != height) {
