@@ -5,6 +5,7 @@ import { ContentSourcePicker, ContactMode, ActionMode } from '@/components/Conte
 import { UrlInput } from '@/components/UrlInput';
 import { ShortcutCustomizer } from '@/components/ShortcutCustomizer';
 import { ContactShortcutCustomizer } from '@/components/ContactShortcutCustomizer';
+import { SlideshowCustomizer } from '@/components/SlideshowCustomizer';
 import { SuccessScreen } from '@/components/SuccessScreen';
 import { ClipboardSuggestion } from '@/components/ClipboardSuggestion';
 import { AppMenu } from '@/components/AppMenu';
@@ -21,12 +22,12 @@ import { useSheetBackHandler } from '@/hooks/useSheetBackHandler';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useToast } from '@/hooks/use-toast';
-import { pickFile, FileTypeFilter } from '@/lib/contentResolver';
+import { pickFile, pickMultipleImages, FileTypeFilter } from '@/lib/contentResolver';
 import { createHomeScreenShortcut } from '@/lib/shortcutManager';
-import type { ContentSource, ShortcutIcon, MessageApp } from '@/types/shortcut';
+import type { ContentSource, ShortcutIcon, MessageApp, MultiFileSource } from '@/types/shortcut';
 import type { ScheduledActionDestination } from '@/types/scheduledAction';
 
-export type AccessStep = 'source' | 'url' | 'customize' | 'contact' | 'success';
+export type AccessStep = 'source' | 'url' | 'customize' | 'slideshow-customize' | 'contact' | 'success';
 export type ContentSourceType = 'url' | 'file' | null;
 
 interface ContactData {
@@ -66,6 +67,7 @@ export function AccessFlow({
 }: AccessFlowProps) {
   const [step, setStep] = useState<AccessStep>('source');
   const [contentSource, setContentSource] = useState<ContentSource | null>(null);
+  const [slideshowSource, setSlideshowSource] = useState<MultiFileSource | null>(null);
   const [lastCreatedName, setLastCreatedName] = useState('');
   const [contactData, setContactData] = useState<ContactData | null>(null);
   const [contactMode, setContactMode] = useState<ContactMode>('dial');
@@ -77,7 +79,7 @@ export function AccessFlow({
   const processedInitialUrlRef = useRef<string | null>(null);
 
   const { t } = useTranslation();
-  const { createShortcut, createContactShortcut } = useShortcuts();
+  const { createShortcut, createContactShortcut, createSlideshowShortcut } = useShortcuts();
   const { toast } = useToast();
   const { settings } = useSettings();
   const { isOnline } = useNetworkStatus();
@@ -96,6 +98,7 @@ export function AccessFlow({
   const handleReset = useCallback(() => {
     setStep('source');
     setContentSource(null);
+    setSlideshowSource(null);
     setContactData(null);
     setLastCreatedName('');
     setPendingActionMode('shortcut');
@@ -116,6 +119,10 @@ export function AccessFlow({
           setStep('source');
           setContentSource(null);
         }
+        break;
+      case 'slideshow-customize':
+        setStep('source');
+        setSlideshowSource(null);
         break;
       case 'contact':
         setStep('source');
@@ -138,6 +145,7 @@ export function AccessFlow({
   // Register journey steps with back handler (priority 10 to intercept before Index fallback)
   useSheetBackHandler('access-url-step', step === 'url', handleGoBack, 10);
   useSheetBackHandler('access-customize-step', step === 'customize', handleGoBack, 10);
+  useSheetBackHandler('access-slideshow-step', step === 'slideshow-customize', handleGoBack, 10);
   useSheetBackHandler('access-contact-step', step === 'contact', handleGoBack, 10);
   useSheetBackHandler('access-success-step', step === 'success', handleReset, 10);
 
@@ -284,6 +292,33 @@ export function AccessFlow({
   };
 
   const handleSelectFile = async (filter: FileTypeFilter, actionMode: ActionMode) => {
+    // Use multi-image picker for images when creating shortcuts (not reminders)
+    if (filter === 'image' && actionMode === 'shortcut') {
+      const result = await pickMultipleImages();
+      
+      if (result && result.files.length > 1) {
+        // Multiple images selected - route to slideshow customizer
+        toast({ title: t('slideshow.creatingSlideshow', { count: result.files.length }) });
+        setSlideshowSource(result);
+        setStep('slideshow-customize');
+        return;
+      } else if (result && result.files.length === 1) {
+        // Single image - use existing flow
+        console.log('[AccessFlow] Single image selected from multi-picker');
+        setContentSource({
+          type: 'file',
+          uri: result.files[0].uri,
+          mimeType: result.files[0].mimeType,
+          name: result.files[0].name,
+        });
+        setStep('customize');
+        return;
+      }
+      // User cancelled
+      return;
+    }
+    
+    // Standard single-file flow for all other cases
     const file = await pickFile(filter);
     if (file) {
       console.log('[AccessFlow] File selected:', {
@@ -406,6 +441,38 @@ export function AccessFlow({
     }
   };
 
+  const handleSlideshowConfirm = async (
+    images: Array<{ uri: string; thumbnail?: string }>,
+    name: string,
+    icon: ShortcutIcon,
+    autoAdvanceInterval?: number
+  ) => {
+    try {
+      const shortcut = createSlideshowShortcut(images, name, icon, autoAdvanceInterval);
+      
+      const success = await createHomeScreenShortcut(shortcut);
+
+      if (success) {
+        setLastCreatedName(name);
+        setStep('success');
+      } else {
+        console.error('[AccessFlow] Failed to create slideshow shortcut');
+        toast({
+          title: 'Something went wrong',
+          description: 'Could not add slideshow to home screen. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('[AccessFlow] Slideshow shortcut creation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Could not create this slideshow shortcut.';
+      toast({
+        title: 'Unable to add',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Show settings page
   if (showSettings) {
@@ -496,6 +563,14 @@ export function AccessFlow({
         <ShortcutCustomizer
           source={contentSource}
           onConfirm={handleConfirm}
+          onBack={handleGoBack}
+        />
+      )}
+
+      {step === 'slideshow-customize' && slideshowSource && (
+        <SlideshowCustomizer
+          source={slideshowSource}
+          onConfirm={handleSlideshowConfirm}
           onBack={handleGoBack}
         />
       )}
