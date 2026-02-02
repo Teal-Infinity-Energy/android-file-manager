@@ -45,7 +45,7 @@ export default function MyShortcuts() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="ps-4 pe-4 pt-header-safe pb-3 border-b bg-background sticky top-0 z-10">
+      <header className="ps-5 pe-5 pt-header-safe pb-4 border-b bg-background sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
