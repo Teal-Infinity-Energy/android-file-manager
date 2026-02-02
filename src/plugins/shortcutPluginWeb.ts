@@ -506,4 +506,27 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     // On web, there are no native proxy activities recording tap events
     return { success: true, events: [] };
   }
+
+  // ========== Slideshow Deep Link (Web Fallback) ==========
+
+  async getPendingSlideshowId(): Promise<{
+    success: boolean;
+    slideshowId?: string;
+    error?: string;
+  }> {
+    console.log('[ShortcutPluginWeb] getPendingSlideshowId called (web fallback)');
+    // On web, check for URL parameter
+    const url = new URL(window.location.href);
+    const slideshowId = url.searchParams.get('slideshowId') || undefined;
+    return { success: true, slideshowId };
+  }
+
+  async clearPendingSlideshowId(): Promise<{ success: boolean; error?: string }> {
+    console.log('[ShortcutPluginWeb] clearPendingSlideshowId called (web fallback)');
+    // Clear URL params on web
+    const url = new URL(window.location.href);
+    url.searchParams.delete('slideshowId');
+    window.history.replaceState({}, '', url.pathname);
+    return { success: true };
+  }
 }

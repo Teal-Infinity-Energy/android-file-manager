@@ -66,6 +66,7 @@ import app.onetap.shortcuts.ShortcutEditProxyActivity;
 import app.onetap.shortcuts.LinkProxyActivity;
 import app.onetap.shortcuts.MessageProxyActivity;
 import app.onetap.shortcuts.FileProxyActivity;
+import app.onetap.shortcuts.SlideshowProxyActivity;
 import app.onetap.shortcuts.ScheduledActionReceiver;
 import app.onetap.shortcuts.NotificationHelper;
 import app.onetap.shortcuts.NotificationClickActivity;
@@ -353,6 +354,17 @@ public class ShortcutPlugin extends Plugin {
                     // Pass shortcut ID for usage tracking
                     intent.putExtra(MessageProxyActivity.EXTRA_SHORTCUT_ID, finalId);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                } else if ("app.onetap.OPEN_SLIDESHOW".equals(finalIntentAction)) {
+                    // Slideshow shortcuts - route through SlideshowProxyActivity
+                    android.util.Log.d("ShortcutPlugin", "Using SlideshowProxyActivity for slideshow shortcut");
+                    intent = new Intent(context, SlideshowProxyActivity.class);
+                    intent.setAction("app.onetap.OPEN_SLIDESHOW");
+                    intent.setData(finalDataUri);
+                    // Pass shortcut ID for usage tracking and slideshow content lookup
+                    intent.putExtra(SlideshowProxyActivity.EXTRA_SHORTCUT_ID, finalId);
+                    // Pass shortcut title for display
+                    intent.putExtra(SlideshowProxyActivity.EXTRA_SHORTCUT_TITLE, finalLabel);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 } else {
                     // Generic file shortcuts (audio, documents, etc.) - route through FileProxyActivity
                     // This ensures tap tracking works for all file types
@@ -541,7 +553,228 @@ public class ShortcutPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Pick multiple files from the system document picker.
+     * Used for slideshow creation - allows selecting up to maxCount images.
+     * Returns an array of file objects with URIs and generated thumbnails.
+     */
     @PluginMethod
+    public void pickMultipleFiles(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "pickMultipleFiles called");
+
+        if (getActivity() == null) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", "Activity is null");
+            call.resolve(result);
+            return;
+        }
+
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);  // Enable multi-select
+
+        // Default to images, but allow caller to restrict by MIME types
+        intent.setType("image/*");
+        try {
+            JSArray mimeTypesArr = call.getArray("mimeTypes");
+            if (mimeTypesArr != null && mimeTypesArr.length() > 0) {
+                String[] mimeTypes = new String[mimeTypesArr.length()];
+                for (int i = 0; i < mimeTypesArr.length(); i++) {
+                    mimeTypes[i] = mimeTypesArr.getString(i);
+                }
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("ShortcutPlugin", "Invalid mimeTypes provided: " + e.getMessage());
+        }
+
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+
+        startActivityForResult(call, intent, "pickMultipleFilesResult");
+    }
+
+    @ActivityCallback
+    private void pickMultipleFilesResult(PluginCall call, ActivityResult result) {
+        android.util.Log.d("ShortcutPlugin", "pickMultipleFilesResult called");
+
+        JSObject ret = new JSObject();
+
+        if (call == null) {
+            android.util.Log.w("ShortcutPlugin", "pickMultipleFilesResult: PluginCall is null");
+            return;
+        }
+
+        if (result == null || result.getResultCode() != Activity.RESULT_OK) {
+            ret.put("success", false);
+            ret.put("error", "cancelled");
+            call.resolve(ret);
+            return;
+        }
+
+        Intent data = result.getData();
+        if (data == null) {
+            ret.put("success", false);
+            ret.put("error", "No files selected");
+            call.resolve(ret);
+            return;
+        }
+
+        // Get max count from call, default to 20
+        Integer maxCount = call.getInt("maxCount", 20);
+        
+        List<Uri> selectedUris = new ArrayList<>();
+        
+        // Check for multiple selections via ClipData
+        ClipData clipData = data.getClipData();
+        if (clipData != null) {
+            int count = Math.min(clipData.getItemCount(), maxCount);
+            for (int i = 0; i < count; i++) {
+                Uri uri = clipData.getItemAt(i).getUri();
+                if (uri != null) {
+                    selectedUris.add(uri);
+                }
+            }
+        } else if (data.getData() != null) {
+            // Single selection fallback
+            selectedUris.add(data.getData());
+        }
+
+        if (selectedUris.isEmpty()) {
+            ret.put("success", false);
+            ret.put("error", "No files selected");
+            call.resolve(ret);
+            return;
+        }
+
+        android.util.Log.d("ShortcutPlugin", "Selected " + selectedUris.size() + " files");
+
+        // Process files on background thread to avoid UI freezing
+        final List<Uri> finalUris = selectedUris;
+        new Thread(() -> {
+            JSArray filesArray = new JSArray();
+            Context context = getContext();
+            
+            for (Uri uri : finalUris) {
+                try {
+                    // Persist permission where possible
+                    if (context != null) {
+                        int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                        try {
+                            context.getContentResolver().takePersistableUriPermission(uri, takeFlags);
+                            android.util.Log.d("ShortcutPlugin", "Persisted URI permission: " + uri);
+                        } catch (Exception e) {
+                            android.util.Log.w("ShortcutPlugin", "Could not persist URI permission: " + e.getMessage());
+                        }
+                    }
+
+                    JSObject fileObj = new JSObject();
+                    fileObj.put("uri", uri.toString());
+
+                    // Get file metadata
+                    if (context != null) {
+                        ContentResolver resolver = context.getContentResolver();
+                        String mimeType = resolver.getType(uri);
+                        if (mimeType != null) fileObj.put("mimeType", mimeType);
+
+                        Cursor cursor = resolver.query(uri, null, null, null, null);
+                        if (cursor != null) {
+                            if (cursor.moveToFirst()) {
+                                int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                                if (nameIndex >= 0) {
+                                    String name = cursor.getString(nameIndex);
+                                    if (name != null) fileObj.put("name", name);
+                                }
+
+                                int sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE);
+                                if (sizeIndex >= 0) {
+                                    long size = cursor.getLong(sizeIndex);
+                                    fileObj.put("size", size);
+                                }
+                            }
+                            cursor.close();
+                        }
+
+                        // Generate thumbnail for the image (256px for icon use)
+                        String thumbnail = generateImageThumbnailBase64(context, uri, 256);
+                        if (thumbnail != null) {
+                            fileObj.put("thumbnail", thumbnail);
+                        }
+                    }
+
+                    filesArray.put(fileObj);
+                } catch (Exception e) {
+                    android.util.Log.w("ShortcutPlugin", "Failed to process file: " + uri + " - " + e.getMessage());
+                }
+            }
+
+            // Return result on main thread
+            getActivity().runOnUiThread(() -> {
+                JSObject finalRet = new JSObject();
+                finalRet.put("success", true);
+                finalRet.put("files", filesArray);
+                call.resolve(finalRet);
+            });
+        }).start();
+    }
+
+    /**
+     * Generate a base64-encoded JPEG thumbnail for an image URI.
+     */
+    private String generateImageThumbnailBase64(Context context, Uri uri, int maxSize) {
+        try {
+            InputStream inputStream = context.getContentResolver().openInputStream(uri);
+            if (inputStream == null) return null;
+
+            // Decode with sample size for efficiency
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeStream(inputStream, null, options);
+            inputStream.close();
+
+            int originalWidth = options.outWidth;
+            int originalHeight = options.outHeight;
+            int sampleSize = 1;
+            while (originalWidth / sampleSize > maxSize * 2 || originalHeight / sampleSize > maxSize * 2) {
+                sampleSize *= 2;
+            }
+
+            options = new BitmapFactory.Options();
+            options.inSampleSize = sampleSize;
+
+            inputStream = context.getContentResolver().openInputStream(uri);
+            if (inputStream == null) return null;
+
+            Bitmap bitmap = BitmapFactory.decodeStream(inputStream, null, options);
+            inputStream.close();
+
+            if (bitmap == null) return null;
+
+            // Scale to target size
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            float scale = Math.min((float) maxSize / width, (float) maxSize / height);
+            
+            if (scale < 1) {
+                int newWidth = Math.round(width * scale);
+                int newHeight = Math.round(height * scale);
+                bitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
+            }
+
+            // Encode to JPEG base64
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos);
+            byte[] bytes = baos.toByteArray();
+            
+            return Base64.encodeToString(bytes, Base64.NO_WRAP);
+        } catch (Exception e) {
+            android.util.Log.w("ShortcutPlugin", "Failed to generate thumbnail for: " + uri + " - " + e.getMessage());
+            return null;
+        }
+    }
+
+
     public void openNativeVideoPlayer(PluginCall call) {
         android.util.Log.d("ShortcutPlugin", "openNativeVideoPlayer called");
 
@@ -3402,6 +3635,81 @@ public class ShortcutPlugin extends Plugin {
             call.resolve(result);
         } catch (Exception e) {
             android.util.Log.e("ShortcutPlugin", "Error clearing pending WhatsApp action: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    // ========== Slideshow Deep Link ==========
+
+    /**
+     * Get pending slideshow ID from deep link (from home screen shortcut tap).
+     * Called by JS layer on app startup to navigate to slideshow viewer if needed.
+     */
+    @PluginMethod
+    public void getPendingSlideshowId(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "getPendingSlideshowId called");
+
+        try {
+            Activity activity = getActivity();
+            if (activity == null || !(activity instanceof MainActivity)) {
+                JSObject result = new JSObject();
+                result.put("success", false);
+                result.put("error", "MainActivity not available");
+                call.resolve(result);
+                return;
+            }
+
+            MainActivity mainActivity = (MainActivity) activity;
+            String slideshowId = mainActivity.getPendingSlideshowId();
+            
+            JSObject result = new JSObject();
+            result.put("success", true);
+            
+            if (slideshowId != null && !slideshowId.isEmpty()) {
+                result.put("slideshowId", slideshowId);
+                android.util.Log.d("ShortcutPlugin", "Found pending slideshow ID: " + slideshowId);
+            } else {
+                android.util.Log.d("ShortcutPlugin", "No pending slideshow ID");
+            }
+            
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error getting pending slideshow ID: " + e.getMessage());
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
+
+    /**
+     * Clear pending slideshow ID after it has been handled.
+     */
+    @PluginMethod
+    public void clearPendingSlideshowId(PluginCall call) {
+        android.util.Log.d("ShortcutPlugin", "clearPendingSlideshowId called");
+
+        try {
+            Activity activity = getActivity();
+            if (activity == null || !(activity instanceof MainActivity)) {
+                JSObject result = new JSObject();
+                result.put("success", false);
+                result.put("error", "MainActivity not available");
+                call.resolve(result);
+                return;
+            }
+
+            MainActivity mainActivity = (MainActivity) activity;
+            mainActivity.clearPendingSlideshowId();
+            
+            JSObject result = new JSObject();
+            result.put("success", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutPlugin", "Error clearing pending slideshow ID: " + e.getMessage());
             JSObject result = new JSObject();
             result.put("success", false);
             result.put("error", e.getMessage());

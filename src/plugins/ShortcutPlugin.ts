@@ -294,6 +294,21 @@ export interface ShortcutPluginInterface {
     contactName?: string;      // Contact display name for WhatsApp
   }): Promise<{ success: boolean; error?: string }>;
 
+  // ========== Slideshow Deep Link ==========
+
+  // Get pending slideshow ID from deep link (from home screen shortcut tap)
+  getPendingSlideshowId(): Promise<{
+    success: boolean;
+    slideshowId?: string;
+    error?: string;
+  }>;
+
+  // Clear pending slideshow ID after navigation
+  clearPendingSlideshowId(): Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
   // ========== Native Usage Tracking ==========
 
   // Get native usage events recorded by proxy activities (home screen taps).

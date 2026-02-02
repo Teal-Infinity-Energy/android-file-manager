@@ -54,6 +54,15 @@ export function useDeepLink() {
         return;
       }
 
+      // Handle slideshow deep link (onetap://slideshow/{shortcutId})
+      if (url.startsWith('onetap://slideshow/')) {
+        const slideshowId = url.replace('onetap://slideshow/', '');
+        console.log('[DeepLink] Slideshow deep link detected, ID:', slideshowId);
+        // Dispatch custom event with slideshow ID for navigation
+        window.dispatchEvent(new CustomEvent('onetap:open-slideshow', { detail: { slideshowId } }));
+        return;
+      }
+
       // Only handle OAuth callbacks
       if (!isOAuthCallback(url)) {
         console.log('[DeepLink] Not an auth callback, ignoring');
