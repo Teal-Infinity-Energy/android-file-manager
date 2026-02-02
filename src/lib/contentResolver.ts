@@ -383,11 +383,20 @@ export async function pickFile(filter: FileTypeFilter = 'all'): Promise<ContentS
 /**
  * Pick multiple images for slideshow creation.
  * On native Android, uses multi-file picker with thumbnail generation.
+ * Shows a native toast hint about multi-select before opening the picker.
  * On web, falls back to multi-file input.
  */
-export async function pickMultipleImages(): Promise<MultiFileSource | null> {
+export async function pickMultipleImages(multiSelectHintMessage?: string): Promise<MultiFileSource | null> {
   if (Capacitor.isNativePlatform()) {
     try {
+      // Show native toast hint before opening picker
+      if (multiSelectHintMessage) {
+        ShortcutPlugin.showNativeToast({
+          message: multiSelectHintMessage,
+          duration: 'long',
+        }).catch(e => console.warn('[ContentResolver] Failed to show toast:', e));
+      }
+
       const result = await ShortcutPlugin.pickMultipleFiles({
         mimeTypes: ['image/*'],
         maxCount: MAX_SLIDESHOW_IMAGES,

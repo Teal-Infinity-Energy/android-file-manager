@@ -322,6 +322,15 @@ export interface ShortcutPluginInterface {
     }>;
     error?: string;
   }>;
+
+  // ========== Native Toast ==========
+
+  // Show a native Android toast message.
+  // Used for brief informational messages that don't interrupt the user.
+  showNativeToast(options: {
+    message: string;
+    duration?: 'short' | 'long';
+  }): Promise<{ success: boolean }>;
 }
 
 // This plugin bridges to native Android code

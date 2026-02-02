@@ -4378,4 +4378,42 @@ public class ShortcutPlugin extends Plugin {
             call.resolve(result);
         }
     }
+
+    /**
+     * Show a native Android toast message.
+     * Used for brief informational messages that don't interrupt the user.
+     */
+    @PluginMethod
+    public void showNativeToast(PluginCall call) {
+        String message = call.getString("message");
+        String duration = call.getString("duration", "short");
+        
+        if (message == null || message.isEmpty()) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            call.resolve(result);
+            return;
+        }
+        
+        Activity activity = getActivity();
+        if (activity == null) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            call.resolve(result);
+            return;
+        }
+        
+        int toastDuration = "long".equals(duration) 
+            ? android.widget.Toast.LENGTH_LONG 
+            : android.widget.Toast.LENGTH_SHORT;
+        
+        // Toast must be shown on UI thread
+        activity.runOnUiThread(() -> {
+            android.widget.Toast.makeText(activity, message, toastDuration).show();
+        });
+        
+        JSObject result = new JSObject();
+        result.put("success", true);
+        call.resolve(result);
+    }
 }

@@ -294,7 +294,9 @@ export function AccessFlow({
   const handleSelectFile = async (filter: FileTypeFilter, actionMode: ActionMode) => {
     // Use multi-image picker for images when creating shortcuts (not reminders)
     if (filter === 'image' && actionMode === 'shortcut') {
-      const result = await pickMultipleImages();
+      // Pass translated hint message for native toast
+      const multiSelectHint = t('slideshow.multiSelectHint');
+      const result = await pickMultipleImages(multiSelectHint);
       
       if (result && result.files.length > 1) {
         // Multiple images selected - route to slideshow customizer

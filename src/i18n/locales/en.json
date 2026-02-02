@@ -832,6 +832,7 @@
     "autoAdvance": "Auto-advance",
     "addToHomeScreen": "Add to Home Screen",
     "notFound": "Slideshow not found",
-    "creatingSlideshow": "Creating a slideshow with {{count}} photos"
+    "creatingSlideshow": "Creating a slideshow with {{count}} photos",
+    "multiSelectHint": "Select multiple photos for a slideshow"
   }
 }
