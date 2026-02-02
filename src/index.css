@@ -118,6 +118,19 @@ All colors MUST be HSL.
   .pt-header-safe-compact {
     padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
   }
+
+  /* Sticky header with scroll shadow */
+  .header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: hsl(var(--background));
+    transition: box-shadow 0.2s ease;
+  }
+  
+  .header-sticky[data-scrolled="true"] {
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.1);
+  }
 }
 
 /* Material Design elevation shadows */
