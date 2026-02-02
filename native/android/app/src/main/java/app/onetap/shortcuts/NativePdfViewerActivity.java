@@ -39,9 +39,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,7 +98,9 @@ public class NativePdfViewerActivity extends Activity {
     private LruCache<String, Bitmap> bitmapCache;
     
     // Track which pages are being rendered to avoid duplicates
-    private final Set<String> pendingRenders = new HashSet<>();
+    // THREAD-SAFE: Uses ConcurrentHashMap.newKeySet() to prevent ConcurrentModificationException
+    // when background render threads remove keys while main thread iterates/adds
+    private final Set<String> pendingRenders = ConcurrentHashMap.newKeySet();
     
     // Track pages awaiting zoom swap (scale reset deferred until high-res arrives)
     private final Set<Integer> pendingZoomSwap = new HashSet<>();
@@ -595,6 +597,12 @@ public class NativePdfViewerActivity extends Activity {
         
         int first = layoutManager.findFirstVisibleItemPosition();
         int last = layoutManager.findLastVisibleItemPosition();
+        
+        // Guard against invalid visible range (empty RecyclerView or layout not ready)
+        if (first < 0 || last < first) {
+            isDoubleTapAnimating = false;
+            return;
+        }
         
         // Cache pivot points before animation starts
         final int[] childLocation = new int[2];
@@ -1143,16 +1151,27 @@ public class NativePdfViewerActivity extends Activity {
             Log.d(TAG, "Rendering page " + pageIndex + " low-res: " + lowWidth + "x" + lowHeight + " ARGB_8888");
             
             // Now open page for actual rendering
+            // CRITICAL FIX: Capture local reference to pdfRenderer before synchronized block
+            // This prevents NullPointerException if pdfRenderer becomes null during onDestroy()
+            // while this background thread is waiting or executing
             boolean lowResSuccess = false;
-            synchronized (pdfRenderer) {
-                if (pdfRenderer == null || pageIndex < 0 || pageIndex >= pdfRenderer.getPageCount()) {
+            PdfRenderer localRenderer = pdfRenderer;
+            if (localRenderer == null) {
+                lowBitmap.recycle();
+                pendingRenders.remove(getCacheKey(pageIndex, targetZoom, false));
+                return;
+            }
+            
+            synchronized (localRenderer) {
+                // Double-check inside synchronized block (pdfRenderer could have been nulled)
+                if (pdfRenderer == null || pageIndex < 0 || pageIndex >= localRenderer.getPageCount()) {
                     lowBitmap.recycle();
                     pendingRenders.remove(getCacheKey(pageIndex, targetZoom, false));
                     return;
                 }
                 
                 try {
-                    PdfRenderer.Page page = pdfRenderer.openPage(pageIndex);
+                    PdfRenderer.Page page = localRenderer.openPage(pageIndex);
                     
                     // Pass null for Matrix - PdfRenderer auto-scales to bitmap dimensions
                     page.render(lowBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
@@ -1202,14 +1221,23 @@ public class NativePdfViewerActivity extends Activity {
             Bitmap highBitmap = Bitmap.createBitmap(highWidth, highHeight, Bitmap.Config.ARGB_8888);
             highBitmap.eraseColor(Color.WHITE);
             
-            synchronized (pdfRenderer) {
-                if (pdfRenderer == null || pageIndex < 0 || pageIndex >= pdfRenderer.getPageCount()) {
+            // CRITICAL FIX: Re-capture local reference for high-res pass (could have changed)
+            localRenderer = pdfRenderer;
+            if (localRenderer == null) {
+                highBitmap.recycle();
+                pendingRenders.remove(getCacheKey(pageIndex, targetZoom, false));
+                return;
+            }
+            
+            synchronized (localRenderer) {
+                // Double-check inside synchronized block
+                if (pdfRenderer == null || pageIndex < 0 || pageIndex >= localRenderer.getPageCount()) {
                     highBitmap.recycle();
                     pendingRenders.remove(getCacheKey(pageIndex, targetZoom, false));
                     return;
                 }
                 
-                PdfRenderer.Page page = pdfRenderer.openPage(pageIndex);
+                PdfRenderer.Page page = localRenderer.openPage(pageIndex);
                 
                 // CRITICAL FIX: Pass null for Matrix - PdfRenderer auto-scales to bitmap dimensions
                 // The bitmap is already sized to highWidth x highHeight, so no Matrix needed
