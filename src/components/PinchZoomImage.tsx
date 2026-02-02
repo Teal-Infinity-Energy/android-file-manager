@@ -209,11 +209,14 @@ export default function PinchZoomImage({
       } else if (deltaY > SWIPE_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
         onSwipeDown?.();
       } else if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
-        // Tap (not double tap - that's handled in touchStart)
-        const now = Date.now();
-        if (now - lastTapRef.current > DOUBLE_TAP_DELAY) {
-          onTap?.();
-        }
+        // Simple tap detected - use timeout to differentiate from double-tap
+        const tapTime = lastTapRef.current;
+        setTimeout(() => {
+          // Only fire tap if no second tap occurred (not a double-tap)
+          if (lastTapRef.current === tapTime) {
+            onTap?.();
+          }
+        }, DOUBLE_TAP_DELAY + 50);
       }
     }
     
