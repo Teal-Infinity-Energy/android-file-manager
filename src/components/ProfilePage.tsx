@@ -256,9 +256,9 @@ export function ProfilePage({}: ProfilePageProps = {}) {
   // Not signed in state
   if (!user) {
     return (
-      <div className="flex-1 flex flex-col p-4 pb-20 overflow-y-auto">
+      <div className="flex-1 flex flex-col pb-20 overflow-y-auto">
         {/* Header with Menu */}
-        <header className="flex items-center justify-between pt-header-safe pb-4">
+        <header className="ps-5 pe-5 pt-header-safe pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <User className="h-4 w-4 text-primary-foreground" />
@@ -337,9 +337,9 @@ export function ProfilePage({}: ProfilePageProps = {}) {
   [rawAvatarUrl]);
 
   return (
-    <div className="flex-1 flex flex-col p-4 pb-20 overflow-y-auto">
+    <div className="flex-1 flex flex-col pb-20 overflow-y-auto">
       {/* Header with Menu */}
-      <header className="flex items-center justify-between pt-header-safe pb-4">
+      <header className="ps-5 pe-5 pt-header-safe pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
             <User className="h-4 w-4 text-primary-foreground" />
@@ -349,6 +349,8 @@ export function ProfilePage({}: ProfilePageProps = {}) {
         <AppMenu onOpenTrash={() => setIsTrashOpen(true)} onOpenSettings={() => setShowSettings(true)} />
       </header>
 
+      {/* Content with horizontal padding */}
+      <div className="px-5">
       {/* User Info Card */}
       <Card id="tutorial-user-card" className="mb-4">
         <CardContent className="pt-6">
@@ -550,6 +552,7 @@ export function ProfilePage({}: ProfilePageProps = {}) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      </div>
       </div>
 
       {/* Trash Sheet */}

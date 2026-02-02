@@ -112,11 +112,11 @@ All colors MUST be HSL.
 
   /* Header-safe utilities: combines safe area + visual padding */
   .pt-header-safe {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
   }
 
   .pt-header-safe-compact {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   }
 
   /* Sticky header with scroll shadow */
