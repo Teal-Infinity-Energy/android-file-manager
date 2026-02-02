@@ -384,6 +384,10 @@ public class NativePdfViewerActivity extends Activity {
     /**
      * Apply visual zoom using ImageView scale (instant, no re-render).
      * Used during pinch gesture for 60fps responsiveness.
+     * 
+     * CRITICAL: focalX/focalY from ScaleGestureDetector are SCREEN coordinates.
+     * ImageView.setPivotX/Y() expects VIEW-LOCAL coordinates.
+     * We must convert screen → view-local for content to stay anchored under fingers.
      */
     private void applyVisualZoom() {
         if (adapter == null) return;
@@ -396,13 +400,28 @@ public class NativePdfViewerActivity extends Activity {
         int first = layoutManager.findFirstVisibleItemPosition();
         int last = layoutManager.findLastVisibleItemPosition();
         
+        // Reusable array for screen location lookup (avoid allocation per child)
+        int[] childLocation = new int[2];
+        
         for (int i = first; i <= last; i++) {
             View child = layoutManager.findViewByPosition(i);
             if (child instanceof ImageView) {
+                // Get child's position in screen coordinates
+                child.getLocationOnScreen(childLocation);
+                
+                // Convert focal point from screen-space to view-local space
+                float localX = focalX - childLocation[0];
+                float localY = focalY - childLocation[1];
+                
+                // Clamp to view bounds to handle edge cases (pinch outside this page)
+                localX = Math.max(0, Math.min(localX, child.getWidth()));
+                localY = Math.max(0, Math.min(localY, child.getHeight()));
+                
+                // Set pivot using view-local coordinates - content now stays under fingers
+                child.setPivotX(localX);
+                child.setPivotY(localY);
                 child.setScaleX(scaleFactor);
                 child.setScaleY(scaleFactor);
-                child.setPivotX(focalX);
-                child.setPivotY(focalY);
             }
         }
     }
