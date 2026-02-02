@@ -1,8 +1,8 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import ShortcutPlugin from '@/plugins/ShortcutPlugin';
-import type { FileType, ContentSource } from '@/types/shortcut';
-import { VIDEO_CACHE_THRESHOLD } from '@/types/shortcut';
+import type { FileType, ContentSource, MultiFileSource } from '@/types/shortcut';
+import { VIDEO_CACHE_THRESHOLD, MAX_SLIDESHOW_IMAGES } from '@/types/shortcut';
 import { detectPlatform, type PlatformInfo } from '@/lib/platformIcons';
 
 // Maximum file size for base64 encoding - matches VIDEO_CACHE_THRESHOLD (50MB)
@@ -377,6 +377,126 @@ export async function pickFile(filter: FileTypeFilter = 'all'): Promise<ContentS
 
     input.oncancel = () => resolve(null);
     input.click();
+  });
+}
+
+/**
+ * Pick multiple images for slideshow creation.
+ * On native Android, uses multi-file picker with thumbnail generation.
+ * On web, falls back to multi-file input.
+ */
+export async function pickMultipleImages(): Promise<MultiFileSource | null> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await ShortcutPlugin.pickMultipleFiles({
+        mimeTypes: ['image/*'],
+        maxCount: MAX_SLIDESHOW_IMAGES,
+      });
+
+      if (!result.success || !result.files || result.files.length === 0) {
+        return null;
+      }
+
+      return {
+        type: 'slideshow',
+        files: result.files.map(file => ({
+          uri: file.uri,
+          mimeType: file.mimeType,
+          name: file.name,
+          thumbnail: file.thumbnail,
+        })),
+      };
+    } catch (e) {
+      console.warn('[ContentResolver] Native pickMultipleFiles failed, falling back to web picker:', e);
+    }
+  }
+
+  // Web fallback with multiple file input
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+
+    input.onchange = async (e) => {
+      const fileList = (e.target as HTMLInputElement).files;
+      if (!fileList || fileList.length === 0) {
+        resolve(null);
+        return;
+      }
+
+      // Limit to max allowed
+      const files = Array.from(fileList).slice(0, MAX_SLIDESHOW_IMAGES);
+      
+      // Process each file to generate thumbnails
+      const processedFiles = await Promise.all(
+        files.map(async (file) => {
+          const thumbnail = await generateImageThumbnailFromFile(file, 256);
+          return {
+            uri: URL.createObjectURL(file),
+            mimeType: file.type,
+            name: file.name,
+            thumbnail: thumbnail || undefined,
+          };
+        })
+      );
+
+      resolve({
+        type: 'slideshow',
+        files: processedFiles,
+      });
+    };
+
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
+/**
+ * Generate a thumbnail from a File object (for web fallback).
+ */
+async function generateImageThumbnailFromFile(file: File, maxSize: number = 256): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        }
+      } else {
+        if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(dataUrl);
+      } else {
+        resolve(null);
+      }
+
+      URL.revokeObjectURL(img.src);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(null);
+    };
+
+    img.src = URL.createObjectURL(file);
   });
 }
 

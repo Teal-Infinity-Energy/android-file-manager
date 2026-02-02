@@ -242,6 +242,30 @@ export function useShortcuts() {
     saveShortcuts(updated);
     return shortcut;
   }, [shortcuts, saveShortcuts]);
+
+  const createSlideshowShortcut = useCallback((
+    images: Array<{ uri: string; thumbnail?: string }>,
+    name: string,
+    icon: ShortcutIcon,
+    autoAdvanceInterval?: number
+  ): ShortcutData => {
+    const shortcut: ShortcutData = {
+      id: crypto.randomUUID(),
+      name,
+      type: 'slideshow',
+      contentUri: '', // Not used for slideshows
+      icon,
+      createdAt: Date.now(),
+      usageCount: 0,
+      imageUris: images.map(i => i.uri),
+      imageThumbnails: images.map(i => i.thumbnail).filter(Boolean) as string[],
+      autoAdvanceInterval,
+    };
+
+    const updated = [...shortcuts, shortcut];
+    saveShortcuts(updated);
+    return shortcut;
+  }, [shortcuts, saveShortcuts]);
   
   // Helper to detect file type from MIME type (robust detection)
   function detectFileTypeFromMime(mimeType?: string, filename?: string): 'image' | 'video' | 'pdf' | 'document' | undefined {
@@ -376,6 +400,7 @@ export function useShortcuts() {
     shortcuts,
     createShortcut,
     createContactShortcut,
+    createSlideshowShortcut,
     deleteShortcut,
     incrementUsage,
     updateShortcut,

@@ -12,6 +12,17 @@ export interface ShortcutIntent {
 
 // Build intent for opening content
 export function buildContentIntent(shortcut: ShortcutData): ShortcutIntent {
+  // Slideshow shortcut - opens in-app viewer
+  if (shortcut.type === 'slideshow') {
+    return {
+      action: 'app.onetap.OPEN_SLIDESHOW',
+      data: `onetap://slideshow/${shortcut.id}`,
+      extras: {
+        shortcut_id: shortcut.id,
+      },
+    };
+  }
+
   // Contact shortcut - routes through ContactProxyActivity for permission checking
   // The proxy will place call directly if CALL_PHONE permission is granted,
   // otherwise falls back to opening the dialer

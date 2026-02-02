@@ -819,5 +819,19 @@
     "invalidNumber": "Enter a valid phone number",
     "tooShort": "Number is too short",
     "tooLong": "Number is too long"
+  },
+  "slideshow": {
+    "customize": "Customize Slideshow",
+    "minPhotos": "Need at least 2 photos",
+    "reorder": "Drag to reorder",
+    "name": "Slideshow name",
+    "iconStyle": "Icon style",
+    "gridIcon": "Grid",
+    "coverIcon": "Cover",
+    "emojiIcon": "Emoji",
+    "autoAdvance": "Auto-advance",
+    "addToHomeScreen": "Add to Home Screen",
+    "notFound": "Slideshow not found",
+    "creatingSlideshow": "Creating a slideshow with {{count}} photos"
   }
 }

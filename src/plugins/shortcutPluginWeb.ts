@@ -69,6 +69,21 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     return { success: false, error: 'Not supported on web' };
   }
 
+  async pickMultipleFiles(): Promise<{
+    success: boolean;
+    files?: Array<{
+      uri: string;
+      name?: string;
+      mimeType?: string;
+      size?: number;
+      thumbnail?: string;
+    }>;
+    error?: string;
+  }> {
+    console.log('[ShortcutPluginWeb] pickMultipleFiles called (web fallback)');
+    return { success: false, error: 'Not supported on web' };
+  }
+
   async openNativeVideoPlayer(): Promise<{ success: boolean; error?: string }> {
     console.log('[ShortcutPluginWeb] openNativeVideoPlayer called (web fallback)');
     return { success: false, error: 'Not supported on web' };
@@ -463,7 +478,7 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     iconText?: string;
     iconData?: string;
     // Intent-affecting properties (WhatsApp only for messaging)
-    shortcutType?: 'file' | 'link' | 'contact' | 'message';
+    shortcutType?: 'file' | 'link' | 'contact' | 'message' | 'slideshow';
     phoneNumber?: string;
     quickMessages?: string[];
     messageApp?: string; // 'whatsapp' only
