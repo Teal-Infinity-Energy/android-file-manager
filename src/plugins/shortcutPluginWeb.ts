@@ -529,4 +529,16 @@ export class ShortcutPluginWeb implements ShortcutPluginInterface {
     window.history.replaceState({}, '', url.pathname);
     return { success: true };
   }
+
+  // ========== Native Toast (Web Fallback) ==========
+
+  async showNativeToast(options: {
+    message: string;
+    duration?: 'short' | 'long';
+  }): Promise<{ success: boolean }> {
+    console.log('[ShortcutPluginWeb] showNativeToast called (web fallback)', options.message);
+    // On web, we can't show native toasts - just log it
+    // The message won't be shown since this is web-only
+    return { success: true };
+  }
 }
