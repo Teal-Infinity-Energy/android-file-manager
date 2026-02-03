@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -200,6 +201,10 @@ public class NativePdfViewerActivity extends Activity {
         shortcutId = getIntent().getStringExtra("shortcut_id");
         resumeEnabled = getIntent().getBooleanExtra("resume", true);
         
+        // Initialize render executor early (before UI, handles all paths including error states)
+        // 3 threads: 1 for low-res, 2 for high-res
+        renderExecutor = Executors.newFixedThreadPool(3);
+        
         if (pdfUri == null) {
             Log.e(TAG, "No PDF URI provided");
             // Build UI first so we can show error state
@@ -209,9 +214,6 @@ public class NativePdfViewerActivity extends Activity {
         }
         
         Log.d(TAG, "Opening PDF: " + pdfUri + ", shortcutId=" + shortcutId + ", resume=" + resumeEnabled);
-        
-        // Initialize render executor (3 threads: 1 for low-res, 2 for high-res)
-        renderExecutor = Executors.newFixedThreadPool(3);
         
         // Load resume state if enabled
         if (resumeEnabled && shortcutId != null) {
@@ -737,7 +739,7 @@ public class NativePdfViewerActivity extends Activity {
      * Called after zoom commit to start the swap pipeline.
      */
     private void prerenderVisiblePages() {
-        if (adapter == null || pdfRenderer == null) return;
+        if (adapter == null || pdfRenderer == null || renderExecutor == null) return;
         
         LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
         if (layoutManager == null) return;
@@ -861,7 +863,7 @@ public class NativePdfViewerActivity extends Activity {
      * Pre-render pages above and below viewport for smooth scrolling.
      */
     private void prerenderAdjacentPages() {
-        if (adapter == null || pdfRenderer == null) return;
+        if (adapter == null || pdfRenderer == null || renderExecutor == null) return;
         
         LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
         if (layoutManager == null) return;
@@ -1281,23 +1283,40 @@ public class NativePdfViewerActivity extends Activity {
         }
         doubleTapAnimator = null;
         
+        // CRITICAL: Capture and null references BEFORE shutting down executor
+        // This signals background threads to exit gracefully and prevents
+        // race conditions where threads try to use closed resources
+        PdfRenderer rendererToClose = pdfRenderer;
+        ParcelFileDescriptor fdToClose = fileDescriptor;
+        pdfRenderer = null;      // Signal threads to exit
+        fileDescriptor = null;
+        
+        // Shutdown executor and wait briefly for threads to finish
         if (renderExecutor != null) {
             renderExecutor.shutdownNow();
+            try {
+                renderExecutor.awaitTermination(500, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            renderExecutor = null;  // Prevent further use
         }
         
+        // Evict bitmaps
         if (bitmapCache != null) {
             bitmapCache.evictAll();
         }
         
-        if (pdfRenderer != null) {
+        // Now safe to close PDF resources (threads have exited)
+        if (rendererToClose != null) {
             try {
-                pdfRenderer.close();
+                rendererToClose.close();
             } catch (Exception ignored) {}
         }
         
-        if (fileDescriptor != null) {
+        if (fdToClose != null) {
             try {
-                fileDescriptor.close();
+                fdToClose.close();
             } catch (Exception ignored) {}
         }
     }
@@ -1366,8 +1385,8 @@ public class NativePdfViewerActivity extends Activity {
                 }
             }
             
-            // Trigger render if not already pending
-            if (!pendingRenders.contains(highKey)) {
+            // Trigger render if not already pending (with null guard for executor)
+            if (!pendingRenders.contains(highKey) && renderExecutor != null) {
                 pendingRenders.add(highKey);
                 renderExecutor.execute(() -> renderPageAsync(position, currentZoom, false));
             }
