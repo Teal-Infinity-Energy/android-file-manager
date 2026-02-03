@@ -23,6 +23,11 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ShortcutPlugin.class);
         super.onCreate(savedInstanceState);
         
+        // Initialize crash logger early with application context
+        // This ensures logs can be persisted even if activities crash
+        CrashLogger.getInstance().initialize(getApplicationContext());
+        CrashLogger.getInstance().addBreadcrumb(CrashLogger.CAT_LIFECYCLE, "MainActivity.onCreate");
+        
         Log.d(TAG, "onCreate called");
         logIntent(getIntent());
         
