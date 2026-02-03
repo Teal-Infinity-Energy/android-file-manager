@@ -108,16 +108,16 @@ export function UsageInsights() {
               {stats.mostUsedShortcuts.slice(0, 3).map((shortcut, index) => (
                 <div 
                   key={shortcut.id} 
-                  className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2"
+                  className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2 min-w-0 overflow-hidden"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                     <span className="text-xs font-medium text-muted-foreground w-4">
                       {index + 1}.
                     </span>
-                    <span className="text-lg">
+                    <span className="text-lg shrink-0">
                       {shortcut.icon.type === 'emoji' ? shortcut.icon.value : '📎'}
                     </span>
-                    <span className="text-sm text-foreground truncate">
+                    <span className="text-sm text-foreground truncate flex-1 min-w-0">
                       {shortcut.name}
                     </span>
                   </div>
