@@ -51,6 +51,7 @@ public class PDFProxyActivity extends Activity {
         
         // Check if this is from a shortcut (has shortcut_id) or external open
         String shortcutId = incomingIntent.getStringExtra("shortcut_id");
+        String shortcutTitle = incomingIntent.getStringExtra("shortcut_title");
         boolean resumeEnabled;
         boolean isFromShortcut = (shortcutId != null);
         
@@ -73,12 +74,12 @@ public class PDFProxyActivity extends Activity {
                   ", action=" + action);
         }
         
-        openInternalViewer(pdfUri, shortcutId, resumeEnabled, mimeType);
+        openInternalViewer(pdfUri, shortcutId, shortcutTitle, resumeEnabled, mimeType);
         
         finish();
     }
     
-    private void openInternalViewer(Uri pdfUri, String shortcutId, boolean resumeEnabled, String mimeType) {
+    private void openInternalViewer(Uri pdfUri, String shortcutId, String shortcutTitle, boolean resumeEnabled, String mimeType) {
         try {
             // Take persistent URI permission if possible (for external opens)
             try {
@@ -93,6 +94,7 @@ public class PDFProxyActivity extends Activity {
             Intent viewerIntent = new Intent(this, NativePdfViewerActivity.class);
             viewerIntent.setDataAndType(pdfUri, mimeType != null ? mimeType : "application/pdf");
             viewerIntent.putExtra("shortcut_id", shortcutId);
+            viewerIntent.putExtra("shortcut_title", shortcutTitle);
             viewerIntent.putExtra("resume", resumeEnabled);
             viewerIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             viewerIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

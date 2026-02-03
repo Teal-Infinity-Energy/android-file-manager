@@ -2127,13 +2127,12 @@ public class NativeVideoPlayerActivity extends Activity {
             externalIntent.setDataAndType(videoUri, videoMimeType);
             externalIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             
-            // Add ClipData for content URIs to ensure permission propagation
-            if ("content".equals(videoUri.getScheme())) {
-                try {
-                    externalIntent.setClipData(ClipData.newUri(getContentResolver(), "video", videoUri));
-                } catch (Exception e) {
-                    logWarn("Failed to set ClipData: " + e.getMessage());
-                }
+            // Set ClipData with meaningful display name for external app
+            String displayName = (videoTitle != null && !videoTitle.isEmpty()) ? videoTitle : "Video";
+            try {
+                externalIntent.setClipData(ClipData.newUri(getContentResolver(), displayName, videoUri));
+            } catch (Exception e) {
+                logWarn("Failed to set ClipData: " + e.getMessage());
             }
             
             // Create a chooser to let user pick the app
@@ -2171,13 +2170,12 @@ public class NativeVideoPlayerActivity extends Activity {
             externalIntent.setDataAndType(videoUri, videoMimeType);
             externalIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             
-            // Add ClipData for content URIs to ensure permission propagation
-            if ("content".equals(videoUri.getScheme())) {
-                try {
-                    externalIntent.setClipData(ClipData.newUri(getContentResolver(), "video", videoUri));
-                } catch (Exception e) {
-                    logWarn("Failed to set ClipData: " + e.getMessage());
-                }
+            // Set ClipData with meaningful display name for external app
+            String displayName = (videoTitle != null && !videoTitle.isEmpty()) ? videoTitle : "Video";
+            try {
+                externalIntent.setClipData(ClipData.newUri(getContentResolver(), displayName, videoUri));
+            } catch (Exception e) {
+                logWarn("Failed to set ClipData: " + e.getMessage());
             }
             
             // Create a chooser to let user pick the app

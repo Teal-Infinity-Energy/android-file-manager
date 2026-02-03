@@ -202,9 +202,19 @@ public class NotificationClickActivity extends Activity {
                 case "file":
                     String fileUri = data.getString("uri");
                     String mimeType = data.optString("mimeType", "*/*");
+                    String displayName = data.optString("displayName", "File");
                     actionIntent = new Intent(Intent.ACTION_VIEW);
                     actionIntent.setDataAndType(Uri.parse(fileUri), mimeType);
                     actionIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    
+                    // Set ClipData with meaningful display name for external app
+                    try {
+                        android.content.ClipData clipData = android.content.ClipData.newUri(
+                            getContentResolver(), displayName, Uri.parse(fileUri));
+                        actionIntent.setClipData(clipData);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to set ClipData: " + e.getMessage());
+                    }
                     break;
                     
                 default:

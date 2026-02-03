@@ -4,6 +4,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -140,11 +141,21 @@ public class NotificationHelper {
                     org.json.JSONObject fileData = new org.json.JSONObject(destinationData);
                     String fileUri = fileData.getString("uri");
                     String mimeType = fileData.optString("mimeType", "*/*");
+                    String displayName = fileData.optString("displayName", "File");
                     
                     Intent fileIntent = new Intent(Intent.ACTION_VIEW);
                     fileIntent.setDataAndType(Uri.parse(fileUri), mimeType);
                     fileIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    
+                    // Set ClipData with meaningful display name for external app
+                    try {
+                        ClipData clipData = ClipData.newUri(
+                            context.getContentResolver(), displayName, Uri.parse(fileUri));
+                        fileIntent.setClipData(clipData);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to set ClipData: " + e.getMessage());
+                    }
                     return fileIntent;
                     
                 default:

@@ -64,13 +64,13 @@ public class FileProxyActivity extends Activity {
             Log.w(TAG, "No shortcut ID provided, tap not tracked");
         }
         
-        // Open the file in an external app
-        openFileInExternalApp(fileUri, mimeType);
+        // Open the file in an external app, passing the shortcut title for better display
+        openFileInExternalApp(fileUri, mimeType, shortcutTitle);
         
         finish();
     }
     
-    private void openFileInExternalApp(Uri fileUri, String mimeType) {
+    private void openFileInExternalApp(Uri fileUri, String mimeType, String displayName) {
         try {
             Intent viewIntent = new Intent(Intent.ACTION_VIEW);
             
@@ -83,6 +83,16 @@ public class FileProxyActivity extends Activity {
             
             viewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            // Set ClipData with meaningful display name for external app
+            String label = (displayName != null && !displayName.isEmpty()) ? displayName : "File";
+            try {
+                android.content.ClipData clipData = android.content.ClipData.newUri(
+                    getContentResolver(), label, fileUri);
+                viewIntent.setClipData(clipData);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to set ClipData: " + e.getMessage());
+            }
             
             // Try to find an activity that can handle this
             if (viewIntent.resolveActivity(getPackageManager()) != null) {
