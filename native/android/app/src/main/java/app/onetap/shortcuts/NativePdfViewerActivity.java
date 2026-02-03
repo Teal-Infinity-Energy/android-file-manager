@@ -74,9 +74,10 @@ public class NativePdfViewerActivity extends Activity {
     private static final String TAG = "NativePdfViewer";
     private static final String PREFS_NAME = "pdf_resume_positions";
     private static final int AUTO_HIDE_DELAY_MS = 4000;
-    private static final float MIN_ZOOM = 1.0f;
+    private static final float MIN_ZOOM = 0.2f;  // Show ~5 pages when zoomed out
     private static final float MAX_ZOOM = 5.0f;
     private static final float DOUBLE_TAP_ZOOM = 2.5f;
+    private static final float FIT_PAGE_ZOOM = 1.0f;  // Default fit-to-width
     
     // Pre-render pages above/below viewport for smooth scrolling
     private static final int PRERENDER_PAGES = 2;
@@ -192,8 +193,16 @@ public class NativePdfViewerActivity extends Activity {
         protected void dispatchDraw(Canvas canvas) {
             canvas.save();
             
-            // Apply horizontal pan (only when zoomed in)
-            canvas.translate(panX, 0);
+            // When zoomed out, center content horizontally
+            float translateX = panX;
+            if (zoomLevel < 1.0f) {
+                // Center the scaled content
+                float scaledWidth = getWidth() * zoomLevel;
+                translateX = (getWidth() - scaledWidth) / 2f;
+            }
+            
+            // Apply horizontal translation (pan when zoomed in, center when zoomed out)
+            canvas.translate(translateX, 0);
             
             // Apply zoom centered on focal point
             canvas.scale(zoomLevel, zoomLevel, focalX, focalY);
@@ -718,9 +727,14 @@ public class NativePdfViewerActivity extends Activity {
                 if (isDoubleTapAnimating) return true;
                 
                 float targetZoom;
-                if (currentZoom > 1.5f) {
-                    targetZoom = 1.0f;
+                if (currentZoom < 0.9f) {
+                    // Zoomed out → fit to width
+                    targetZoom = FIT_PAGE_ZOOM;
+                } else if (currentZoom > 1.5f) {
+                    // Zoomed in → fit to width
+                    targetZoom = FIT_PAGE_ZOOM;
                 } else {
+                    // At fit → zoom in
                     targetZoom = DOUBLE_TAP_ZOOM;
                 }
                 
