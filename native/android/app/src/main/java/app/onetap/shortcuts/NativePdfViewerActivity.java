@@ -32,6 +32,7 @@ import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
@@ -420,6 +421,12 @@ public class NativePdfViewerActivity extends Activity {
         private float lastTouchY = 0f;  // Track Y for vertical panning
         private boolean isPanning = false;
         
+        // Velocity tracking for fling physics
+        private VelocityTracker velocityTracker;
+        private ValueAnimator flingAnimator;
+        private static final float FLING_FRICTION = 0.92f;  // Deceleration factor per frame
+        private static final float MIN_FLING_VELOCITY = 50f;  // Minimum velocity to trigger fling
+        
         @Override
         public boolean onTouchEvent(MotionEvent e) {
             // CRITICAL: Process gesture detectors FIRST, before any scroll handling
@@ -453,12 +460,29 @@ public class NativePdfViewerActivity extends Activity {
             if (zoomLevel > 1.0f) {
                 switch (action) {
                     case MotionEvent.ACTION_DOWN:
+                        // Cancel any ongoing fling
+                        if (flingAnimator != null && flingAnimator.isRunning()) {
+                            flingAnimator.cancel();
+                        }
+                        
+                        // Initialize velocity tracker
+                        if (velocityTracker == null) {
+                            velocityTracker = VelocityTracker.obtain();
+                        } else {
+                            velocityTracker.clear();
+                        }
+                        velocityTracker.addMovement(e);
+                        
                         lastTouchX = e.getX();
                         lastTouchY = e.getY();
                         isPanning = false;
                         break;
                         
                     case MotionEvent.ACTION_MOVE:
+                        if (velocityTracker != null) {
+                            velocityTracker.addMovement(e);
+                        }
+                        
                         if (e.getPointerCount() == 1 && !isInternalScaling) {
                             float dx = e.getX() - lastTouchX;
                             float dy = e.getY() - lastTouchY;
@@ -493,9 +517,25 @@ public class NativePdfViewerActivity extends Activity {
                         
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
-                        if (isPanning) {
+                        if (isPanning && velocityTracker != null) {
+                            // Compute velocity
+                            velocityTracker.computeCurrentVelocity(1000);  // pixels per second
+                            float vx = velocityTracker.getXVelocity();
+                            float vy = velocityTracker.getYVelocity();
+                            
+                            // Start fling if velocity exceeds threshold
+                            if (Math.abs(vx) > MIN_FLING_VELOCITY || Math.abs(vy) > MIN_FLING_VELOCITY) {
+                                startFling(vx, vy);
+                            }
+                            
+                            velocityTracker.recycle();
+                            velocityTracker = null;
                             isPanning = false;
                             return true;
+                        }
+                        if (velocityTracker != null) {
+                            velocityTracker.recycle();
+                            velocityTracker = null;
                         }
                         break;
                 }
@@ -503,6 +543,61 @@ public class NativePdfViewerActivity extends Activity {
             
             // Allow normal RecyclerView scroll for single-touch when not in scale mode
             return super.onTouchEvent(e);
+        }
+        
+        /**
+         * Start fling animation with given initial velocities.
+         * Uses friction-based deceleration for natural feel.
+         */
+        private void startFling(float velocityX, float velocityY) {
+            if (flingAnimator != null && flingAnimator.isRunning()) {
+                flingAnimator.cancel();
+            }
+            
+            // Scale velocities for smoother feel (pixels/sec to pixels/frame at 60fps)
+            final float[] vx = {velocityX / 60f};
+            final float[] vy = {velocityY / 60f};
+            
+            flingAnimator = ValueAnimator.ofFloat(0f, 1f);
+            flingAnimator.setDuration(2000);  // Max duration, will stop early when velocity dies
+            flingAnimator.setInterpolator(new android.view.animation.LinearInterpolator());
+            
+            flingAnimator.addUpdateListener(animation -> {
+                // Apply friction
+                vx[0] *= FLING_FRICTION;
+                vy[0] *= FLING_FRICTION;
+                
+                // Stop when velocity is negligible
+                if (Math.abs(vx[0]) < 0.5f && Math.abs(vy[0]) < 0.5f) {
+                    flingAnimator.cancel();
+                    return;
+                }
+                
+                // Calculate scaled content dimensions
+                float scaledContentWidth = getWidth() * zoomLevel;
+                float scaledContentHeight = getHeight() * zoomLevel;
+                
+                // Apply velocity to pan
+                if (scaledContentWidth > getWidth()) {
+                    panX += vx[0];
+                }
+                if (scaledContentHeight > getHeight()) {
+                    panY += vy[0];
+                }
+                
+                // Clamp and check for edge bounce
+                float oldPanX = panX;
+                float oldPanY = panY;
+                clampPan();
+                
+                // If we hit an edge, dampen velocity in that direction
+                if (panX != oldPanX + vx[0]) vx[0] = 0;
+                if (panY != oldPanY + vy[0]) vy[0] = 0;
+                
+                invalidate();
+            });
+            
+            flingAnimator.start();
         }
         
         /**
