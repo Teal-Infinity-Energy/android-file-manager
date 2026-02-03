@@ -45,6 +45,9 @@ export function useShortcuts() {
   }, [syncToWidgets]);
 
   // Sync with home screen - remove orphaned shortcuts that were deleted from home screen
+  // NOTE: On Android 12+, getPinnedShortcuts() is unreliable for shortcuts created via
+  // requestPinShortcut() without dynamic shortcut registration. Therefore, sync only
+  // removes shortcuts if we get a positive signal that they're definitely unpinned.
   const syncWithHomeScreen = useCallback(async () => {
     if (!Capacitor.isNativePlatform()) return;
     
@@ -55,10 +58,19 @@ export function useShortcuts() {
       const stored = localStorage.getItem(STORAGE_KEY);
       const currentShortcuts: ShortcutData[] = stored ? JSON.parse(stored) : [];
       
-      // If no pinned shortcuts returned (empty array), skip sync
-      // This handles the case where the API isn't available or returns empty
-      if (ids.length === 0 && currentShortcuts.length > 0) {
-        console.log('[useShortcuts] No pinned shortcuts returned, skipping sync');
+      console.log(`[useShortcuts] Sync check: ${ids.length} pinned IDs from OS, ${currentShortcuts.length} shortcuts in storage`);
+      
+      // Android 12+ limitation: getPinnedShortcuts() may return empty or incomplete
+      // for shortcuts created via requestPinShortcut() alone.
+      // 
+      // Strategy:
+      // - If OS returns some IDs: filter out shortcuts not in the list (they were unpinned)
+      // - If OS returns empty but we have shortcuts: don't delete anything (API unreliable)
+      
+      if (ids.length === 0) {
+        // Can't determine what's actually pinned - keep all shortcuts
+        console.log('[useShortcuts] No pinned IDs from OS, keeping all shortcuts (API may be unreliable)');
+        setShortcuts(currentShortcuts);
         return;
       }
       
@@ -78,7 +90,7 @@ export function useShortcuts() {
     } catch (error) {
       console.warn('[useShortcuts] Failed to sync with home screen:', error);
     }
-  }, [saveShortcuts]); // Removed `shortcuts` dependency - now reads fresh from localStorage
+  }, [saveShortcuts]);
 
   // Sync native usage events from home screen taps
   const syncNativeUsageEvents = useCallback(async () => {
