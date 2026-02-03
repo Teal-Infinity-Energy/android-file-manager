@@ -1,34 +1,47 @@
 
-# Enable Scroll in Bookmark Library & Profile Page
+# Add "Create Reminder" Option to Bookmark Library
 
-## Problem
+## Overview
 
-The Bookmark Library tab doesn't scroll when there are many saved URLs. This is because it uses a native `<div>` with `overflow-y-auto` instead of the `<ScrollArea>` component that other list views use.
+Add a "Create Reminder" / "Remind Later" option in the Bookmark Library that allows users to schedule a reminder for a saved URL. This feature will be available in two places:
 
-Similarly, the Profile Page uses native overflow styling which may have inconsistent behavior.
+1. **BookmarkActionSheet** - When tapping on a bookmark item
+2. **Bulk Action Bar** - When exactly one bookmark is selected
 
-## Root Cause
-
-**BookmarkLibrary.tsx** (line 973) uses:
-```jsx
-<div className="flex-1 overflow-y-auto ps-5 pe-5 pb-16 ...">
-```
-
-While other list views like **NotificationsPage.tsx** (line 898) and **MyShortcutsContent.tsx** (line 597) use:
-```jsx
-<ScrollArea className="flex-1 px-5">
-```
-
-The `ScrollArea` component from shadcn/ui provides better cross-platform scroll behavior and consistent touch handling.
+This mirrors the existing "Create Shortcut" functionality which allows setting up home screen access.
 
 ---
 
-## Solution
+## Architecture
 
-Replace native `div` with `<ScrollArea>` in:
+The existing pattern is well-established:
+- `Index.tsx` manages cross-tab navigation and passes `pendingReminderDestination` to `NotificationsPage`
+- `onCreateReminder` callback receives a `ScheduledActionDestination` object
+- Switching to the Reminders tab with a pre-filled destination opens the reminder creator
 
-1. **BookmarkLibrary.tsx** - Main bookmark list container
-2. **ProfilePage.tsx** - Signed-in and signed-out content areas
+```text
+┌──────────────────────┐
+│   BookmarkLibrary    │
+│                      │
+│  onCreateReminder    │────▶ Index.tsx
+│  (callback prop)     │      │
+└──────────────────────┘      │
+                              ▼
+                    setPendingReminderDestination
+                              │
+                              ▼
+                    setActiveTab('reminders')
+                              │
+                              ▼
+                    ┌──────────────────────┐
+                    │  NotificationsPage   │
+                    │                      │
+                    │ initialDestination   │
+                    │    ▼                 │
+                    │ Opens reminder       │
+                    │ creator with URL     │
+                    └──────────────────────┘
+```
 
 ---
 
@@ -36,60 +49,117 @@ Replace native `div` with `<ScrollArea>` in:
 
 ### 1. BookmarkLibrary.tsx
 
-**Current (lines 950-973):**
-```jsx
-<div 
-  ref={scrollContainerRef}
-  onScroll={(e) => { /* scroll handler */ }}
-  className="flex-1 overflow-y-auto ps-5 pe-5 pb-16 overscroll-contain touch-pan-y"
+**Add new prop:**
+```typescript
+interface BookmarkLibraryProps {
+  onCreateShortcut: (url: string) => void;
+  onCreateReminder: (url: string) => void;  // NEW
+  onSelectionModeChange?: (isSelectionMode: boolean) => void;
+  clearSelectionSignal?: number;
+  onActionSheetOpenChange?: (isOpen: boolean) => void;
+}
+```
+
+**Add new handler:**
+```typescript
+const handleCreateReminder = (url: string) => {
+  onCreateReminder(url);
+};
+```
+
+**Update BookmarkActionSheet usage:**
+```typescript
+<BookmarkActionSheet
+  ...
+  onCreateReminder={handleCreateReminder}  // NEW
+/>
+```
+
+**Add button to bulk action bar (when single selection):**
+```typescript
+{shortlistedLinks.length === 1 && (
+  <>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={() => handleCreateReminder(shortlistedLinks[0].url)}
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
+          aria-label={t('bookmarkAction.remindLater')}
+        >
+          <Bell className="h-5 w-5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{t('bookmarkAction.remindLater')}</TooltipContent>
+    </Tooltip>
+    ...existing Edit and Home buttons...
+  </>
+)}
+```
+
+---
+
+### 2. BookmarkActionSheet.tsx
+
+**Add new prop:**
+```typescript
+interface BookmarkActionSheetProps {
+  ...
+  onCreateReminder: (url: string) => void;  // NEW
+}
+```
+
+**Add new action button (after "Create Shortcut"):**
+```typescript
+{/* Create Reminder */}
+<button
+  onClick={() => handleAction(() => {
+    onCreateReminder(link.url);
+    onOpenChange(false);
+  })}
+  className="w-full flex items-center gap-3 p-3 landscape:p-2.5 rounded-xl hover:bg-muted/50 transition-colors"
 >
-  {/* Bookmark content */}
-</div>
+  <Bell className="h-5 w-5 landscape:h-4 landscape:w-4 text-muted-foreground" />
+  <span className="font-medium landscape:text-sm">{t('bookmarkAction.remindLater')}</span>
+</button>
 ```
 
-**Change to:**
-```jsx
-<ScrollArea 
-  className="flex-1" 
-  onScrollCapture={(e) => { /* scroll handler */ }}
->
-  <div ref={scrollContainerRef} className="ps-5 pe-5 pb-16">
-    {/* Bookmark content */}
-  </div>
-</ScrollArea>
+---
+
+### 3. Index.tsx
+
+**Add handler:**
+```typescript
+const handleCreateReminderFromBookmark = useCallback((url: string) => {
+  // Create UrlDestination and switch to reminders tab
+  const destination: UrlDestination = {
+    type: 'url',
+    uri: url,
+    name: url, // Will be parsed to hostname in NotificationsPage
+  };
+  setPendingReminderDestination(destination);
+  setActiveTab('reminders');
+}, []);
 ```
 
-Key changes:
-- Wrap content with `<ScrollArea>` component
-- Move horizontal padding inside the ScrollArea viewport
-- Use `onScrollCapture` event on ScrollArea for scroll detection
-- Keep `scrollContainerRef` on inner div for scroll position tracking
-
-### 2. ProfilePage.tsx (Signed-out state)
-
-**Current (lines 258-259):**
-```jsx
-<div className="flex-1 flex flex-col pb-20 overflow-y-auto">
+**Pass to BookmarkLibrary:**
+```typescript
+<BookmarkLibrary
+  onCreateShortcut={handleCreateShortcutFromBookmark}
+  onCreateReminder={handleCreateReminderFromBookmark}  // NEW
+  ...
+/>
 ```
 
-**Change to:**
-```jsx
-<ScrollArea className="flex-1">
-  <div className="flex flex-col pb-20">
+---
+
+### 4. Translation Key
+
+Add to `en.json` under `bookmarkAction`:
+```json
+"remindLater": "Remind Later"
 ```
 
-### 3. ProfilePage.tsx (Signed-in state)
-
-**Current (line 339-340):**
-```jsx
-<div className="flex-1 flex flex-col pb-20 overflow-y-auto">
-```
-
-**Change to:**
-```jsx
-<ScrollArea className="flex-1">
-  <div className="flex flex-col pb-20">
-```
+This reuses the existing translation key pattern already present in `sharedUrl` and `clipboard` sections.
 
 ---
 
@@ -97,25 +167,46 @@ Key changes:
 
 | File | Changes |
 |------|---------|
-| `src/components/BookmarkLibrary.tsx` | Replace native scroll `div` with `ScrollArea` component |
-| `src/components/ProfilePage.tsx` | Wrap both signed-in and signed-out content with `ScrollArea` |
+| `src/components/BookmarkLibrary.tsx` | Add `onCreateReminder` prop, handler, and bulk action bar button |
+| `src/components/BookmarkActionSheet.tsx` | Add `onCreateReminder` prop and action button |
+| `src/pages/Index.tsx` | Add `handleCreateReminderFromBookmark` handler and pass to BookmarkLibrary |
+| `src/i18n/locales/en.json` | Add `bookmarkAction.remindLater` translation key |
 
 ---
 
-## Technical Notes
+## UI Placement
 
-- The `ScrollArea` component already provides `overflow-x-hidden` via the `viewportClassName` prop when needed
-- The scroll event handler needs to use `onScrollCapture` on ScrollArea or use a ref to the viewport
-- Bottom padding remains on the inner content div to clear fixed bottom elements
-- The `overscroll-contain` and `touch-pan-y` classes are not needed with ScrollArea as it handles these natively
+### Action Sheet Menu (BookmarkActionSheet)
+```
+┌─────────────────────────────────┐
+│ Bookmark Title                  │
+│ https://example.com/article     │
+├─────────────────────────────────┤
+│ 🔗 Open in Browser              │
+│ ➕ Set Up Home Screen Access    │
+│ 🔔 Remind Later         ← NEW  │
+│ ✏️ Edit                         │
+│ 🗑️ Move to Trash                │
+│ 🗑️ Delete Permanently           │
+└─────────────────────────────────┘
+```
+
+### Bulk Action Bar (single selection)
+```
+┌────────────────────────────────────────────────────┐
+│  1 selected │ 📁  🔔  ✏️  🏠  🗑️  │ ✕ │
+│             │         ↑                            │
+│             │     NEW Bell                         │
+└────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Testing Checklist
 
-- [ ] Bookmark Library: Add 10+ bookmarks and verify smooth scrolling
-- [ ] Bookmark Library: Verify scroll-based bottom button visibility still works
-- [ ] Profile Page (signed out): Scroll content if taller than viewport
-- [ ] Profile Page (signed in): Scroll through all cards and verify smooth behavior
-- [ ] Landscape orientation: Verify scrolling works in both orientations
-- [ ] Swipe navigation: Ensure horizontal swipe between tabs still works (no gesture conflicts)
+- [ ] Tap bookmark → Action sheet shows "Remind Later" option
+- [ ] Tap "Remind Later" → Switches to Reminders tab with reminder creator pre-filled with URL
+- [ ] Long-press to select one bookmark → Bulk bar shows Bell icon
+- [ ] Tap Bell icon → Switches to Reminders tab with reminder creator pre-filled
+- [ ] Complete reminder creation → Reminder saved with correct URL destination
+- [ ] Both portrait and landscape modes display correctly
