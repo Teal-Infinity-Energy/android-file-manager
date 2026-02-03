@@ -59,12 +59,53 @@ public class CrashLogger {
     /**
      * Initialize with application context.
      * Call this from Application.onCreate() or early in the app lifecycle.
+     * Can be called multiple times safely - only first call with valid context takes effect.
      */
     public void initialize(Context context) {
-        if (context != null) {
+        if (context != null && appContext == null) {
+            // Always use application context to survive activity destruction
             appContext = context.getApplicationContext();
+            Log.d(TAG, "CrashLogger initialized with context");
+            
+            // Install uncaught exception handler to capture crashes
+            installUncaughtExceptionHandler();
         }
         addBreadcrumb("app", "CrashLogger initialized");
+    }
+    
+    /**
+     * Install an uncaught exception handler to capture crashes.
+     * This ensures crashes are logged even if they bypass our try-catch blocks.
+     */
+    private void installUncaughtExceptionHandler() {
+        final Thread.UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+        
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            try {
+                // Log the crash
+                Log.e(TAG, "UNCAUGHT EXCEPTION on thread " + thread.getName(), throwable);
+                
+                // Persist crash info synchronously (we're about to die)
+                recordError("UncaughtException", thread.getName(), throwable,
+                    "thread", thread.getName(),
+                    "fatal", "true");
+                
+                // Give a moment for the sync write to complete
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {}
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error in uncaught exception handler", e);
+            }
+            
+            // Call the default handler (usually terminates the app)
+            if (defaultHandler != null) {
+                defaultHandler.uncaughtException(thread, throwable);
+            }
+        });
+        
+        Log.d(TAG, "Uncaught exception handler installed");
     }
     
     /**
@@ -217,7 +258,10 @@ public class CrashLogger {
     }
     
     private void persistError(String component, String operation, String errorLog) {
-        if (appContext == null) return;
+        if (appContext == null) {
+            Log.e(TAG, "Cannot persist error - appContext is null. Call initialize() first.");
+            return;
+        }
         
         try {
             SharedPreferences prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -232,12 +276,20 @@ public class CrashLogger {
                 combined = combined.substring(combined.length() - MAX_ERROR_LOG_SIZE);
             }
             
-            prefs.edit()
+            // CRITICAL: Use commit() instead of apply() for synchronous write
+            // This ensures logs are persisted even if the app crashes immediately after
+            boolean success = prefs.edit()
                 .putString("error_log", combined)
                 .putString("last_error_component", component)
                 .putString("last_error_operation", operation)
                 .putLong("last_error_time", System.currentTimeMillis())
-                .apply();
+                .commit();  // Synchronous write - blocks until complete
+            
+            if (!success) {
+                Log.e(TAG, "Failed to commit error log to SharedPreferences");
+            } else {
+                Log.d(TAG, "Error log persisted successfully");
+            }
         } catch (Exception e) {
             Log.e(TAG, "Failed to persist error log", e);
         }
