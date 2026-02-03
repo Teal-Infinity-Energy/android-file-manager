@@ -13,6 +13,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -123,8 +124,11 @@ export function SlideshowCustomizer({ source, onConfirm, onBack }: SlideshowCust
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const sensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    }),
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { distance: 5 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -318,7 +322,14 @@ export function SlideshowCustomizer({ source, onConfirm, onBack }: SlideshowCust
             >
               <div className="flex flex-col items-center gap-2">
                 {files[0]?.thumbnail ? (
-                  <img src={files[0].thumbnail} alt="Cover" className="w-12 h-12 rounded object-cover" />
+                  <img 
+                    src={files[0].thumbnail.startsWith('data:') || files[0].thumbnail.startsWith('blob:') 
+                      ? files[0].thumbnail 
+                      : `data:image/jpeg;base64,${files[0].thumbnail}`
+                    } 
+                    alt="Cover" 
+                    className="w-12 h-12 rounded object-cover" 
+                  />
                 ) : (
                   <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
                     <Image className="h-6 w-6 text-muted-foreground" />

@@ -333,7 +333,7 @@ export default function SlideshowViewer() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.2 }}
-              className="absolute top-0 left-0 right-0 p-4 pt-safe bg-gradient-to-b from-black/60 to-transparent"
+              className="absolute top-0 left-0 right-0 px-4 pb-4 pt-header-safe bg-gradient-to-b from-black/60 to-transparent"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
