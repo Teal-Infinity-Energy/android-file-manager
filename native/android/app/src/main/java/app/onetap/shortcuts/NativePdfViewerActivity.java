@@ -111,6 +111,9 @@ public class NativePdfViewerActivity extends Activity {
     private static final int FAST_SCROLL_AUTO_HIDE_MS = 1500;
     private static final int FAST_SCROLL_POPUP_MARGIN_DP = 56;
     
+    // Layout update throttle for train view (zoom < 1.0x) during pinch gesture
+    private static final int LAYOUT_UPDATE_THROTTLE_MS = 50;
+    
     // Core components
     private ZoomableRecyclerView recyclerView;
     private PdfPageAdapter adapter;
@@ -170,6 +173,9 @@ public class NativePdfViewerActivity extends Activity {
     private int screenWidth;
     private int screenHeight;
     private float density;
+    
+    // Throttle tracking for train view layout updates during pinch
+    private long lastLayoutUpdateTime = 0;
     
     // Background rendering (2 threads for low-res + high-res parallel rendering)
     private ExecutorService renderExecutor;
@@ -1205,15 +1211,17 @@ public class NativePdfViewerActivity extends Activity {
             
             @Override
             public void onScale(float newZoom, float fx, float fy) {
-                // Check if we crossed the 1.0 threshold - need to update layout
-                boolean wasBelow = currentZoom < 1.0f;
-                boolean isBelow = newZoom < 1.0f;
-                
-                if (wasBelow != isBelow) {
-                    // Threshold crossed - will update on scale end
-                }
-                
                 currentZoom = newZoom;
+                
+                // Trigger throttled layout update during gesture for train view
+                // This makes zoom out feel instant instead of waiting for gesture end
+                if (newZoom < 1.0f && adapter != null) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastLayoutUpdateTime > LAYOUT_UPDATE_THROTTLE_MS) {
+                        lastLayoutUpdateTime = now;
+                        adapter.notifyDataSetChanged();
+                    }
+                }
             }
             
             @Override
