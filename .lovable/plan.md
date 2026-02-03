@@ -1,182 +1,214 @@
 
 
-# Pass Original Filename to External Apps
+# PDF Page Centering & Panning Enhancement
 
 ## Overview
 
-When users open files in external apps (via "Open with" options), the external apps often display cryptic URIs or generic names like "Document" instead of the user's meaningful shortcut label. This impacts the premium UX experience. We need to pass the original filename/title to external apps for proper display.
+Ensure PDF pages stay horizontally centered when their scaled width is less than the screen width (in both portrait and landscape), and enable smooth one-finger movement in all directions when the zoomed page exceeds screen bounds.
 
 ---
 
-## Identified Locations
+## Current Behavior
 
-There are **7 locations** across 5 files where files are opened in external/installed apps:
-
-| # | File | Method | File Type | Has Title? |
-|---|------|--------|-----------|------------|
-| 1 | `NativePdfViewerActivity.java` | `openWithExternalApp()` | PDF | ❌ No |
-| 2 | `NativeVideoPlayerActivity.java` | `tryOpenExternalPlayer()` | Video | ❌ No |
-| 3 | `NativeVideoPlayerActivity.java` | `openInExternalPlayer()` | Video | ❌ No |
-| 4 | `FileProxyActivity.java` | `openFileInExternalApp()` | Audio/Docs | ❌ No (has title in intent but doesn't pass) |
-| 5 | `ShortcutPlugin.java` | `openWithExternalApp()` | Any file | ❌ No |
-| 6 | `NotificationHelper.java` | `buildActionIntent()` (file case) | Files from reminders | ❌ No |
-| 7 | `NotificationClickActivity.java` | `executeAction()` (file case) | Files from reminders | ❌ No |
+| Scenario | Current Behavior |
+|----------|-----------------|
+| Zoomed out (< 1.0x) | Pages are centered horizontally via `Gravity.CENTER_HORIZONTAL` ✓ |
+| At 1.0x | Pages fill screen width, no centering needed ✓ |
+| Zoomed in (> 1.0x) | Canvas scales content, horizontal panning available |
+| Orientation change | `screenWidth` not updated - pages may not recenter |
+| Vertical panning when zoomed | Not available - RecyclerView handles scroll |
 
 ---
 
-## How External Apps Get Filenames
+## Problem Areas
 
-Android external apps typically get the displayed filename from one of these sources:
+### 1. Orientation Changes Not Handled
+The `screenWidth` and `screenHeight` are set only in `onCreate()`. When device rotates:
+- Pages may use stale dimensions
+- Centering calculations become incorrect
+- Page scaling doesn't adapt to new screen width
 
-1. **ClipData label** (most reliable): When setting `ClipData.newUri(resolver, label, uri)`, the `label` parameter is often used by receiving apps as the display name
-2. **ContentProvider query** (fallback): Apps query `OpenableColumns.DISPLAY_NAME` from the content resolver
-3. **Uri path segment** (last resort): The last path segment of the URI
+### 2. Pan Direction Limited
+Current panning only allows horizontal movement when zoomed in (> 1.0x):
+```java
+if (zoomLevel > 1.0f) {
+    // Only horizontal pan via panX
+}
+```
+Users expect smooth one-finger movement in all directions when content exceeds screen bounds.
 
-Since we're using FileProvider URIs, external apps that query `DISPLAY_NAME` get the internal filename, not our friendly label. The **ClipData label** is our best option for passing a display name.
+### 3. Centering Logic Needs Refinement
+When a page's scaled width is less than screen width (even when zoomed in), pages should remain centered rather than being pannable.
 
 ---
 
 ## Implementation Plan
 
-### 1. NativePdfViewerActivity - PDF Viewer "Open with"
+### 1. Handle Orientation Changes
 
-**Current code (lines 1188-1206):**
+Update screen dimensions when configuration changes:
+
 ```java
-private void openWithExternalApp() {
-    Intent intent = new Intent(Intent.ACTION_VIEW);
-    intent.setDataAndType(pdfUri, "application/pdf");
-    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    Intent chooser = Intent.createChooser(intent, null);
-    startActivity(chooser);
+@Override
+public void onConfigurationChanged(Configuration newConfig) {
+    super.onConfigurationChanged(newConfig);
+    
+    // Update screen dimensions
+    DisplayMetrics metrics = getResources().getDisplayMetrics();
+    screenWidth = metrics.widthPixels;
+    screenHeight = metrics.heightPixels;
+    
+    // Reset pan to recenter
+    if (recyclerView != null) {
+        recyclerView.resetPan();
+        recyclerView.invalidate();
+    }
+    
+    // Trigger adapter rebind for new dimensions
+    if (adapter != null) {
+        adapter.notifyDataSetChanged();
+    }
 }
 ```
 
-**Required changes:**
-- Add `pdfTitle` field to store the document title
-- Pass title via `PDFProxyActivity` → `NativePdfViewerActivity`
-- Set `ClipData` with meaningful label
+Add to `AndroidManifest.xml`:
+```xml
+android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+```
+
+### 2. Improve Pan Logic in ZoomableRecyclerView
+
+Replace horizontal-only panning with bidirectional movement:
 
 ```java
-// Add field
-private String pdfTitle;
+private float panX = 0f;
+private float panY = 0f;  // NEW: Add vertical pan offset
+private float lastTouchX = 0f;
+private float lastTouchY = 0f;  // NEW: Track Y position
 
-// In openWithExternalApp():
-private void openWithExternalApp() {
-    if (pdfUri == null) return;
+// In onTouchEvent():
+case MotionEvent.ACTION_MOVE:
+    if (e.getPointerCount() == 1 && !isInternalScaling) {
+        float dx = e.getX() - lastTouchX;
+        float dy = e.getY() - lastTouchY;
+        
+        // Calculate content bounds
+        float scaledContentWidth = getWidth() * zoomLevel;
+        float scaledContentHeight = getTotalContentHeight() * zoomLevel;
+        
+        // Allow horizontal pan only if content wider than screen
+        if (scaledContentWidth > getWidth()) {
+            if (Math.abs(dx) > 5) isPanning = true;
+            if (isPanning) {
+                panX = clampPanX(panX + dx);
+            }
+        }
+        
+        // Allow vertical pan only if content taller than screen
+        // (Otherwise RecyclerView handles vertical scroll)
+        if (scaledContentHeight > getHeight() && zoomLevel > 1.0f) {
+            if (Math.abs(dy) > 5) isPanning = true;
+            if (isPanning) {
+                panY = clampPanY(panY + dy);
+            }
+        }
+        
+        lastTouchX = e.getX();
+        lastTouchY = e.getY();
+        invalidate();
+    }
+    break;
+```
+
+### 3. Update dispatchDraw for Combined Transform
+
+Modify canvas transform to include vertical pan:
+
+```java
+@Override
+protected void dispatchDraw(Canvas canvas) {
+    canvas.save();
     
-    Intent intent = new Intent(Intent.ACTION_VIEW);
-    intent.setDataAndType(pdfUri, "application/pdf");
-    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    if (zoomLevel < 1.0f) {
+        // ZOOMED OUT: No canvas transform - layout heights handle sizing
+        // Pages are centered via Gravity.CENTER_HORIZONTAL in adapter
+    } else if (zoomLevel > 1.0f) {
+        // ZOOMED IN: Pan + scale from focal point
+        // Check if content width exceeds screen before applying horizontal pan
+        float scaledContentWidth = getWidth() * zoomLevel;
+        float effectivePanX = (scaledContentWidth > getWidth()) ? panX : 0;
+        
+        canvas.translate(effectivePanX, panY);
+        canvas.scale(zoomLevel, zoomLevel, focalX, focalY);
+    }
+    // At 1.0x: No transformation needed
     
-    // Set ClipData with meaningful display name
-    String displayName = (pdfTitle != null && !pdfTitle.isEmpty()) ? pdfTitle : "Document";
-    ClipData clipData = ClipData.newUri(getContentResolver(), displayName, pdfUri);
-    intent.setClipData(clipData);
-    
-    Intent chooser = Intent.createChooser(intent, null);
-    startActivity(chooser);
+    super.dispatchDraw(canvas);
+    canvas.restore();
 }
 ```
 
-### 2. PDFProxyActivity - Pass Title Through
+### 4. Smart Centering with Pan Clamping
 
-**Required changes:**
-- Accept `shortcut_title` extra from shortcut intents
-- Forward it to `NativePdfViewerActivity`
+Update `clampPan()` to handle both directions and auto-center when content fits:
 
 ```java
-// In openInternalViewer():
-String shortcutTitle = incomingIntent.getStringExtra("shortcut_title");
-
-viewerIntent.putExtra("shortcut_title", shortcutTitle);
-```
-
-### 3. ShortcutPlugin - Pass Title When Creating PDF Shortcuts
-
-**Lines 304-312 - PDF shortcut creation:**
-```java
-// Add shortcut_title for PDF shortcuts
-intent.putExtra("shortcut_title", finalLabel);
-```
-
-**Lines 4282-4291 - PDF shortcut update:**
-```java
-// Add shortcut_title for PDF shortcut updates
-intent.putExtra("shortcut_title", label);
-```
-
-### 4. NativeVideoPlayerActivity - Video "Open with"
-
-**Two methods need updates:**
-
-```java
-// In tryOpenExternalPlayer() and openInExternalPlayer():
-// Use videoTitle which is already available
-
-String displayName = (videoTitle != null && !videoTitle.isEmpty()) ? videoTitle : "Video";
-ClipData clipData = ClipData.newUri(getContentResolver(), displayName, videoUri);
-externalIntent.setClipData(clipData);
-```
-
-### 5. FileProxyActivity - Generic File Handler
-
-**Current situation:** Has `shortcutTitle` from intent but doesn't use it for external opening.
-
-```java
-// In openFileInExternalApp():
-private void openFileInExternalApp(Uri fileUri, String mimeType, String displayName) {
-    Intent viewIntent = new Intent(Intent.ACTION_VIEW);
-    viewIntent.setDataAndType(fileUri, mimeType);
-    viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+private void clampPan() {
+    // Calculate scaled content dimensions
+    float scaledContentWidth = getWidth() * zoomLevel;
     
-    // Pass display name via ClipData
-    String label = (displayName != null && !displayName.isEmpty()) ? displayName : "File";
-    ClipData clipData = ClipData.newUri(getContentResolver(), label, fileUri);
-    viewIntent.setClipData(clipData);
+    // Horizontal: If content fits, center it (panX = 0)
+    // If content exceeds, allow panning within bounds
+    if (scaledContentWidth <= getWidth()) {
+        panX = 0;  // Center content
+    } else {
+        float maxPanX = (scaledContentWidth - getWidth()) / 2;
+        panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+    }
     
-    // ... rest of method
+    // Vertical pan clamping (for zoomed-in mode)
+    if (zoomLevel <= 1.0f) {
+        panY = 0;  // No vertical pan when zoomed out/at 1.0x
+    } else {
+        // Clamp vertical pan based on content height
+        float visibleContentHeight = getHeight();
+        float scaledVisibleHeight = visibleContentHeight * zoomLevel;
+        float maxPanY = Math.max(0, (scaledVisibleHeight - visibleContentHeight) / 2);
+        panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+    }
 }
 ```
 
-### 6. ShortcutPlugin.openWithExternalApp() - JS Bridge
+### 5. Update Zoom Animation to Reset Pan
 
-**Lines 900-990:**
+In `animateZoomTo()`, animate pan to 0 when zooming to 1.0x or below:
+
 ```java
-// Accept optional displayName parameter
-String displayName = call.getString("displayName", null);
-
-// When setting ClipData:
-String label = (displayName != null && !displayName.isEmpty()) ? displayName : "File";
-ClipData clipData = ClipData.newUri(context.getContentResolver(), label, uri);
-intent.setClipData(clipData);
+final float targetPanX = (targetZoom <= 1.0f) ? 0 : panX;
+final float targetPanY = (targetZoom <= 1.0f) ? 0 : panY;
 ```
 
-### 7. NotificationHelper.buildActionIntent() and NotificationClickActivity.executeAction()
+---
 
-**For file type reminders:**
+## Technical Details
 
-The notification system needs to pass the shortcut label through the notification intent and use it when opening files.
+### Content Width Calculation
+At any zoom level, the effective content width is:
+- For individual pages: `pageWidth * (screenWidth / originalPageWidth) * zoomLevel`
+- For the viewport: `screenWidth * zoomLevel`
 
-**NotificationHelper (lines 138-148):**
-```java
-case "file":
-    org.json.JSONObject fileData = new org.json.JSONObject(destinationData);
-    String fileUri = fileData.getString("uri");
-    String mimeType = fileData.optString("mimeType", "*/*");
-    String displayName = fileData.optString("displayName", "File");
-    
-    Intent fileIntent = new Intent(Intent.ACTION_VIEW);
-    fileIntent.setDataAndType(Uri.parse(fileUri), mimeType);
-    fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    
-    // Pass display name via ClipData
-    ClipData clipData = ClipData.newUri(context.getContentResolver(), displayName, Uri.parse(fileUri));
-    fileIntent.setClipData(clipData);
-    return fileIntent;
-```
+When `screenWidth * zoomLevel <= screenWidth` (i.e., `zoomLevel <= 1.0`), pages are centered via the adapter's `Gravity.CENTER_HORIZONTAL`.
 
-**NotificationClickActivity (lines 202-208):**
-Same pattern as above.
+### RecyclerView Integration
+Vertical scrolling through the RecyclerView should continue to work normally:
+- When `zoomLevel <= 1.0`: RecyclerView handles all vertical scroll
+- When `zoomLevel > 1.0`: `panY` handles initial vertical offset within the visible area, then RecyclerView takes over for scrolling between pages
+
+### Gesture Conflict Resolution
+The touch handling priority:
+1. Scale gesture (two fingers) - highest priority
+2. Pan gesture (one finger, content exceeds screen)
+3. RecyclerView scroll (one finger, vertical navigation)
 
 ---
 
@@ -184,36 +216,19 @@ Same pattern as above.
 
 | File | Changes |
 |------|---------|
-| `NativePdfViewerActivity.java` | Add `pdfTitle` field, read from intent, use in `openWithExternalApp()` |
-| `PDFProxyActivity.java` | Read `shortcut_title`, forward to viewer |
-| `NativeVideoPlayerActivity.java` | Use existing `videoTitle` in ClipData for both external player methods |
-| `FileProxyActivity.java` | Pass `shortcutTitle` to `openFileInExternalApp()` |
-| `ShortcutPlugin.java` | Add `shortcut_title` to PDF intents (2 places), accept `displayName` in `openWithExternalApp()` |
-| `NotificationHelper.java` | Use `displayName` from JSON in ClipData |
-| `NotificationClickActivity.java` | Use `displayName` from JSON in ClipData |
-
----
-
-## Technical Notes
-
-### ClipData Label Behavior
-
-Not all external apps respect the ClipData label - some will still query the ContentProvider for `DISPLAY_NAME`. However, many popular apps (file viewers, PDF readers, media players) do use the ClipData label when available, so this provides a meaningful improvement.
-
-### Backward Compatibility
-
-- Existing shortcuts without `shortcut_title` will fall back to generic names ("Document", "Video", "File")
-- No breaking changes to existing functionality
+| `NativePdfViewerActivity.java` | Add `panY` field, update touch handling, modify `dispatchDraw()`, update `clampPan()`, handle config changes |
+| `AndroidManifest.xml` | Add `configChanges` to prevent activity restart on rotation |
 
 ---
 
 ## Testing Checklist
 
-- [ ] PDF "Open with" shows shortcut label in external PDF reader
-- [ ] Video "Open with" shows shortcut label in external video player
-- [ ] Audio file taps show shortcut label in external music player
-- [ ] Document shortcuts show shortcut label when opening externally
-- [ ] Reminder notifications for files show correct label when opened
-- [ ] External opens from clipboard/share still work correctly
-- [ ] Fallback to generic names works when no title is available
+- [ ] Portrait: Pages centered when zoomed out (< 1.0x)
+- [ ] Landscape: Pages centered when zoomed out (< 1.0x)
+- [ ] Rotate device: Pages recenter correctly
+- [ ] Zoom to 2.5x: Can pan left/right when page exceeds width
+- [ ] Zoom to 2.5x: Can pan up/down smoothly
+- [ ] One-finger movement: Smooth in all directions when zoomed
+- [ ] At 1.0x zoom: Pages fill width, no horizontal pan
+- [ ] Double-tap zoom: Pan resets to center when zooming out
 
