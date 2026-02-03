@@ -978,11 +978,11 @@ public class NativePdfViewerActivity extends Activity {
             loadResumeState();
         }
         
-        // Setup immersive fullscreen
-        setupImmersiveMode();
-        
-        // Build UI
+        // Build UI first (must happen before setupImmersiveMode to avoid null DecorView)
         buildUI();
+        
+        // Setup immersive fullscreen (after setContentView in buildUI)
+        setupImmersiveMode();
         
         // Setup gesture detectors
         setupGestureDetectors();
