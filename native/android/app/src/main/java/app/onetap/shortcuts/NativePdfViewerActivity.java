@@ -133,8 +133,9 @@ public class NativePdfViewerActivity extends Activity {
     
     private int pageGapPx;
     
-    // PDF URI for "Open with" feature
+    // PDF URI and title for "Open with" feature
     private Uri pdfUri;
+    private String pdfTitle;
     
     // Cached page dimensions (avoids synchronous PDF access during binding)
     private int[] pageWidths;
@@ -953,6 +954,7 @@ public class NativePdfViewerActivity extends Activity {
         // Extract intent data
         pdfUri = getIntent().getData();
         shortcutId = getIntent().getStringExtra("shortcut_id");
+        pdfTitle = getIntent().getStringExtra("shortcut_title");
         resumeEnabled = getIntent().getBooleanExtra("resume", true);
         
         // Initialize render executor early
@@ -1195,6 +1197,12 @@ public class NativePdfViewerActivity extends Activity {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(pdfUri, "application/pdf");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            // Set ClipData with meaningful display name for external app
+            String displayName = (pdfTitle != null && !pdfTitle.isEmpty()) ? pdfTitle : "Document";
+            android.content.ClipData clipData = android.content.ClipData.newUri(
+                getContentResolver(), displayName, pdfUri);
+            intent.setClipData(clipData);
             
             // Use chooser to let user pick the app
             Intent chooser = Intent.createChooser(intent, null);

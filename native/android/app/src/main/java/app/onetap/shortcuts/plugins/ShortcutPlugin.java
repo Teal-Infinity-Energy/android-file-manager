@@ -307,6 +307,7 @@ public class ShortcutPlugin extends Plugin {
                     intent.setAction("app.onetap.OPEN_PDF");
                     intent.setDataAndType(finalDataUri, finalIntentType != null ? finalIntentType : "application/pdf");
                     intent.putExtra("shortcut_id", finalId);
+                    intent.putExtra("shortcut_title", finalLabel);
                     intent.putExtra("resume_enabled", finalResumeEnabled != null && finalResumeEnabled);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -915,6 +916,7 @@ public class ShortcutPlugin extends Plugin {
 
         String uriString = call.getString("uri");
         String mimeType = call.getString("mimeType", "*/*");
+        String displayName = call.getString("displayName", null);
 
         if (uriString == null || uriString.isEmpty()) {
             JSObject result = new JSObject();
@@ -949,6 +951,17 @@ public class ShortcutPlugin extends Plugin {
             // Use the robust createCompatibleIntent helper which handles all the edge cases
             Intent intent = createCompatibleIntent(context, Intent.ACTION_VIEW, uri, mimeType);
             intent.addCategory(Intent.CATEGORY_DEFAULT);
+            
+            // Set ClipData with meaningful display name for external app
+            String label = (displayName != null && !displayName.isEmpty()) ? displayName : "File";
+            try {
+                android.content.ClipData clipData = android.content.ClipData.newUri(
+                    context.getContentResolver(), label, uri);
+                intent.setClipData(clipData);
+                android.util.Log.d("ShortcutPlugin", "Set ClipData with label: " + label);
+            } catch (Exception e) {
+                android.util.Log.w("ShortcutPlugin", "Failed to set ClipData: " + e.getMessage());
+            }
             
             android.util.Log.d("ShortcutPlugin", "openWithExternalApp - final URI: " + uri + ", mimeType: " + mimeType);
             
