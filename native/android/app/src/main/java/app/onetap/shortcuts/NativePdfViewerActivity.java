@@ -1713,6 +1713,22 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     /**
+     * Get page width with zoom-aware layout.
+     * 
+     * When zoomed out (< 1.0x), scale width proportionally to create centered
+     * narrow page tiles with dark background on sides (Google Drive style).
+     * When zoomed in (>= 1.0x), pages fill the screen width.
+     */
+    private int getScaledPageWidth(int pageIndex) {
+        // At or above 1.0x: Full screen width
+        if (currentZoom >= 1.0f) {
+            return screenWidth;
+        }
+        // When zoomed out: Scale width proportionally
+        return (int) (screenWidth * currentZoom);
+    }
+    
+    /**
      * Render a page asynchronously with low-res → high-res atomic swap.
      */
     private void renderPageAsync(int pageIndex, float targetZoom, boolean lowResOnly) {
@@ -1941,18 +1957,29 @@ public class NativePdfViewerActivity extends Activity {
     
     /**
      * RecyclerView adapter for PDF pages.
-     * Layout height scales with zoom when below 1.0x for train view.
+     * Layout height and width scale with zoom when below 1.0x for train view.
+     * Pages are wrapped in FrameLayout for horizontal centering.
      */
     private class PdfPageAdapter extends RecyclerView.Adapter<PdfPageAdapter.PageViewHolder> {
         
         @NonNull
         @Override
         public PageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            ImageView imageView = new ImageView(parent.getContext());
-            imageView.setLayoutParams(new RecyclerView.LayoutParams(
+            // Wrapper FrameLayout for centering pages horizontally
+            FrameLayout wrapper = new FrameLayout(parent.getContext());
+            wrapper.setLayoutParams(new RecyclerView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ));
+            
+            // Actual page ImageView - centered inside wrapper
+            ImageView imageView = new ImageView(parent.getContext());
+            FrameLayout.LayoutParams imageParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            imageParams.gravity = Gravity.CENTER_HORIZONTAL;
+            imageView.setLayoutParams(imageParams);
             imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             imageView.setBackgroundColor(0xFFFFFFFF);
             
@@ -1963,18 +1990,27 @@ public class NativePdfViewerActivity extends Activity {
                 imageView.setClipToOutline(true);
             }
             
-            return new PageViewHolder(imageView);
+            wrapper.addView(imageView);
+            return new PageViewHolder(wrapper, imageView);
         }
         
         @Override
         public void onBindViewHolder(@NonNull PageViewHolder holder, int position) {
             holder.pageIndex = position;
             
-            // Set height from cached dimensions (zoom-aware for train view)
+            // Set both width and height from cached dimensions (zoom-aware for train view)
+            int width = getScaledPageWidth(position);
             int height = getScaledPageHeight(position);
-            ViewGroup.LayoutParams params = holder.imageView.getLayoutParams();
+            
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) holder.imageView.getLayoutParams();
+            params.width = width;
             params.height = height;
             holder.imageView.setLayoutParams(params);
+            
+            // Update wrapper height to match
+            ViewGroup.LayoutParams wrapperParams = holder.wrapper.getLayoutParams();
+            wrapperParams.height = height;
+            holder.wrapper.setLayoutParams(wrapperParams);
             
             // Multi-level fallback to avoid white flashes
             String highKey = getCacheKey(position, currentZoom, false);
@@ -2020,26 +2056,34 @@ public class NativePdfViewerActivity extends Activity {
             
             if (pageIndex >= first && pageIndex <= last) {
                 View child = layoutManager.findViewByPosition(pageIndex);
-                if (child instanceof ImageView) {
-                    ImageView imageView = (ImageView) child;
-                    
-                    Bitmap current = null;
-                    if (imageView.getDrawable() instanceof android.graphics.drawable.BitmapDrawable) {
-                        current = ((android.graphics.drawable.BitmapDrawable) imageView.getDrawable()).getBitmap();
-                    }
-                    
-                    String highKey = getCacheKey(pageIndex, currentZoom, false);
-                    boolean shouldUpdate = !isLowRes || current == null || bitmapCache.get(highKey) == null;
-                    
-                    if (shouldUpdate && bitmap != null && !bitmap.isRecycled()) {
-                        imageView.setImageBitmap(bitmap);
+                if (child instanceof FrameLayout) {
+                    FrameLayout wrapper = (FrameLayout) child;
+                    if (wrapper.getChildCount() > 0 && wrapper.getChildAt(0) instanceof ImageView) {
+                        ImageView imageView = (ImageView) wrapper.getChildAt(0);
                         
-                        // Update height only if at 1.0x or above (train view handles its own sizing)
-                        if (currentZoom >= 1.0f) {
-                            ViewGroup.LayoutParams params = imageView.getLayoutParams();
-                            if (params.height != height) {
-                                params.height = height;
-                                imageView.setLayoutParams(params);
+                        Bitmap current = null;
+                        if (imageView.getDrawable() instanceof android.graphics.drawable.BitmapDrawable) {
+                            current = ((android.graphics.drawable.BitmapDrawable) imageView.getDrawable()).getBitmap();
+                        }
+                        
+                        String highKey = getCacheKey(pageIndex, currentZoom, false);
+                        boolean shouldUpdate = !isLowRes || current == null || bitmapCache.get(highKey) == null;
+                        
+                        if (shouldUpdate && bitmap != null && !bitmap.isRecycled()) {
+                            imageView.setImageBitmap(bitmap);
+                            
+                            // Update dimensions only if at 1.0x or above (train view handles its own sizing)
+                            if (currentZoom >= 1.0f) {
+                                FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) imageView.getLayoutParams();
+                                if (params.height != height) {
+                                    params.width = screenWidth;
+                                    params.height = height;
+                                    imageView.setLayoutParams(params);
+                                    
+                                    ViewGroup.LayoutParams wrapperParams = wrapper.getLayoutParams();
+                                    wrapperParams.height = height;
+                                    wrapper.setLayoutParams(wrapperParams);
+                                }
                             }
                         }
                     }
@@ -2059,12 +2103,14 @@ public class NativePdfViewerActivity extends Activity {
         }
         
         class PageViewHolder extends RecyclerView.ViewHolder {
+            FrameLayout wrapper;
             ImageView imageView;
             int pageIndex = -1;
             
-            PageViewHolder(ImageView view) {
-                super(view);
-                this.imageView = view;
+            PageViewHolder(FrameLayout wrapper, ImageView imageView) {
+                super(wrapper);
+                this.wrapper = wrapper;
+                this.imageView = imageView;
             }
         }
     }
