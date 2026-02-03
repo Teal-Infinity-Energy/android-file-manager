@@ -1,5 +1,7 @@
 package app.onetap.shortcuts;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
@@ -14,6 +16,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.Typeface;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.os.Build;
@@ -34,13 +37,18 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.graphics.drawable.GradientDrawable;
 import android.view.ViewOutlineProvider;
+
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -145,10 +153,14 @@ public class NativePdfViewerActivity extends Activity {
     // Error state UI (shown instead of RecyclerView when PDF can't be opened)
     private FrameLayout errorView;
     
-    // UI chrome
+    // UI chrome - premium header with content-aware layout
+    private LinearLayout rootLayout;
+    private FrameLayout headerSpace;
     private FrameLayout topBar;
     private ImageButton closeButton;
     private ImageButton openWithButton;
+    private ValueAnimator headerAnimator;
+    private int statusBarHeight = 0;
     private TextView pageIndicator;
     private boolean isTopBarVisible = true;
     
@@ -999,34 +1011,107 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     private void setupImmersiveMode() {
-        getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        );
+        // Set status bar color to match header for premium appearance
+        getWindow().setStatusBarColor(0xFF1C1C1E);
         
+        // Use edge-to-edge layout with visible status bar (content below header)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             getWindow().setDecorFitsSystemWindows(false);
             WindowInsetsController controller = getWindow().getInsetsController();
             if (controller != null) {
-                controller.hide(WindowInsets.Type.systemBars());
+                // Hide navigation bar but keep status bar for header integration
+                controller.hide(WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(
                     WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 );
             }
+        } else {
+            // For older Android versions, use standard flags
+            getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            );
         }
     }
     
     private void buildUI() {
-        // Root container
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF000000); // Pure black background
-        root.setLayoutParams(new FrameLayout.LayoutParams(
+        // Root uses LinearLayout for header + content stacking (premium design)
+        rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        rootLayout.setBackgroundColor(0xFF000000); // Pure black background
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        
+        // Wrapper for header space reservation - animates height for show/hide
+        headerSpace = new FrameLayout(this);
+        LinearLayout.LayoutParams headerSpaceParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dpToPx(56) // Start with header visible
+        );
+        headerSpace.setLayoutParams(headerSpaceParams);
+        headerSpace.setBackgroundColor(0xFF1C1C1E); // Match header color for seamless transition
+        
+        // Top bar - solid opaque premium background
+        topBar = new FrameLayout(this);
+        int topBarHeight = dpToPx(56);
+        topBar.setLayoutParams(new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, topBarHeight
+        ));
+        topBar.setBackgroundColor(0xFF1C1C1E); // Premium dark gray
+        topBar.setElevation(dpToPx(4)); // Subtle shadow
+        topBar.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+        
+        // Close button with circular ripple
+        closeButton = new ImageButton(this);
+        closeButton.setImageResource(R.drawable.ic_close_pdf);
+        closeButton.setBackgroundResource(R.drawable.ripple_circle);
+        closeButton.setColorFilter(0xFFFFFFFF);
+        closeButton.setScaleType(ImageView.ScaleType.CENTER);
+        int buttonSize = dpToPx(48);
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(buttonSize, buttonSize);
+        closeParams.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
+        closeButton.setLayoutParams(closeParams);
+        closeButton.setOnClickListener(v -> exitViewer());
+        topBar.addView(closeButton);
+        
+        // Page indicator (center) - premium typography
+        pageIndicator = new TextView(this);
+        pageIndicator.setTextColor(0xDEFFFFFF); // 87% white (Material primary text)
+        pageIndicator.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        pageIndicator.setTypeface(pageIndicator.getTypeface(), Typeface.BOLD);
+        FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        indicatorParams.gravity = Gravity.CENTER;
+        pageIndicator.setLayoutParams(indicatorParams);
+        topBar.addView(pageIndicator);
+        
+        // "Open with" button - new external link icon with ripple
+        openWithButton = new ImageButton(this);
+        openWithButton.setImageResource(R.drawable.ic_open_external);
+        openWithButton.setBackgroundResource(R.drawable.ripple_circle);
+        openWithButton.setColorFilter(0xFFFFFFFF);
+        openWithButton.setScaleType(ImageView.ScaleType.CENTER);
+        FrameLayout.LayoutParams openWithParams = new FrameLayout.LayoutParams(buttonSize, buttonSize);
+        openWithParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        openWithButton.setLayoutParams(openWithParams);
+        openWithButton.setOnClickListener(v -> openWithExternalApp());
+        topBar.addView(openWithButton);
+        
+        headerSpace.addView(topBar);
+        rootLayout.addView(headerSpace);
+        
+        // Content container (RecyclerView + fast scroll) - fills remaining space
+        FrameLayout contentContainer = new FrameLayout(this);
+        contentContainer.setLayoutParams(new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            0,
+            1f // weight = 1 to fill remaining space
         ));
         
         // ZoomableRecyclerView for pages (canvas-level zoom)
@@ -1039,8 +1124,7 @@ public class NativePdfViewerActivity extends Activity {
         recyclerView.setHasFixedSize(false);
         recyclerView.setItemAnimator(null); // Disable animations for smooth scrolling
         recyclerView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
-        
-        root.addView(recyclerView);
+        contentContainer.addView(recyclerView);
         
         // Fast scroll overlay
         fastScrollOverlay = new FastScrollOverlay(this);
@@ -1048,67 +1132,54 @@ public class NativePdfViewerActivity extends Activity {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         ));
-        root.addView(fastScrollOverlay);
+        contentContainer.addView(fastScrollOverlay);
         
-        // Top bar with gradient background
-        topBar = new FrameLayout(this);
-        int topBarHeight = dpToPx(56);
-        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, topBarHeight
-        );
-        topBar.setLayoutParams(topBarParams);
+        rootLayout.addView(contentContainer);
         
-        // Gradient background for top bar
-        android.graphics.drawable.GradientDrawable gradient = new android.graphics.drawable.GradientDrawable(
-            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[]{0xCC000000, 0x00000000}
-        );
-        topBar.setBackground(gradient);
-        topBar.setPadding(dpToPx(16), dpToPx(8), dpToPx(16), 0);
-        
-        // Close button (left)
-        closeButton = new ImageButton(this);
-        closeButton.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
-        closeButton.setColorFilter(0xFFFFFFFF);
-        closeButton.setBackgroundResource(android.R.drawable.dialog_holo_dark_frame);
-        int buttonSize = dpToPx(44);
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(buttonSize, buttonSize);
-        closeParams.gravity = android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL;
-        closeButton.setLayoutParams(closeParams);
-        closeButton.setOnClickListener(v -> exitViewer());
-        topBar.addView(closeButton);
-        
-        // Page indicator (center)
-        pageIndicator = new TextView(this);
-        pageIndicator.setTextColor(0xAAFFFFFF);
-        pageIndicator.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        indicatorParams.gravity = android.view.Gravity.CENTER;
-        pageIndicator.setLayoutParams(indicatorParams);
-        topBar.addView(pageIndicator);
-        
-        // "Open with" button (right)
-        openWithButton = new ImageButton(this);
-        openWithButton.setImageResource(android.R.drawable.ic_menu_share);
-        openWithButton.setColorFilter(0xFFFFFFFF);
-        openWithButton.setBackgroundResource(android.R.drawable.dialog_holo_dark_frame);
-        FrameLayout.LayoutParams openWithParams = new FrameLayout.LayoutParams(buttonSize, buttonSize);
-        openWithParams.gravity = android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL;
-        openWithButton.setLayoutParams(openWithParams);
-        openWithButton.setOnClickListener(v -> openWithExternalApp());
-        topBar.addView(openWithButton);
-        
-        root.addView(topBar);
-        
-        // Error view (hidden by default)
+        // Error view (hidden by default) - overlays entire layout
         errorView = buildCalmErrorView();
         errorView.setVisibility(View.GONE);
-        root.addView(errorView);
         
-        setContentView(root);
+        // Wrap in FrameLayout to allow error overlay
+        FrameLayout rootWrapper = new FrameLayout(this);
+        rootWrapper.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        rootWrapper.addView(rootLayout);
+        rootWrapper.addView(errorView);
+        
+        setContentView(rootWrapper);
+        
+        // Apply status bar insets to header
+        applyHeaderInsets();
+    }
+    
+    /**
+     * Apply window insets to header for proper status bar spacing.
+     */
+    private void applyHeaderInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(headerSpace, (v, insets) -> {
+            statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+            
+            // Update header space height to include status bar
+            int headerHeight = dpToPx(56) + statusBarHeight;
+            ViewGroup.LayoutParams params = headerSpace.getLayoutParams();
+            if (isTopBarVisible && params.height != headerHeight) {
+                params.height = headerHeight;
+                headerSpace.setLayoutParams(params);
+            }
+            
+            // Add top padding to topBar for status bar clearance
+            topBar.setPadding(dpToPx(8), statusBarHeight, dpToPx(8), 0);
+            
+            // Also update header background height
+            FrameLayout.LayoutParams topBarParams = (FrameLayout.LayoutParams) topBar.getLayoutParams();
+            topBarParams.height = headerHeight;
+            topBar.setLayoutParams(topBarParams);
+            
+            return insets;
+        });
     }
     
     /**
@@ -1526,15 +1597,38 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     private void showTopBar() {
-        if (topBar != null && !isTopBarVisible) {
+        if (topBar != null && headerSpace != null && !isTopBarVisible) {
             isTopBarVisible = true;
+            
+            // Cancel any running animation
+            if (headerAnimator != null && headerAnimator.isRunning()) {
+                headerAnimator.cancel();
+            }
+            
+            int targetHeight = dpToPx(56) + statusBarHeight;
+            headerAnimator = ValueAnimator.ofInt(headerSpace.getHeight(), targetHeight);
+            headerAnimator.setDuration(200);
+            headerAnimator.setInterpolator(new DecelerateInterpolator());
+            headerAnimator.addUpdateListener(animation -> {
+                ViewGroup.LayoutParams params = headerSpace.getLayoutParams();
+                params.height = (int) animation.getAnimatedValue();
+                headerSpace.setLayoutParams(params);
+            });
+            headerAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    topBar.setVisibility(View.VISIBLE);
+                    topBar.setAlpha(0f);
+                }
+            });
+            
+            // Fade in topBar
             topBar.animate()
                 .alpha(1f)
-                .translationY(0)
                 .setDuration(200)
-                .withStartAction(() -> topBar.setVisibility(View.VISIBLE))
                 .start();
             
+            headerAnimator.start();
             scheduleHide();
         } else if (topBar != null && isTopBarVisible) {
             // Already visible, just reschedule hide
@@ -1543,17 +1637,32 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     private void hideTopBar() {
-        if (topBar != null && isTopBarVisible) {
+        if (topBar != null && headerSpace != null && isTopBarVisible) {
             isTopBarVisible = false;
             hideHandler.removeCallbacks(hideRunnable);
+            
+            // Cancel any running animation
+            if (headerAnimator != null && headerAnimator.isRunning()) {
+                headerAnimator.cancel();
+            }
+            
+            // Collapse header space
+            headerAnimator = ValueAnimator.ofInt(headerSpace.getHeight(), 0);
+            headerAnimator.setDuration(200);
+            headerAnimator.setInterpolator(new AccelerateInterpolator());
+            headerAnimator.addUpdateListener(animation -> {
+                ViewGroup.LayoutParams params = headerSpace.getLayoutParams();
+                params.height = (int) animation.getAnimatedValue();
+                headerSpace.setLayoutParams(params);
+            });
+            
+            // Fade out topBar
             topBar.animate()
                 .alpha(0f)
-                .translationY(-topBar.getHeight())
-                .setDuration(200)
-                .withEndAction(() -> {
-                    // Keep visibility but make it hidden via alpha/translation
-                })
+                .setDuration(150)
                 .start();
+            
+            headerAnimator.start();
         }
     }
     
