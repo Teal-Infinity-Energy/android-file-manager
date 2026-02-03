@@ -3971,10 +3971,14 @@ public class ShortcutPlugin extends Plugin {
     /**
      * Get IDs of shortcuts currently pinned on the home screen.
      * Used to sync app storage with actual home screen state.
+     * 
+     * Android 12+ Note: Uses getShortcuts(FLAG_MATCH_PINNED) for more accurate results
+     * and explicitly filters by isPinned() flag to handle edge cases where dynamic
+     * shortcuts may persist after unpinning.
      */
     @PluginMethod
     public void getPinnedShortcutIds(PluginCall call) {
-        android.util.Log.d("ShortcutPlugin", "getPinnedShortcutIds called");
+        android.util.Log.d("ShortcutPlugin", "getPinnedShortcutIds called, API=" + Build.VERSION.SDK_INT);
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             // ShortcutManager not available before Android 8.0
@@ -3987,6 +3991,7 @@ public class ShortcutPlugin extends Plugin {
         try {
             Context context = getContext();
             if (context == null) {
+                android.util.Log.w("ShortcutPlugin", "getPinnedShortcutIds: context is null");
                 JSObject result = new JSObject();
                 result.put("ids", new JSArray());
                 call.resolve(result);
@@ -3995,26 +4000,61 @@ public class ShortcutPlugin extends Plugin {
 
             ShortcutManager manager = context.getSystemService(ShortcutManager.class);
             if (manager == null) {
+                android.util.Log.w("ShortcutPlugin", "getPinnedShortcutIds: ShortcutManager is null");
                 JSObject result = new JSObject();
                 result.put("ids", new JSArray());
                 call.resolve(result);
                 return;
             }
 
-            List<ShortcutInfo> pinnedShortcuts = manager.getPinnedShortcuts();
-            JSArray ids = new JSArray();
+            // Get pinned shortcuts using the most appropriate API for the Android version
+            List<ShortcutInfo> pinnedShortcuts;
             
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // API 30+ (Android 11+): Use newer getShortcuts with FLAG_MATCH_PINNED
+                // This is more accurate on Android 12+ for detecting unpinned shortcuts
+                pinnedShortcuts = manager.getShortcuts(ShortcutManager.FLAG_MATCH_PINNED);
+                android.util.Log.d("ShortcutPlugin", "Using getShortcuts(FLAG_MATCH_PINNED) for API " + Build.VERSION.SDK_INT);
+            } else {
+                // Legacy API for older Android versions (8.0-10)
+                pinnedShortcuts = manager.getPinnedShortcuts();
+                android.util.Log.d("ShortcutPlugin", "Using legacy getPinnedShortcuts() for API " + Build.VERSION.SDK_INT);
+            }
+            
+            // Also get dynamic shortcuts for cross-reference logging
+            List<ShortcutInfo> dynamicShortcuts = manager.getDynamicShortcuts();
+            android.util.Log.d("ShortcutPlugin", "Dynamic shortcuts count: " + dynamicShortcuts.size() + 
+                ", Pinned query returned: " + pinnedShortcuts.size());
+            
+            JSArray ids = new JSArray();
+            int actuallyPinned = 0;
+            
+            // Filter shortcuts that are actually pinned (extra verification for Android 12+)
             for (ShortcutInfo info : pinnedShortcuts) {
-                ids.put(info.getId());
+                // Log detailed state of each shortcut for debugging
+                android.util.Log.d("ShortcutPlugin", "Shortcut: id=" + info.getId() + 
+                    ", isPinned=" + info.isPinned() + 
+                    ", isDynamic=" + info.isDynamic() + 
+                    ", isEnabled=" + info.isEnabled());
+                
+                // Only include shortcuts that are truly pinned
+                // This filter is essential on Android 12+ where the ShortcutManager may
+                // return stale data for shortcuts that were unpinned from the home screen
+                if (info.isPinned()) {
+                    ids.put(info.getId());
+                    actuallyPinned++;
+                }
             }
 
-            android.util.Log.d("ShortcutPlugin", "Found " + pinnedShortcuts.size() + " pinned shortcuts");
+            android.util.Log.d("ShortcutPlugin", "getPinnedShortcutIds: API=" + Build.VERSION.SDK_INT + 
+                ", queryReturned=" + pinnedShortcuts.size() + 
+                ", actuallyPinned=" + actuallyPinned);
 
             JSObject result = new JSObject();
             result.put("ids", ids);
             call.resolve(result);
         } catch (Exception e) {
-            android.util.Log.e("ShortcutPlugin", "Error getting pinned shortcuts: " + e.getMessage());
+            android.util.Log.e("ShortcutPlugin", "Error getting pinned shortcuts: " + e.getMessage(), e);
             JSObject result = new JSObject();
             result.put("ids", new JSArray());
             call.resolve(result);
