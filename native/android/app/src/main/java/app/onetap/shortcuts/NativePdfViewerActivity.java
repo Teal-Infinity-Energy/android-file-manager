@@ -8,9 +8,12 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.os.Build;
@@ -23,6 +26,7 @@ import android.util.Log;
 import android.util.LruCache;
 import android.util.TypedValue;
 import android.view.GestureDetector;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
@@ -64,6 +68,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - Resume position (scroll + zoom persisted)
  * - Auto-hiding header with scroll detection
  * - "Open with" external app support
+ * - Fast scroll with page indicator for large documents
+ * - Dynamic layout heights when zoomed out (train view)
  * 
  * Explicitly excluded (by design):
  * - Search, annotations, thumbnails, reading modes, page overlays
@@ -81,7 +87,8 @@ public class NativePdfViewerActivity extends Activity {
     private static final float FIT_PAGE_ZOOM = 1.0f;  // Default fit-to-width
     
     // Pre-render pages above/below viewport for smooth scrolling
-    private static final int PRERENDER_PAGES = 2;
+    // Increased from 2 to 5 for smoother scrolling with train view
+    private static final int PRERENDER_PAGES = 5;
     
     // Low-res scale factor for instant preview (0.5x = half resolution)
     private static final float LOW_RES_SCALE = 0.5f;
@@ -92,11 +99,21 @@ public class NativePdfViewerActivity extends Activity {
     // Scroll threshold for header show/hide (in pixels)
     private static final int SCROLL_THRESHOLD = 20;
     
+    // Fast scroll constants
+    private static final int FAST_SCROLL_THUMB_WIDTH_DP = 6;
+    private static final int FAST_SCROLL_THUMB_MIN_HEIGHT_DP = 48;
+    private static final int FAST_SCROLL_TOUCH_WIDTH_DP = 44;
+    private static final int FAST_SCROLL_AUTO_HIDE_MS = 1500;
+    private static final int FAST_SCROLL_POPUP_MARGIN_DP = 56;
+    
     // Core components
     private ZoomableRecyclerView recyclerView;
     private PdfPageAdapter adapter;
     private PdfRenderer pdfRenderer;
     private ParcelFileDescriptor fileDescriptor;
+    
+    // Fast scroll overlay
+    private FastScrollOverlay fastScrollOverlay;
     
     // PDF URI for "Open with" feature
     private Uri pdfUri;
@@ -339,11 +356,8 @@ public class NativePdfViewerActivity extends Activity {
             canvas.save();
             
             if (zoomLevel < 1.0f) {
-                // ZOOMED OUT: Scale from screen center, no focal point tracking
-                // This keeps content centered on screen (Google Drive behavior)
-                float centerX = getWidth() / 2f;
-                float centerY = getHeight() / 2f;
-                canvas.scale(zoomLevel, zoomLevel, centerX, centerY);
+                // ZOOMED OUT: No canvas transform - layout heights handle sizing
+                // This allows RecyclerView to bind more pages for train view
             } else if (zoomLevel > 1.0f) {
                 // ZOOMED IN: Pan + scale from focal point
                 canvas.translate(panX, 0);
@@ -575,6 +589,313 @@ public class NativePdfViewerActivity extends Activity {
         }
     }
     
+    /**
+     * Fast scroll overlay for quick navigation through large documents.
+     * Shows a draggable thumb on the right edge with page number popup.
+     */
+    private class FastScrollOverlay extends View {
+        private Paint thumbPaint;
+        private Paint trackPaint;
+        private Paint popupBgPaint;
+        private Paint popupTextPaint;
+        
+        private RectF thumbRect = new RectF();
+        private RectF touchArea = new RectF();
+        
+        private boolean isDragging = false;
+        private boolean isVisible = false;
+        private float thumbAlpha = 0f;
+        
+        private int thumbWidth;
+        private int thumbMinHeight;
+        private int touchWidth;
+        private int popupMargin;
+        
+        private String pageText = "";
+        
+        private ValueAnimator fadeAnimator;
+        private final Handler hideHandler = new Handler(Looper.getMainLooper());
+        private final Runnable hideRunnable = this::fadeOut;
+        
+        public FastScrollOverlay(Context context) {
+            super(context);
+            init();
+        }
+        
+        private void init() {
+            thumbWidth = dpToPx(FAST_SCROLL_THUMB_WIDTH_DP);
+            thumbMinHeight = dpToPx(FAST_SCROLL_THUMB_MIN_HEIGHT_DP);
+            touchWidth = dpToPx(FAST_SCROLL_TOUCH_WIDTH_DP);
+            popupMargin = dpToPx(FAST_SCROLL_POPUP_MARGIN_DP);
+            
+            // Thumb paint - semi-transparent white
+            thumbPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            thumbPaint.setColor(0xCCFFFFFF);
+            thumbPaint.setStyle(Paint.Style.FILL);
+            
+            // Track paint - very subtle
+            trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            trackPaint.setColor(0x33FFFFFF);
+            trackPaint.setStyle(Paint.Style.FILL);
+            
+            // Popup background
+            popupBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            popupBgPaint.setColor(0xDD333333);
+            popupBgPaint.setStyle(Paint.Style.FILL);
+            
+            // Popup text
+            popupTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            popupTextPaint.setColor(0xFFFFFFFF);
+            popupTextPaint.setTextSize(dpToPx(14));
+            popupTextPaint.setTextAlign(Paint.Align.RIGHT);
+        }
+        
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            
+            if (thumbAlpha <= 0) return;
+            
+            int width = getWidth();
+            int height = getHeight();
+            
+            // Apply alpha
+            thumbPaint.setAlpha((int) (0xCC * thumbAlpha));
+            trackPaint.setAlpha((int) (0x33 * thumbAlpha));
+            
+            // Draw track
+            float trackLeft = width - thumbWidth - dpToPx(4);
+            canvas.drawRoundRect(trackLeft, dpToPx(8), width - dpToPx(4), height - dpToPx(8), 
+                    thumbWidth / 2f, thumbWidth / 2f, trackPaint);
+            
+            // Draw thumb
+            canvas.drawRoundRect(thumbRect, thumbWidth / 2f, thumbWidth / 2f, thumbPaint);
+            
+            // Draw popup when dragging
+            if (isDragging && pageText.length() > 0) {
+                popupBgPaint.setAlpha((int) (0xDD * thumbAlpha));
+                popupTextPaint.setAlpha((int) (0xFF * thumbAlpha));
+                
+                float textWidth = popupTextPaint.measureText(pageText);
+                float popupPadding = dpToPx(12);
+                float popupHeight = dpToPx(36);
+                float popupLeft = thumbRect.left - popupMargin - textWidth - popupPadding * 2;
+                float popupTop = thumbRect.centerY() - popupHeight / 2;
+                float popupRight = thumbRect.left - popupMargin;
+                float popupBottom = popupTop + popupHeight;
+                
+                // Clamp popup to screen
+                if (popupTop < dpToPx(8)) {
+                    popupTop = dpToPx(8);
+                    popupBottom = popupTop + popupHeight;
+                }
+                if (popupBottom > height - dpToPx(8)) {
+                    popupBottom = height - dpToPx(8);
+                    popupTop = popupBottom - popupHeight;
+                }
+                
+                RectF popupRect = new RectF(popupLeft, popupTop, popupRight, popupBottom);
+                canvas.drawRoundRect(popupRect, dpToPx(4), dpToPx(4), popupBgPaint);
+                
+                // Draw text centered vertically in popup
+                float textY = popupRect.centerY() + popupTextPaint.getTextSize() / 3;
+                canvas.drawText(pageText, popupRight - popupPadding, textY, popupTextPaint);
+            }
+        }
+        
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            int action = event.getActionMasked();
+            float x = event.getX();
+            float y = event.getY();
+            
+            // Expand touch area for easier grabbing
+            touchArea.set(thumbRect);
+            touchArea.left = getWidth() - touchWidth;
+            touchArea.top = Math.max(0, thumbRect.top - dpToPx(16));
+            touchArea.bottom = Math.min(getHeight(), thumbRect.bottom + dpToPx(16));
+            
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                    if (touchArea.contains(x, y) || (x > getWidth() - touchWidth && isVisible)) {
+                        isDragging = true;
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                        scrollToPosition(y);
+                        showImmediate();
+                        return true;
+                    }
+                    return false;
+                    
+                case MotionEvent.ACTION_MOVE:
+                    if (isDragging) {
+                        scrollToPosition(y);
+                        return true;
+                    }
+                    break;
+                    
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (isDragging) {
+                        isDragging = false;
+                        getParent().requestDisallowInterceptTouchEvent(false);
+                        scheduleHide();
+                        invalidate();
+                        return true;
+                    }
+                    break;
+            }
+            
+            return super.onTouchEvent(event);
+        }
+        
+        private void scrollToPosition(float y) {
+            if (recyclerView == null || adapter == null) return;
+            
+            int totalPages = adapter.getItemCount();
+            if (totalPages <= 0) return;
+            
+            // Calculate target page from touch position
+            float scrollableHeight = getHeight() - thumbMinHeight;
+            float fraction = (y - thumbMinHeight / 2f) / scrollableHeight;
+            fraction = Math.max(0, Math.min(1, fraction));
+            
+            int targetPage = (int) (fraction * (totalPages - 1));
+            targetPage = Math.max(0, Math.min(totalPages - 1, targetPage));
+            
+            // Update page text
+            pageText = (targetPage + 1) + " / " + totalPages;
+            
+            // Scroll to target page
+            LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+            if (layoutManager != null) {
+                layoutManager.scrollToPositionWithOffset(targetPage, 0);
+            }
+            
+            updateThumbPosition();
+            invalidate();
+        }
+        
+        /**
+         * Update thumb position based on current scroll position.
+         */
+        public void updateThumbPosition() {
+            if (recyclerView == null || adapter == null) return;
+            
+            int totalPages = adapter.getItemCount();
+            if (totalPages <= 1) {
+                thumbRect.setEmpty();
+                return;
+            }
+            
+            LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+            if (layoutManager == null) return;
+            
+            int firstVisible = layoutManager.findFirstVisibleItemPosition();
+            int lastVisible = layoutManager.findLastVisibleItemPosition();
+            
+            if (firstVisible < 0) return;
+            
+            // Calculate scroll fraction
+            View firstView = layoutManager.findViewByPosition(firstVisible);
+            float scrollOffset = 0;
+            if (firstView != null) {
+                scrollOffset = -firstView.getTop() / (float) Math.max(1, firstView.getHeight());
+            }
+            
+            float fraction = (firstVisible + scrollOffset) / (totalPages - 1);
+            fraction = Math.max(0, Math.min(1, fraction));
+            
+            // Calculate thumb size based on visible fraction
+            float visibleFraction = (float) (lastVisible - firstVisible + 1) / totalPages;
+            int thumbHeight = (int) Math.max(thumbMinHeight, getHeight() * visibleFraction);
+            
+            // Calculate thumb position
+            float scrollableHeight = getHeight() - thumbHeight;
+            float thumbTop = fraction * scrollableHeight;
+            
+            int width = getWidth();
+            thumbRect.set(
+                    width - thumbWidth - dpToPx(4),
+                    thumbTop,
+                    width - dpToPx(4),
+                    thumbTop + thumbHeight
+            );
+            
+            // Update page text for current position
+            if (!isDragging) {
+                pageText = (firstVisible + 1) + " / " + totalPages;
+            }
+        }
+        
+        /**
+         * Show the fast scroll thumb.
+         */
+        public void show() {
+            if (adapter != null && adapter.getItemCount() <= 3) {
+                return; // Don't show for small documents
+            }
+            
+            isVisible = true;
+            hideHandler.removeCallbacks(hideRunnable);
+            
+            if (fadeAnimator != null && fadeAnimator.isRunning()) {
+                fadeAnimator.cancel();
+            }
+            
+            fadeAnimator = ValueAnimator.ofFloat(thumbAlpha, 1f);
+            fadeAnimator.setDuration(150);
+            fadeAnimator.addUpdateListener(animation -> {
+                thumbAlpha = (float) animation.getAnimatedValue();
+                invalidate();
+            });
+            fadeAnimator.start();
+            
+            scheduleHide();
+        }
+        
+        private void showImmediate() {
+            isVisible = true;
+            thumbAlpha = 1f;
+            hideHandler.removeCallbacks(hideRunnable);
+            invalidate();
+        }
+        
+        private void fadeOut() {
+            if (isDragging) return;
+            
+            if (fadeAnimator != null && fadeAnimator.isRunning()) {
+                fadeAnimator.cancel();
+            }
+            
+            fadeAnimator = ValueAnimator.ofFloat(thumbAlpha, 0f);
+            fadeAnimator.setDuration(300);
+            fadeAnimator.addUpdateListener(animation -> {
+                thumbAlpha = (float) animation.getAnimatedValue();
+                invalidate();
+            });
+            fadeAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(android.animation.Animator animation) {
+                    isVisible = false;
+                }
+            });
+            fadeAnimator.start();
+        }
+        
+        private void scheduleHide() {
+            hideHandler.removeCallbacks(hideRunnable);
+            hideHandler.postDelayed(hideRunnable, FAST_SCROLL_AUTO_HIDE_MS);
+        }
+        
+        public void cleanup() {
+            hideHandler.removeCallbacks(hideRunnable);
+            if (fadeAnimator != null) {
+                fadeAnimator.cancel();
+                fadeAnimator = null;
+            }
+        }
+    }
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -707,6 +1028,14 @@ public class NativePdfViewerActivity extends Activity {
         recyclerView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         
         root.addView(recyclerView);
+        
+        // Fast scroll overlay
+        fastScrollOverlay = new FastScrollOverlay(this);
+        fastScrollOverlay.setLayoutParams(new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        root.addView(fastScrollOverlay);
         
         // Top bar with gradient background
         topBar = new FrameLayout(this);
@@ -849,6 +1178,9 @@ public class NativePdfViewerActivity extends Activity {
         if (topBar != null) {
             topBar.setVisibility(View.GONE);
         }
+        if (fastScrollOverlay != null) {
+            fastScrollOverlay.setVisibility(View.GONE);
+        }
         if (errorView != null) {
             errorView.setVisibility(View.VISIBLE);
         }
@@ -866,7 +1198,15 @@ public class NativePdfViewerActivity extends Activity {
             
             @Override
             public void onScale(float newZoom, float fx, float fy) {
-                // Visual update handled internally by ZoomableRecyclerView
+                // Check if we crossed the 1.0 threshold - need to update layout
+                boolean wasBelow = currentZoom < 1.0f;
+                boolean isBelow = newZoom < 1.0f;
+                
+                if (wasBelow != isBelow) {
+                    // Threshold crossed - will update on scale end
+                }
+                
+                currentZoom = newZoom;
             }
             
             @Override
@@ -924,10 +1264,18 @@ public class NativePdfViewerActivity extends Activity {
     
     /**
      * Commit zoom and trigger high-res re-render.
+     * Also updates layout if zoom changed across the 1.0 threshold.
      */
     private void commitZoomAndRerender() {
         renderGeneration.incrementAndGet();
         pendingRenders.clear();
+        
+        // Notify adapter when zoom is below 1.0 to trigger layout changes
+        // This enables the "train view" with more pages visible
+        if (adapter != null && currentZoom < 1.0f) {
+            adapter.notifyDataSetChanged();
+        }
+        
         prerenderVisiblePages();
     }
     
@@ -1023,7 +1371,7 @@ public class NativePdfViewerActivity extends Activity {
         adapter = new PdfPageAdapter();
         recyclerView.setAdapter(adapter);
         
-        // Add scroll listener for page indicator and header auto-hide
+        // Add scroll listener for page indicator, header auto-hide, and fast scroll
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             private int lastDy = 0;
             private int accumulatedDy = 0;
@@ -1034,6 +1382,14 @@ public class NativePdfViewerActivity extends Activity {
                 
                 // Update page indicator
                 updatePageIndicator();
+                
+                // Update fast scroll thumb position
+                if (fastScrollOverlay != null) {
+                    fastScrollOverlay.updateThumbPosition();
+                    if (Math.abs(dy) > 5) {
+                        fastScrollOverlay.show();
+                    }
+                }
                 
                 // Prerender nearby pages
                 LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
@@ -1065,10 +1421,18 @@ public class NativePdfViewerActivity extends Activity {
         });
         
         updatePageIndicator();
+        
+        // Initial fast scroll position
+        recyclerView.post(() -> {
+            if (fastScrollOverlay != null) {
+                fastScrollOverlay.updateThumbPosition();
+            }
+        });
     }
     
     /**
      * Pre-render pages near the visible area for smooth scrolling.
+     * Increased range and prioritizes low-res for distant pages.
      */
     private void prerenderNearbyPages(int centerPage) {
         if (adapter == null || pdfRenderer == null || renderExecutor == null) return;
@@ -1077,12 +1441,28 @@ public class NativePdfViewerActivity extends Activity {
         int start = Math.max(0, centerPage - PRERENDER_PAGES);
         int end = Math.min(pageWidths.length - 1, centerPage + PRERENDER_PAGES);
         
-        for (int i = start; i <= end; i++) {
+        // Render visible and near pages at high-res
+        for (int i = centerPage - 2; i <= centerPage + 2; i++) {
+            if (i < start || i > end) continue;
+            
             String cacheKey = getCacheKey(i, currentZoom, false);
             if (bitmapCache.get(cacheKey) == null && !pendingRenders.contains(cacheKey)) {
                 final int pageIndex = i;
                 pendingRenders.add(cacheKey);
                 renderExecutor.execute(() -> renderPageAsync(pageIndex, currentZoom, false));
+            }
+        }
+        
+        // Render distant pages at low-res only for faster preloading
+        for (int i = start; i <= end; i++) {
+            if (i >= centerPage - 2 && i <= centerPage + 2) continue; // Already handled above
+            
+            String lowKey = getCacheKey(i, currentZoom, true);
+            String highKey = getCacheKey(i, currentZoom, false);
+            if (bitmapCache.get(lowKey) == null && bitmapCache.get(highKey) == null && !pendingRenders.contains(highKey)) {
+                final int pageIndex = i;
+                pendingRenders.add(highKey);
+                renderExecutor.execute(() -> renderPageAsync(pageIndex, currentZoom, true)); // Low-res only
             }
         }
     }
@@ -1252,16 +1632,29 @@ public class NativePdfViewerActivity extends Activity {
     }
     
     /**
-     * Get cached page height at 1.0x zoom (layout size).
-     * Visual zoom is handled at canvas level.
+     * Get cached page height with zoom-aware layout.
+     * 
+     * When zoomed out (< 1.0x), scale layout heights proportionally so more pages
+     * are bound by RecyclerView, creating the "train of pages" effect.
+     * When zoomed in (>= 1.0x), layout stays at 1.0x and canvas handles visual scaling.
      */
     private int getScaledPageHeight(int pageIndex) {
         if (pageWidths == null || pageIndex < 0 || pageIndex >= pageWidths.length) {
             return screenHeight / 2;
         }
-        // Layout dimensions always at 1.0x - canvas-level zoom handles visual scaling
+        
+        // Base height at 1.0x (fit-to-width)
         float scale = (float) screenWidth / pageWidths[pageIndex];
-        return (int) (pageHeights[pageIndex] * scale);
+        int baseHeight = (int) (pageHeights[pageIndex] * scale);
+        
+        // When zoomed out, scale layout heights to show more pages
+        // This allows RecyclerView to bind more items, creating the train view
+        if (currentZoom < 1.0f) {
+            return (int) (baseHeight * currentZoom);
+        }
+        
+        // At or above 1.0x: Layout at full size, canvas handles zoom
+        return baseHeight;
     }
     
     /**
@@ -1342,6 +1735,7 @@ public class NativePdfViewerActivity extends Activity {
             });
             
             if (lowResOnly) {
+                pendingRenders.remove(getCacheKey(pageIndex, targetZoom, false));
                 return;
             }
             
@@ -1418,6 +1812,10 @@ public class NativePdfViewerActivity extends Activity {
         
         hideHandler.removeCallbacks(hideRunnable);
         
+        if (fastScrollOverlay != null) {
+            fastScrollOverlay.cleanup();
+        }
+        
         if (doubleTapAnimator != null && doubleTapAnimator.isRunning()) {
             doubleTapAnimator.cancel();
         }
@@ -1488,7 +1886,7 @@ public class NativePdfViewerActivity extends Activity {
     
     /**
      * RecyclerView adapter for PDF pages.
-     * Layout is always at 1.0x - visual zoom happens at canvas level.
+     * Layout height scales with zoom when below 1.0x for train view.
      */
     private class PdfPageAdapter extends RecyclerView.Adapter<PdfPageAdapter.PageViewHolder> {
         
@@ -1509,7 +1907,7 @@ public class NativePdfViewerActivity extends Activity {
         public void onBindViewHolder(@NonNull PageViewHolder holder, int position) {
             holder.pageIndex = position;
             
-            // Set height from cached dimensions (always 1.0x for layout)
+            // Set height from cached dimensions (zoom-aware for train view)
             int height = getScaledPageHeight(position);
             ViewGroup.LayoutParams params = holder.imageView.getLayoutParams();
             params.height = height;
@@ -1533,8 +1931,10 @@ public class NativePdfViewerActivity extends Activity {
                 if (fallback != null && !fallback.isRecycled()) {
                     holder.imageView.setImageBitmap(fallback);
                 } else {
+                    // Use a subtle gray placeholder instead of pure white
+                    // This provides visual feedback that content is loading
                     holder.imageView.setImageBitmap(null);
-                    holder.imageView.setBackgroundColor(0xFFFFFFFF);
+                    holder.imageView.setBackgroundColor(0xFFF5F5F5);
                 }
             }
             
@@ -1571,10 +1971,13 @@ public class NativePdfViewerActivity extends Activity {
                     if (shouldUpdate && bitmap != null && !bitmap.isRecycled()) {
                         imageView.setImageBitmap(bitmap);
                         
-                        ViewGroup.LayoutParams params = imageView.getLayoutParams();
-                        if (params.height != height) {
-                            params.height = height;
-                            imageView.setLayoutParams(params);
+                        // Update height only if at 1.0x or above (train view handles its own sizing)
+                        if (currentZoom >= 1.0f) {
+                            ViewGroup.LayoutParams params = imageView.getLayoutParams();
+                            if (params.height != height) {
+                                params.height = height;
+                                imageView.setLayoutParams(params);
+                            }
                         }
                     }
                 }
