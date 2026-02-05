@@ -62,21 +62,30 @@ node scripts/android/clean-rebuild-android.mjs --run
 |--------|-------------|
 | `node scripts/android/clean-rebuild-android.mjs` | Full rebuild: delete, add, patch, sync |
 | `node scripts/android/clean-rebuild-android.mjs --run` | Rebuild and run on device |
+| `node scripts/android/clean-rebuild-android.mjs --verify` | Rebuild and verify Gradle build |
+| `node scripts/android/clean-rebuild-android.mjs --release` | Rebuild and build release AAB |
+| `node scripts/android/clean-rebuild-android.mjs --warning-mode` | Check for Gradle deprecations |
 | `node scripts/android/clean-rebuild-android.mjs --skip-sync` | Rebuild without final sync |
 | `node scripts/android/patch-android-project.mjs` | Apply patches only (without rebuild) |
 
 ### What the Patch Script Does
 
-The `patch-android-project.mjs` script:
+The `patch-android-project.mjs` script applies **Gradle 9/10 compatible** configurations:
 
 - **Copies native files** from `native/android/` to `android/`
   - Custom Java files (MainActivity, ShortcutPlugin, VideoPlayer, etc.)
   - AndroidManifest.xml customizations
   - Resource files and layouts
-- **Updates Gradle** wrapper to 8.13
+- **Updates Gradle** wrapper to 8.13 (Gradle 9/10 ready)
 - **Configures SDK versions**: minSdk=31, compileSdk=36, targetSdk=36
+- **Uses modern Gradle DSL syntax**:
+  - `minSdk =` instead of deprecated `minSdkVersion`
+  - `compileSdk =` instead of deprecated `compileSdkVersion`
+  - All property assignments use `=` operator
 - **Sets JDK 21** in gradle.properties
-- **Adds dependencies**: SwipeRefreshLayout, ExoPlayer/Media3, RecyclerView
+- **Adds dependencies**: SwipeRefreshLayout, ExoPlayer/Media3, RecyclerView, ExifInterface
+- **Removes deprecated patterns**: jcenter(), old dependency configurations
+- **Configures release signing** with environment variables
 
 ## After Code Changes
 
@@ -184,6 +193,8 @@ adb shell am start -W -a android.intent.action.VIEW \
 | `spawn ./gradlew ENOENT` | See Gradlew fix below |
 | OAuth goes to browser | Check assetlinks.json and App Links verification |
 | "ES256 invalid signing" | Backend redirect URL not configured |
+| Gradle deprecation warnings | Run `--warning-mode` flag to check, patch script fixes these |
+| `shrinkResources` error | Fixed by patch script (disables resource shrinking) |
 
 ### Gradlew Not Found Fix
 
@@ -257,6 +268,25 @@ npm run build
 npx cap sync android
 npx cap run android
 ```
+
+### Gradle 9/10 Deprecation Warnings
+
+If you see warnings about deprecated Gradle syntax:
+
+```bash
+# Check for deprecations
+cd android && ./gradlew build --warning-mode all
+
+# The patch script fixes these automatically
+node scripts/android/patch-android-project.mjs
+```
+
+Common deprecations fixed by the patch script:
+- `minSdkVersion` → `minSdk`
+- `compileSdkVersion` → `compileSdk`
+- Property assignments without `=` operator
+- `jcenter()` repository (removed)
+- Old dependency configurations (`compile` → `implementation`)
 
 ## Release APK
 

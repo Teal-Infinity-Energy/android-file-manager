@@ -68,36 +68,40 @@ npm -v     # Should show 10.x
 
 ---
 
-## Part 3: Java Setup (Fixes Gradle + Java 21 Issues)
+## Part 3: Java Setup (JDK 21 Required)
 
-Android builds are most reliable when **Gradle runs on JDK 17**, even if your system default is JDK 21.
+Android builds require **JDK 21** for Gradle 8.13 and modern Android Gradle Plugin compatibility.
 
-### 3.1 Install JDK 17 (required for Android/Gradle reliability)
+### 3.1 Install JDK 21 (required)
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jdk
+sudo apt install -y openjdk-21-jdk
 
-# Recommended: expose a dedicated env var the patch script can use
-echo 'export JAVA_HOME_17=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+# Set as default
+sudo update-alternatives --config java
+sudo update-alternatives --config javac
+
+# Set JAVA_HOME
+echo 'export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64' >> ~/.bashrc
 source ~/.bashrc
 
 # Verify
-/usr/lib/jvm/java-17-openjdk-amd64/bin/java -version
+java -version  # Should show 21.x
+echo $JAVA_HOME
 ```
 
-### 3.2 (Optional) Keep JDK 21 as your system default
+### 3.2 (Optional) Keep JDK 17 available
 
-If you already use JDK 21 for other projects, you can keep it installed and even set it as default:
+If you need JDK 17 for other projects:
 
 ```bash
-sudo apt install -y openjdk-21-jdk
+sudo apt install -y openjdk-17-jdk
+# Switch between versions with:
 sudo update-alternatives --config java
-sudo update-alternatives --config javac
-java -version
 ```
 
-**Key point:** the Android project will be configured to use **JDK 17** via `android/gradle.properties` (`org.gradle.java.home=...`) using the patch script below.
+**Key point:** The patch script configures the Android project to use **JDK 21** via `android/gradle.properties`.
 
 ---
 
@@ -201,16 +205,20 @@ npm install
 
 ---
 
-## Part 7: Add Android Platform (and apply required Android-12 + Java/Gradle fixes)
+## Part 7: Add Android Platform (Gradle 9/10 Compatible)
 
 ```bash
 # Add Android platform (generates android/ gradle files)
 npx cap add android
 
 # Patch the generated Android project:
-# - Updates Gradle wrapper (fixes Java 21 "Could not determine java version")
-# - Forces minimum Android version to Android 12 (minSdkVersion=31)
-# - Pins Gradle to run on JDK 17 (org.gradle.java.home)
+# - Updates Gradle wrapper to 8.13 (Gradle 9/10 ready)
+# - Uses modern Gradle DSL syntax (= assignments)
+# - Converts deprecated SDK version properties (minSdkVersion → minSdk)
+# - Removes deprecated repositories (jcenter)
+# - Sets minimum Android version to Android 12 (minSdk=31)
+# - Configures JDK 21
+# - Adds release signing configuration
 node scripts/android/patch-android-project.mjs
 
 # Build web assets
@@ -292,10 +300,16 @@ git pull
 npm run build
 npx cap sync android
 
-# Re-apply Android 12 + Gradle/JDK fixes (safe to run every time)
+# Re-apply Gradle 9/10 compatible patches (safe to run every time)
 node scripts/android/patch-android-project.mjs
 
 npx cap run android
+```
+
+Or use the automated rebuild with verification:
+
+```bash
+node scripts/android/clean-rebuild-android.mjs --verify --run
 ```
 
 ---
@@ -307,22 +321,16 @@ Run these commands to verify your setup:
 ```bash
 echo "=== Node.js ===" && node -v
 echo "=== npm ===" && npm -v
-echo "=== Java (system) ===" && java -version
-echo "=== JAVA_HOME_17 (recommended) ===" && echo $JAVA_HOME_17
+echo "=== Java ===" && java -version
+echo "=== JAVA_HOME ===" && echo $JAVA_HOME
 echo "=== Android SDK ===" && echo $ANDROID_HOME
 echo "=== ADB ===" && adb devices
 ```
 
-(Optional) If you installed Gradle system-wide:
-
-```bash
-gradle -v
-```
-
 Expected output:
 - Node: v18+ or v20+
-- Java (system): 17.x or 21.x
-- JAVA_HOME_17: set (points to JDK 17)
+- Java: 21.x (required for Gradle 8.13)
+- JAVA_HOME: set to JDK 21 path
 - ANDROID_HOME: set correctly
 - ADB: shows connected devices
 
@@ -338,12 +346,25 @@ This happens when the generated Android project is using an older Gradle wrapper
 # Ensure Android platform exists
 npx cap add android
 
-# Apply all Gradle/Java/SDK fixes
+# Apply all Gradle 9/10 compatible fixes
 node scripts/android/patch-android-project.mjs
 
 # Then try again
 npx cap sync android
 npx cap run android
+```
+
+### Gradle Deprecation Warnings
+
+If you see warnings like "will be removed in Gradle 10":
+
+```bash
+# Check for deprecations
+cd android && ./gradlew build --warning-mode all
+
+# The patch script fixes these automatically
+cd ..
+node scripts/android/patch-android-project.mjs
 ```
 
 ### `spawn ./gradlew ENOENT`
@@ -394,15 +415,15 @@ npx cap run android
       ↓
 1. System Update
       ↓
-2. Install: Node.js, JDK 17 (and optionally JDK 21), Android Studio
+2. Install: Node.js, JDK 21, Android Studio
       ↓
-3. Set Environment Variables (ANDROID_HOME, JAVA_HOME_17)
+3. Set Environment Variables (ANDROID_HOME, JAVA_HOME)
       ↓
 4. Clone Repo → npm install
       ↓
 5. npx cap add android
       ↓
-6. node scripts/android/patch-android-project.mjs   (Android 12 + Gradle/JDK fixes)
+6. node scripts/android/patch-android-project.mjs   (Gradle 9/10 compatible)
       ↓
 7. npm run build → npx cap sync android
       ↓
@@ -412,4 +433,17 @@ npx cap run android
       ↓
 10. npx cap run android
 ```
+
+## Gradle 9/10 Compatibility
+
+The patch script ensures full compatibility with future Gradle versions:
+
+| Deprecated Pattern | Modern Replacement |
+|-------------------|-------------------|
+| `minSdkVersion 31` | `minSdk = 31` |
+| `compileSdkVersion 36` | `compileSdk = 36` |
+| `signingConfig signingConfigs.release` | `signingConfig = signingConfigs.release` |
+| `jcenter()` | Removed (uses `google()` + `mavenCentral()`) |
+| `compile 'lib'` | `implementation 'lib'` |
+| `lintOptions {}` | `lint {}` |
 
