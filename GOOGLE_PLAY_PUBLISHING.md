@@ -43,26 +43,27 @@ For CI/CD, push a tag like `v1.0.0` to trigger automated builds.
    ```
 
 4. **Configure App Signing**
-   - In `android/app/build.gradle`, add signing config:
+   - The `patch-android-project.mjs` script automatically configures signing:
    ```groovy
    android {
        signingConfigs {
            release {
-               storeFile file('path/to/onetap-upload-key.jks')
-               storePassword 'YOUR_STORE_PASSWORD'
-               keyAlias 'onetap-key'
-               keyPassword 'YOUR_KEY_PASSWORD'
+               storeFile = file('path/to/onetap-upload-key.jks')
+               storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ''
+               keyAlias = 'onetap-key'
+               keyPassword = System.getenv("KEY_PASSWORD") ?: ''
            }
        }
        buildTypes {
            release {
-               signingConfig signingConfigs.release
-               minifyEnabled true
-               proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+               signingConfig = signingConfigs.release
+               minifyEnabled = false  // ProGuard disabled for stability
+               shrinkResources = false
            }
        }
    }
    ```
+   **Note:** Uses modern Gradle DSL syntax with `=` assignments (Gradle 9/10 compatible).
 
 5. **Build Release APK/AAB**
    ```bash
@@ -92,12 +93,16 @@ For CI/CD, push a tag like `v1.0.0` to trigger automated builds.
    - No `com.google.android.gms.ads` dependencies
 
 2. **Update Version Info**
-   - In `android/app/build.gradle`:
+   - Handled automatically by the patch script via environment variables:
+   ```bash
+   ONETAP_VERSION_CODE=1 ONETAP_VERSION_NAME=1.0.0 node scripts/android/patch-android-project.mjs
+   ```
+   - Or manually in `android/app/build.gradle` (use modern syntax):
    ```groovy
    android {
        defaultConfig {
-           versionCode 1  // Increment for each release
-           versionName "1.0.0"
+           versionCode = 1  // Increment for each release
+           versionName = "1.0.0"
        }
    }
    ```
