@@ -75,11 +75,17 @@
     .section:last-child {
       border-bottom: none;
     }
+    .highlight {
+      background: var(--border);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin: 1rem 0;
+    }
   </style>
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="last-updated">Last updated: January 25, 2026</p>
+  <p class="last-updated">Last updated: February 5, 2026</p>
 
   <div class="section">
     <h2>Introduction</h2>
@@ -87,52 +93,99 @@
       OneTap Shortcuts ("we", "our", or "the app") is committed to protecting your privacy. 
       This Privacy Policy explains how we collect, use, and safeguard your information when you use our mobile application.
     </p>
+    <div class="highlight">
+      <strong>Key Points:</strong>
+      <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+        <li>Your shortcuts are stored locally on your device by default</li>
+        <li>Cloud sync is optional and requires signing in</li>
+        <li>We do not use advertising or analytics tracking</li>
+        <li>We do not sell or share your data with third parties</li>
+      </ul>
+    </div>
   </div>
 
   <div class="section">
     <h2>Information We Collect</h2>
-    <p><strong>Information you provide:</strong></p>
+    <p><strong>Information you provide (optional):</strong></p>
     <ul>
-      <li><strong>Account information:</strong> If you choose to sign in with Google, we receive your email address, name, and profile picture from Google.</li>
-      <li><strong>Bookmarks and shortcuts:</strong> The URLs, titles, and metadata of bookmarks you save within the app.</li>
+      <li><strong>Account information:</strong> If you choose to sign in with Google, we receive your email address, name, and profile picture from Google. This is used solely for authentication and displaying your profile.</li>
+      <li><strong>Bookmarks and shortcuts:</strong> The URLs, titles, and metadata of bookmarks you save within the app. These are synced to our cloud service only if you sign in.</li>
       <li><strong>Scheduled actions:</strong> Information about reminders and scheduled shortcuts you create.</li>
     </ul>
-    <p><strong>Information collected automatically:</strong></p>
+    <p><strong>Information stored locally only (never transmitted):</strong></p>
     <ul>
-      <li><strong>Device information:</strong> General device type and operating system version for compatibility purposes.</li>
-      <li><strong>Usage data:</strong> Basic app usage statistics to improve the app experience (if analytics are enabled).</li>
+      <li><strong>Contact references:</strong> When you create contact shortcuts, only a reference identifier is stored locally. We do not upload your contacts.</li>
+      <li><strong>File references:</strong> Paths to local files you create shortcuts for. The files themselves are never uploaded.</li>
+      <li><strong>App preferences:</strong> Your settings and customization choices.</li>
+    </ul>
+    <p><strong>Information we do NOT collect:</strong></p>
+    <ul>
+      <li>Device identifiers or advertising IDs</li>
+      <li>Location data</li>
+      <li>Usage analytics or behavioral data</li>
+      <li>Crash reports (beyond what you explicitly share)</li>
     </ul>
   </div>
 
   <div class="section">
     <h2>How We Use Your Information</h2>
-    <p>We use the information we collect to:</p>
+    <p>We use the information we collect solely to:</p>
     <ul>
       <li>Provide, maintain, and improve the OneTap Shortcuts app</li>
-      <li>Sync your bookmarks across devices when you sign in</li>
-      <li>Send scheduled notifications for your reminders</li>
+      <li>Sync your bookmarks across devices when you choose to sign in</li>
+      <li>Send scheduled notifications for your reminders (locally triggered)</li>
       <li>Respond to your requests and provide customer support</li>
     </ul>
+    <p>
+      We do not use your data for advertising, profiling, or any purpose other than providing the app's core functionality.
+    </p>
   </div>
 
   <div class="section">
     <h2>Data Storage and Security</h2>
     <p>
-      Your shortcuts and local data are stored on your device. If you choose to sign in, your bookmarks 
-      are synced to our secure cloud servers. We use industry-standard encryption to protect your data 
-      in transit and at rest.
+      <strong>Local Storage:</strong> Your shortcuts and preferences are stored on your device using standard Android storage mechanisms. This data never leaves your device unless you explicitly sign in for cloud sync.
     </p>
     <p>
-      We do not sell, trade, or otherwise transfer your personal information to third parties.
+      <strong>Cloud Storage (Optional):</strong> If you sign in with Google, your bookmarks are synced to our cloud infrastructure powered by Supabase. Supabase provides enterprise-grade security including:
+    </p>
+    <ul>
+      <li>Encryption in transit (TLS 1.3)</li>
+      <li>Encryption at rest (AES-256)</li>
+      <li>Row-level security policies ensuring only you can access your data</li>
+      <li>SOC 2 Type II certified infrastructure</li>
+    </ul>
+    <p>
+      <strong>Data Isolation:</strong> Your cloud data is strictly isolated. Our database security policies ensure that each user can only read and modify their own data.
     </p>
   </div>
 
   <div class="section">
     <h2>Third-Party Services</h2>
-    <p>The app may use the following third-party services:</p>
+    <p>The app uses the following third-party services:</p>
     <ul>
-      <li><strong>Google Sign-In:</strong> For authentication. Subject to <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</li>
-      <li><strong>Supabase:</strong> For cloud storage and authentication infrastructure.</li>
+      <li>
+        <strong>Google Sign-In:</strong> For authentication only. Subject to 
+        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
+        We receive only your basic profile information (email, name, profile picture).
+      </li>
+      <li>
+        <strong>Supabase:</strong> For cloud storage and authentication infrastructure. Supabase is SOC 2 Type II certified and provides enterprise-grade security. See 
+        <a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase's Privacy Policy</a>.
+      </li>
+    </ul>
+    <p>
+      <strong>We do not use:</strong> Advertising networks, analytics services, crash reporting services, or any other third-party tracking.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Data Retention</h2>
+    <ul>
+      <li><strong>Local data:</strong> Retained on your device until you uninstall the app or clear app data.</li>
+      <li><strong>Cloud data:</strong> Retained until you delete your account or request deletion.</li>
+      <li><strong>Trash:</strong> Items moved to trash are automatically deleted after 30 days.</li>
+      <li><strong>Account deletion:</strong> When you delete your account, all cloud data is permanently removed within 30 days.</li>
     </ul>
   </div>
 
@@ -140,11 +193,15 @@
     <h2>Your Rights</h2>
     <p>You have the right to:</p>
     <ul>
-      <li><strong>Access:</strong> Request a copy of your personal data</li>
-      <li><strong>Delete:</strong> Delete your account and all associated data through the app's Profile section</li>
-      <li><strong>Export:</strong> Export your bookmarks from the app</li>
-      <li><strong>Opt-out:</strong> Use the app without signing in (local-only mode)</li>
+      <li><strong>Access:</strong> View all your data within the app</li>
+      <li><strong>Delete:</strong> Delete your account and all associated cloud data through Profile → Delete Account</li>
+      <li><strong>Export:</strong> Your bookmarks can be viewed and copied from the app</li>
+      <li><strong>Opt-out:</strong> Use the app entirely offline without signing in—no cloud sync, no data transmission</li>
+      <li><strong>Correction:</strong> Update your bookmarks and settings at any time</li>
     </ul>
+    <p>
+      For data requests not handled through the app, contact us at the email below.
+    </p>
   </div>
 
   <div class="section">
@@ -152,22 +209,40 @@
     <p>
       OneTap Shortcuts is not intended for children under 13. We do not knowingly collect personal 
       information from children under 13. If you believe we have collected such information, 
-      please contact us.
+      please contact us immediately.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>International Users</h2>
+    <p>
+      Our cloud infrastructure is hosted in the United States. If you access the app from outside the United States, 
+      your information may be transferred to, stored, and processed in the United States. By using the app with 
+      cloud sync enabled, you consent to this transfer.
+    </p>
+    <p>
+      <strong>EU/EEA Users:</strong> Under GDPR, you have rights to access, rectify, erase, restrict processing, 
+      data portability, and object to processing. Contact us to exercise these rights.
+    </p>
+    <p>
+      <strong>California Users:</strong> Under CCPA, you have the right to know what personal information we collect, 
+      request deletion, and opt-out of sale (we do not sell personal information).
     </p>
   </div>
 
   <div class="section">
     <h2>Changes to This Policy</h2>
     <p>
-      We may update this Privacy Policy from time to time. We will notify you of any changes by 
-      posting the new Privacy Policy on this page and updating the "Last updated" date.
+      We may update this Privacy Policy from time to time. We will notify you of any material changes by 
+      posting the new Privacy Policy on this page and updating the "Last updated" date. We encourage you 
+      to review this policy periodically.
     </p>
   </div>
 
   <div class="section">
     <h2>Contact Us</h2>
     <p>
-      If you have any questions about this Privacy Policy, please contact us at:
+      If you have any questions about this Privacy Policy or our data practices, please contact us at:
       <br>
       <a href="mailto:support@onetap.app">support@onetap.app</a>
     </p>
