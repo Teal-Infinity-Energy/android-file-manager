@@ -27,7 +27,14 @@ export function ContentPreview({ source, className }: ContentPreviewProps) {
   // Build priority-ordered list of image sources
   const imageSources = useMemo(() => {
     if (!isImage) return [];
-    return buildImageSources(source.thumbnailData, source.uri);
+    const sources = buildImageSources(source.thumbnailData, source.uri);
+    console.log('[ContentPreview] Image sources:', {
+      hasThumbnailData: !!source.thumbnailData,
+      thumbnailDataLength: source.thumbnailData?.length,
+      uri: source.uri?.substring(0, 50),
+      resultCount: sources.length,
+    });
+    return sources;
   }, [isImage, source.thumbnailData, source.uri]);
 
   return (
