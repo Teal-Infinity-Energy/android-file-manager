@@ -21,11 +21,11 @@ export function isValidImageSource(src: string | undefined | null): boolean {
   // Valid HTTP(S) URL
   if (src.startsWith('http://') || src.startsWith('https://')) return true;
   
-  // Android content URI (may or may not work, but worth trying)
-  if (src.startsWith('content://')) return true;
-  
   // File URI
   if (src.startsWith('file://')) return true;
+  
+  // content:// URIs CANNOT be rendered by WebView <img> tags
+  // They require native code to resolve - do NOT include them
   
   return false;
 }

@@ -81,7 +81,14 @@ export function ShortcutCustomizer({ source, onConfirm, onBack }: ShortcutCustom
   // Build priority-ordered list of preview image sources
   const previewSources = useMemo(() => {
     if (icon.type !== 'thumbnail') return [];
-    return buildImageSources(icon.value, thumbnail);
+    const sources = buildImageSources(icon.value, thumbnail);
+    console.log('[ShortcutCustomizer] Preview sources:', {
+      iconType: icon.type,
+      iconValueLength: icon.value?.length,
+      thumbnailLength: thumbnail?.length,
+      resultCount: sources.length,
+    });
+    return sources;
   }, [icon.type, icon.value, thumbnail]);
   
   // Update icon to favicon when metadata loads for unrecognized URLs
