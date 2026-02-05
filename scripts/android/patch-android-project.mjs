@@ -4,12 +4,19 @@
  * - Copy custom native files from native/android/ to android/
  * - Java / Gradle compatibility (update Gradle wrapper)
  * - Minimum Android version (minSdkVersion = 31 / Android 12)
+ * - Release signing configuration
+ * - Version code and version name for releases
  *
  * Usage:
  *   node scripts/android/patch-android-project.mjs
  *
  * Optional env vars:
  *   JAVA_HOME_21=/path/to/jdk21   (recommended)
+ *   ONETAP_VERSION_CODE=1         (for release builds)
+ *   ONETAP_VERSION_NAME=1.0.0     (for release builds)
+ *   KEYSTORE_PATH=path/to/keystore.jks (for CI signing)
+ *   KEYSTORE_PASSWORD=xxx         (for CI signing)
+ *   KEY_PASSWORD=xxx              (for CI signing)
  */
 
 import fs from "node:fs";
@@ -24,6 +31,10 @@ const TARGET_SDK = 36;
 const GRADLE_VERSION = "8.13";
 const JAVA_TOOLCHAIN = 21;
 const AGP_VERSION = "8.9.1"; // Required for compileSdk 36 + recent AndroidX
+
+// Version configuration - can be overridden by environment variables
+const VERSION_CODE = parseInt(process.env.ONETAP_VERSION_CODE || "1", 10);
+const VERSION_NAME = process.env.ONETAP_VERSION_NAME || "1.0.0";
 
 function fileExists(p) {
   try {
@@ -173,6 +184,113 @@ function patchAppDependencies() {
     console.log(`[patch-android] Added dependencies to app/build.gradle (SwipeRefreshLayout, ExoPlayer/Media3, RecyclerView).`);
   } else {
     console.log(`[patch-android] All dependencies already present.`);
+  }
+}
+
+/**
+ * Configure version code and version name in app/build.gradle
+ */
+function patchVersionInfo() {
+  const appBuildGradle = path.join(ANDROID_DIR, "app", "build.gradle");
+  
+  if (!fileExists(appBuildGradle)) {
+    console.log(`[patch-android] Skipping version patch: app/build.gradle not found.`);
+    return;
+  }
+
+  const before = readFile(appBuildGradle);
+  let after = before;
+
+  // Update versionCode
+  const versionCodeRe = /versionCode\s+\d+/;
+  if (versionCodeRe.test(after)) {
+    after = after.replace(versionCodeRe, `versionCode ${VERSION_CODE}`);
+  } else {
+    // Insert after defaultConfig {
+    after = after.replace(
+      /(defaultConfig\s*\{)/,
+      `$1\n        versionCode ${VERSION_CODE}`
+    );
+  }
+
+  // Update versionName
+  const versionNameRe = /versionName\s*["'][^"']+["']/;
+  if (versionNameRe.test(after)) {
+    after = after.replace(versionNameRe, `versionName "${VERSION_NAME}"`);
+  } else {
+    // Insert after versionCode
+    after = after.replace(
+      /(versionCode\s+\d+)/,
+      `$1\n        versionName "${VERSION_NAME}"`
+    );
+  }
+
+  if (after !== before) {
+    writeFile(appBuildGradle, after);
+    console.log(`[patch-android] Set versionCode=${VERSION_CODE}, versionName="${VERSION_NAME}".`);
+  } else {
+    console.log(`[patch-android] Version info already set.`);
+  }
+}
+
+/**
+ * Configure release signing in app/build.gradle
+ */
+function patchReleaseSigning() {
+  const appBuildGradle = path.join(ANDROID_DIR, "app", "build.gradle");
+  
+  if (!fileExists(appBuildGradle)) {
+    console.log(`[patch-android] Skipping signing patch: app/build.gradle not found.`);
+    return;
+  }
+
+  const before = readFile(appBuildGradle);
+  let after = before;
+
+  // Check if signing config already exists
+  if (after.includes("signingConfigs")) {
+    console.log(`[patch-android] Signing config already present.`);
+    return;
+  }
+
+  // Add signingConfigs block inside android { }
+  const signingConfig = `
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv("KEYSTORE_PATH") ?: "onetap-release.jks"
+            def ksFile = file(keystorePath)
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+                keyAlias "onetap-key"
+                keyPassword System.getenv("KEY_PASSWORD") ?: ""
+            }
+        }
+    }
+`;
+
+  // Insert signingConfigs after android {
+  after = after.replace(
+    /(android\s*\{)/,
+    `$1${signingConfig}`
+  );
+
+  // Update release buildType to use signing config
+  const buildTypesRe = /(buildTypes\s*\{[\s\S]*?release\s*\{)/;
+  if (buildTypesRe.test(after)) {
+    after = after.replace(
+      buildTypesRe,
+      `$1
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'`
+    );
+  }
+
+  if (after !== before) {
+    writeFile(appBuildGradle, after);
+    console.log(`[patch-android] Added release signing configuration.`);
   }
 }
 
@@ -381,9 +499,12 @@ function main() {
   patchJavaVersions();
   patchSdkVersions();
   patchAppDependencies();
+  patchVersionInfo();
+  patchReleaseSigning();
 
   console.log("[patch-android] Done.");
   console.log(`[patch-android] Configuration: Gradle ${GRADLE_VERSION}, JDK ${JAVA_TOOLCHAIN}, compileSdk ${COMPILE_SDK}, minSdk ${MIN_SDK}`);
+  console.log(`[patch-android] Version: ${VERSION_NAME} (${VERSION_CODE})`);
 }
 
 main();

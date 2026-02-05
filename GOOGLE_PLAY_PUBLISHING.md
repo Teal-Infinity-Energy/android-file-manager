@@ -1,34 +1,36 @@
 # OneTap - Google Play Store Publishing Guide
 
-This guide covers two monetization strategies for publishing OneTap on Google Play Store.
+> **Note:** This guide has been superseded by the production-ready implementation. See:
+> - `PLAY_STORE_CHECKLIST.md` - Step-by-step pre-publish checklist
+> - `.github/workflows/android-release.yml` - Automated CI/CD workflow
+> - `scripts/android/patch-android-project.mjs` - Build configuration with signing
+> - `native/android/app/proguard-rules.pro` - ProGuard rules for release builds
+
+This guide covers the original planning for two monetization strategies. **OneTap is published as a paid app (Strategy A).**
+
+---
+
+## Quick Start (Paid App)
+
+```bash
+# 1. Generate keystore (one-time)
+keytool -genkey -v -keystore onetap-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias onetap-key
+
+# 2. Build release
+npm run build
+npx cap sync android
+ONETAP_VERSION_CODE=1 ONETAP_VERSION_NAME=1.0.0 node scripts/android/patch-android-project.mjs
+cd android && ./gradlew bundleRelease
+
+# 3. Find AAB
+ls -la app/build/outputs/bundle/release/
+```
+
+For CI/CD, push a tag like `v1.0.0` to trigger automated builds.
 
 ---
 
 ## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [Strategy A: Paid App (One-Time Purchase)](#strategy-a-paid-app-one-time-purchase)
-3. [Strategy B: Free with Ads + Ad-Free Upgrade](#strategy-b-free-with-ads--ad-free-upgrade)
-4. [Common Steps for Both Strategies](#common-steps-for-both-strategies)
-5. [Post-Launch Checklist](#post-launch-checklist)
-
----
-
-## Prerequisites
-
-### Developer Account Setup
-
-1. **Create Google Play Developer Account**
-   - Go to [Google Play Console](https://play.google.com/console)
-   - Pay one-time $25 registration fee
-   - Complete identity verification (can take 24-48 hours)
-   - Set up your developer profile (name, email, website)
-
-2. **Merchant Account (Required for Paid Apps/IAP)**
-   - In Play Console → Setup → Payments profile
-   - Link or create Google Payments merchant account
-   - Provide tax information (W-9 for US, varies by country)
-   - Set up bank account for payouts
 
 ### Technical Requirements
 

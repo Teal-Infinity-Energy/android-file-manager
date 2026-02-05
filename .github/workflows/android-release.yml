@@ -1,0 +1,236 @@
+# ============================================================================
+# OneTap Shortcuts - Android Release Build Workflow
+# ============================================================================
+# This workflow builds and optionally publishes the Android app to Google Play.
+#
+# Triggers:
+#   - Push to tags matching 'v*' (e.g., v1.0.0)
+#   - Manual dispatch with track selection
+#
+# Required GitHub Secrets:
+#   - KEYSTORE_BASE64: Base64-encoded release keystore file
+#   - KEYSTORE_PASSWORD: Password for the keystore
+#   - KEY_PASSWORD: Password for the signing key
+#   - PLAY_SERVICE_ACCOUNT_JSON: Google Play API service account credentials
+# ============================================================================
+
+name: Android Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play Store track (internal/alpha/beta/production)'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      skip_upload:
+        description: 'Skip Play Store upload (build only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '21'
+  ANDROID_COMPILE_SDK: '36'
+  ANDROID_BUILD_TOOLS: '36.0.0'
+  PACKAGE_NAME: 'app.onetap.shortcuts'
+
+jobs:
+  build:
+    name: Build Release AAB
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+    
+    steps:
+      # -----------------------------------------------------------------------
+      # Setup Environment
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+      
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      
+      # -----------------------------------------------------------------------
+      # Extract Version Information
+      # -----------------------------------------------------------------------
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION_NAME="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION_NAME="1.0.0-dev"
+          fi
+          
+          # Calculate version code from version name (major*10000 + minor*100 + patch)
+          IFS='.' read -ra VERSION_PARTS <<< "$VERSION_NAME"
+          MAJOR="${VERSION_PARTS[0]:-1}"
+          MINOR="${VERSION_PARTS[1]:-0}"
+          PATCH="${VERSION_PARTS[2]:-0}"
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "Building version $VERSION_NAME (code: $VERSION_CODE)"
+      
+      # -----------------------------------------------------------------------
+      # Build Web Application
+      # -----------------------------------------------------------------------
+      - name: Install npm dependencies
+        run: npm ci
+      
+      - name: Build web application
+        run: npm run build
+      
+      # -----------------------------------------------------------------------
+      # Initialize Android Project
+      # -----------------------------------------------------------------------
+      - name: Add Capacitor Android platform
+        run: npx cap add android || true
+      
+      - name: Sync Capacitor
+        run: npx cap sync android
+      
+      - name: Apply Android patches
+        run: node scripts/android/patch-android-project.mjs
+        env:
+          ONETAP_VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          ONETAP_VERSION_NAME: ${{ steps.version.outputs.version_name }}
+      
+      # -----------------------------------------------------------------------
+      # Configure Signing
+      # -----------------------------------------------------------------------
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/onetap-release.jks
+          echo "Keystore decoded successfully"
+      
+      - name: Verify keystore
+        run: |
+          keytool -list -keystore android/app/onetap-release.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" || true
+      
+      # -----------------------------------------------------------------------
+      # Build Release AAB
+      # -----------------------------------------------------------------------
+      - name: Make gradlew executable
+        working-directory: android
+        run: chmod +x gradlew
+      
+      - name: Build release AAB
+        working-directory: android
+        env:
+          KEYSTORE_PATH: onetap-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+      
+      - name: Verify AAB was created
+        run: |
+          AAB_PATH="android/app/build/outputs/bundle/release/app-release.aab"
+          if [ -f "$AAB_PATH" ]; then
+            echo "✅ AAB created successfully"
+            ls -la "$AAB_PATH"
+          else
+            echo "❌ AAB not found!"
+            find android -name "*.aab" 2>/dev/null || echo "No AAB files found"
+            exit 1
+          fi
+      
+      # -----------------------------------------------------------------------
+      # Upload Artifacts
+      # -----------------------------------------------------------------------
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab-${{ steps.version.outputs.version_name }}
+          path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+      
+      - name: Upload mapping file (if exists)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mapping-${{ steps.version.outputs.version_name }}
+          path: android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: ignore
+          retention-days: 90
+
+  # ---------------------------------------------------------------------------
+  # Publish to Google Play Store
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish to Play Store
+    needs: build
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && !inputs.skip_upload)
+    
+    steps:
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-aab-${{ needs.build.outputs.version_name }}
+          path: ./release
+      
+      - name: List downloaded files
+        run: ls -la ./release
+      
+      - name: Determine track
+        id: track
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "track=${{ inputs.track }}" >> $GITHUB_OUTPUT
+          else
+            # Default to internal for tag pushes
+            echo "track=internal" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: ./release/*.aab
+          track: ${{ steps.track.outputs.track }}
+          status: completed
+          releaseName: "v${{ needs.build.outputs.version_name }}"
+          whatsNewDirectory: ./whatsnew
+        continue-on-error: true
+      
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./release/*.aab
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
