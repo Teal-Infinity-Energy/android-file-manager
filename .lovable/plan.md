@@ -1,446 +1,283 @@
 
-# Google Play Store Production Publishing Plan
 
-## Executive Summary
+# Google Play Store Screenshots Design Specification
 
-This plan prepares OneTap Shortcuts for production publishing on Google Play Store as a one-time paid app. The app is already well-architected with strong security foundations (RLS policies, local-first design) and comprehensive native Android functionality.
+## Overview
 
----
-
-## 1. Production Build Readiness
-
-### Current Status
-- **Build Configuration**: Already configured for Android 12+ (minSdk 31, compileSdk 36, targetSdk 36)
-- **Gradle/JDK**: Using Gradle 8.13 with JDK 21 (production-ready)
-- **Patch Script**: `scripts/android/patch-android-project.mjs` properly handles SDK versions and dependencies
-
-### Required Changes
-
-#### A. Version Configuration
-Create or update `native/android/app/build.gradle` version values:
-
-| Field | Current | Required |
-|-------|---------|----------|
-| `versionCode` | Not set | `1` (increment for each release) |
-| `versionName` | Not set | `1.0.0` |
-
-#### B. Release Signing Configuration
-Create signing configuration for release builds. The keystore must be generated locally.
-
-Add to `android/app/build.gradle`:
-```groovy
-android {
-    signingConfigs {
-        release {
-            storeFile file(System.getenv("KEYSTORE_PATH") ?: 'onetap-release.jks')
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: ''
-            keyAlias 'onetap-key'
-            keyPassword System.getenv("KEY_PASSWORD") ?: ''
-        }
-    }
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-}
-```
-
-#### C. Debug Logging Review
-The codebase contains production-appropriate logging:
-- `console.log/warn/error` statements are used for debugging (54 files with console usage)
-- These are appropriate for production as they only appear in developer tools
-- Native `Log.d/Log.e` statements follow Android best practices
-
-**Recommendation**: No changes needed. Console logs are stripped from production builds by minification, and they don't affect end-user experience.
-
-#### D. ProGuard Rules
-Create `native/android/app/proguard-rules.pro` for code shrinking:
-- Keep Capacitor plugin classes
-- Keep ExoPlayer/Media3 classes
-- Preserve native activity classes
+This document provides detailed specifications for capturing **8 Google Play Store screenshots** for OneTap - a premium paid Android app that provides instant home screen access to files, links, contacts, and reminders.
 
 ---
 
-## 2. Google Play Store Compliance
+## Global Requirements Checklist
 
-### A. Permissions Audit
-
-| Permission | Usage | Justified | Play Store Category |
-|------------|-------|-----------|---------------------|
-| `INTERNET` | Cloud sync, metadata fetch | Yes | Standard |
-| `INSTALL_SHORTCUT` | Core feature - home screen shortcuts | Yes | Core functionality |
-| `READ_EXTERNAL_STORAGE` (SDK ≤32) | File access for shortcuts | Yes | Media access |
-| `WRITE_EXTERNAL_STORAGE` (SDK ≤29) | Legacy file access | Yes | Media access |
-| `READ_MEDIA_IMAGES` (SDK 33+) | Image shortcuts | Yes | Media access |
-| `READ_MEDIA_VIDEO` (SDK 33+) | Video shortcuts | Yes | Media access |
-| `SCHEDULE_EXACT_ALARM` | Reminder notifications | Yes | Alarms & reminders |
-| `USE_EXACT_ALARM` | Reminder notifications | Yes | Alarms & reminders |
-| `RECEIVE_BOOT_COMPLETED` | Restore alarms after reboot | Yes | Alarms & reminders |
-| `POST_NOTIFICATIONS` (SDK 33+) | Reminder notifications | Yes | Notifications |
-| `VIBRATE` | Haptic feedback | Yes | Standard |
-| `CALL_PHONE` | One-tap call shortcuts | Yes | Phone calls |
-
-**Assessment**: All permissions are justified and properly scoped with `maxSdkVersion` where appropriate. No over-privileged or unused permissions.
-
-### B. Privacy & Data Safety Declaration
-
-| Category | Data Collected | Shared | Required |
-|----------|---------------|--------|----------|
-| **Email** | Yes (Google OAuth) | No | Optional (for sync) |
-| **Name** | Yes (Google OAuth) | No | Optional (for sync) |
-| **Phone numbers** | No (stored locally only) | No | N/A |
-| **Files/media** | No (references stored locally) | No | N/A |
-| **App activity** | No analytics | No | N/A |
-| **Device identifiers** | No | No | N/A |
-
-**Data Safety Form Responses**:
-- Does your app collect user data? **Yes** (optional account info)
-- Is data encrypted in transit? **Yes** (Supabase uses HTTPS)
-- Can users request data deletion? **Yes** (delete account feature)
-- Does your app share data with third parties? **No**
+| Requirement | Status |
+|-------------|--------|
+| Aspect ratio: 9:16 | Required |
+| Real app UI only | Required |
+| No mockups/fake data | Required |
+| No emojis in overlays | Required |
+| One idea per screenshot | Required |
+| Under 3 seconds to understand | Required |
+| Consistent device frame | Required |
+| Clean status bar | Required |
 
 ---
 
-## 3. Privacy Policy (Updated Version)
+## Visual Consistency Standards
 
-The existing `public/privacy-policy.html` is well-structured but needs updates for production compliance:
-
-### Required Updates:
-1. Update "Last updated" date to current date
-2. Clarify "no analytics" statement (remove ambiguity about "if analytics are enabled")
-3. Explicitly state no ads are used
-4. Add Supabase infrastructure mention
-5. Add data retention periods
-
-### Updated Privacy Policy
-A production-ready privacy policy will be created at `public/privacy-policy.html` with:
-- Clear statement: "OneTap does not use advertising or analytics tracking"
-- Explicit Supabase mention as backend provider
-- Specific data retention information
-- GDPR/CCPA compliance language
-- Clear data deletion instructions
+- **Device**: Use a single Android phone for all captures (Pixel-style recommended)
+- **Status bar**: Set to clean state - full battery, Wi-Fi connected, minimal icons
+- **Theme**: Use light mode (default app theme) for maximum visibility
+- **Wallpaper**: Simple, dark gradient or solid color to contrast with shortcut icons
+- **Overlay placement**: Bottom third of screen with semi-transparent gradient backdrop
+- **Typography**: Sans-serif, high contrast white text on dark gradient
 
 ---
 
-## 4. Store Listing Content
+## Screenshot Specifications
 
-### App Title
-**OneTap - Quick Access Shortcuts**
+### Screenshot 1: Core Promise
 
-### Short Description (80 chars max)
-"Create instant home screen shortcuts for any URL, contact, or file."
+**Purpose**: Establish the app philosophy - instant access without distraction.
 
-### Full Description
-```text
-OneTap puts everything you need one tap away.
+**App State to Capture**:
+- Android home screen with 5-7 created shortcuts visible
+- Shortcuts should include a mix of:
+  - URL shortcuts (e.g., YouTube, a news site)
+  - PDF document shortcut
+  - Photo/slideshow shortcut
+  - Contact call shortcut
+  - WhatsApp shortcut
+- Clean wallpaper (dark gradient)
+- No app drawer open, no notifications
 
-Create home screen shortcuts for:
-• Websites and web apps
-• Contacts (call or message instantly)
-• Videos and PDFs with native viewers
-• Reminders with scheduled notifications
+**Capture Instructions**:
+1. Create 5-7 demo shortcuts of varied types
+2. Arrange them in a clean grid on home screen
+3. Use a minimal dark wallpaper
+4. Capture the home screen itself (not the app)
 
-DESIGNED FOR CALM
-
-OneTap respects your attention. No notifications asking you to engage. No usage tracking. No "streaks" or gamification. Just the shortcuts you create, working exactly as expected.
-
-LOCAL-FIRST
-
-Your shortcuts live on your device. Sign in with Google to sync across devices, or use OneTap entirely offline. Your data, your choice.
-
-PREMIUM QUALITY
-
-• Native PDF viewer with smooth scrolling
-• Video player with picture-in-picture support
-• WhatsApp quick messages with custom templates
-• Beautiful icon customization
-
-WHAT YOU GET
-
-✓ Unlimited shortcuts
-✓ All features included
-✓ No ads, ever
-✓ No subscriptions
-✓ No in-app purchases
-✓ Privacy-focused design
-
-One purchase. Complete access. Forever.
-```
-
-### Feature Bullet Points
-1. Create home screen shortcuts instantly
-2. Native PDF and video viewers
-3. WhatsApp quick message templates
-4. Scheduled reminders with notifications
-5. Optional cloud sync with Google account
-6. No ads or subscriptions
-
-### "Why Paid" Positioning
-This positioning is embedded naturally in the description rather than defensively stated. The phrase "One purchase. Complete access. Forever." communicates premium value without appearing defensive.
-
-### Screenshots Guide
-
-| Order | Screen | State | Caption |
-|-------|--------|-------|---------|
-| 1 | Home screen | Shortcuts pinned | "One tap to what matters" |
-| 2 | Shortcut creation | URL being added | "Create shortcuts in seconds" |
-| 3 | Native PDF viewer | Document open | "Built-in PDF reader" |
-| 4 | Video player | PiP mode active | "Picture-in-picture support" |
-| 5 | Contact shortcuts | Quick call/message | "Instant contact access" |
-| 6 | Reminders | Scheduled notification | "Never forget with reminders" |
-| 7 | Icon customization | Emoji/color picker | "Personalize your shortcuts" |
-| 8 | Cloud sync | Profile screen | "Sync across devices (optional)" |
+**Overlay Text**:
+- **Headline**: "One tap to what matters"
+- **Subtext**: "Instant access. No distractions."
 
 ---
 
-## 5. Supabase Production Hardening
+### Screenshot 2: URL Shortcut Creation
 
-### RLS Policy Audit
+**Purpose**: Demonstrate the simplest and most common use case.
 
-**Current Status**: All tables have proper RLS policies using `auth.uid() = user_id`:
+**App State to Capture**:
+- The ShortcutCustomizer screen (`src/components/ShortcutCustomizer.tsx`)
+- URL source visible in ContentPreview component
+- Name input field with a recognizable name (e.g., "YouTube")
+- Platform icon visible (YouTube logo)
+- "Add to Home Screen" button at bottom
 
-| Table | RLS | Policies |
-|-------|-----|----------|
-| `cloud_bookmarks` | Enabled | CRUD restricted to owner |
-| `cloud_trash` | Enabled | CRUD restricted to owner |
-| `cloud_scheduled_actions` | Enabled | CRUD restricted to owner |
+**Capture Instructions**:
+1. Navigate to Access tab
+2. Tap "Link" button in grid
+3. Enter a recognizable URL (youtube.com)
+4. Proceed to customize step
+5. Capture at the customization screen showing the preview
 
-**Assessment**: RLS is correctly configured. No cross-user access possible.
-
-### Edge Functions Review
-
-| Function | Purpose | Security |
-|----------|---------|----------|
-| `fetch-url-metadata` | CORS bypass for metadata | No auth required, read-only |
-| `delete-account` | Account deletion | Requires valid JWT, uses service role |
-
-**Assessment**: Both functions are production-ready:
-- `fetch-url-metadata`: Properly handles CORS, has timeout, minimal data exposure
-- `delete-account`: Validates JWT, uses admin client for privileged operations
-
-### Linter Warning Resolution
-
-The linter shows one warning:
-- **Leaked Password Protection Disabled**
-
-This is acceptable for this app because:
-1. The app uses Google OAuth exclusively, not password authentication
-2. No password fields exist in the app
-
-**No action required** - this warning is not applicable.
-
-### Free Tier Considerations
-
-| Resource | Free Limit | App Usage | Risk |
-|----------|------------|-----------|------|
-| Database | 500MB | Low (text data only) | Very low |
-| Auth | 50,000 MAU | Expected low | Very low |
-| Edge functions | 500k invocations/month | Metadata fetch only | Low |
-| Bandwidth | 2GB/month | Text sync only | Very low |
+**Overlay Text**:
+- **Headline**: "Open what you need. Instantly."
 
 ---
 
-## 6. CI/CD Configuration
+### Screenshot 3: PDF Access
 
-### GitHub Actions Workflow
+**Purpose**: Build trust for document reading use cases.
 
-Create `.github/workflows/android-release.yml`:
+**App State to Capture**:
+- Native PDF viewer activity (`NativePdfViewerActivity.java`)
+- PDF document open mid-page (not page 1)
+- Clean reading UI visible (top bar with close and open-with buttons)
+- Multi-page document showing continuous scroll
 
-```yaml
-name: Android Release Build
+**Capture Instructions**:
+1. Create a PDF shortcut with a multi-page document (e.g., book, notes)
+2. Open the PDF via the shortcut
+3. Scroll to middle of document
+4. Let the header auto-hide or tap to show minimal UI
+5. Capture while reading
 
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      track:
-        description: 'Play Store track (internal/alpha/beta/production)'
-        required: true
-        default: 'internal'
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build web app
-        run: npm run build
-      
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      
-      - name: Initialize Capacitor Android
-        run: |
-          npx cap add android || true
-          npx cap sync android
-          node scripts/android/patch-android-project.mjs
-      
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/onetap-release.jks
-      
-      - name: Build release AAB
-        working-directory: android
-        env:
-          KEYSTORE_PATH: onetap-release.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew bundleRelease
-      
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-      
-      - name: Upload to Play Store
-        if: github.event_name == 'push' || github.event.inputs.track != ''
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: app.onetap.shortcuts
-          releaseFiles: android/app/build/outputs/bundle/release/*.aab
-          track: ${{ github.event.inputs.track || 'internal' }}
-          status: completed
-```
-
-### Required GitHub Secrets
-
-| Secret | Description | How to Generate |
-|--------|-------------|-----------------|
-| `KEYSTORE_BASE64` | Base64-encoded release keystore | `base64 -w0 onetap-release.jks` |
-| `KEYSTORE_PASSWORD` | Keystore password | Set during keytool generation |
-| `KEY_PASSWORD` | Key password | Set during keytool generation |
-| `PLAY_SERVICE_ACCOUNT_JSON` | Google Play API credentials | Play Console → API access → Service account |
-
-### Local Build Commands
-
-```bash
-# Generate keystore (one-time)
-keytool -genkey -v -keystore onetap-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias onetap-key
-
-# Build release
-npm run build
-npx cap sync android
-node scripts/android/patch-android-project.mjs
-cd android && ./gradlew bundleRelease
-
-# Find AAB
-ls -la android/app/build/outputs/bundle/release/
-```
+**Overlay Text**:
+- **Headline**: "Resume reading in one tap"
+- **Subtext**: "Books. Notes. Documents."
 
 ---
 
-## 7. Final Pre-Publish Checklist
+### Screenshot 4: Photo Slideshow Access
 
-### Play Console Setup (One-Time)
+**Purpose**: Personal content access - photos and memories.
 
-- [ ] Create app in Play Console (app.onetap.shortcuts)
-- [ ] Complete App Content questionnaire
-- [ ] Upload AAB to Internal testing track first
-- [ ] Complete Data Safety form
-- [ ] Add privacy policy URL
-- [ ] Set up Store listing (title, descriptions, screenshots)
-- [ ] Upload feature graphic (1024x500)
-- [ ] Upload app icon (512x512)
-- [ ] Complete Content rating questionnaire
-- [ ] Set pricing ($2.99 recommended)
-- [ ] Configure target countries
+**App State to Capture**:
+- Slideshow viewer screen (`src/pages/SlideshowViewer.tsx`)
+- A personal photo visible (landscape image recommended)
+- Navigation controls visible (dots, arrows)
+- Image counter visible (e.g., "3 / 8")
 
-### Before Each Release
+**Capture Instructions**:
+1. Create a slideshow shortcut with 5-8 personal photos
+2. Open the slideshow via the shortcut
+3. Navigate to a visually appealing image
+4. Tap to show controls
+5. Capture with controls visible
 
-- [ ] Increment `versionCode` in build.gradle
-- [ ] Update `versionName` if significant changes
-- [ ] Run `npm run build` successfully
-- [ ] Run `npx cap sync android`
-- [ ] Run `node scripts/android/patch-android-project.mjs`
-- [ ] Build release AAB: `./gradlew bundleRelease`
-- [ ] Verify AAB is signed: `jarsigner -verify *.aab`
-- [ ] Test on physical device
-- [ ] Write release notes
-
-### Common Rejection Risks
-
-| Risk | Mitigation |
-|------|------------|
-| Missing privacy policy | Ensure URL is accessible and comprehensive |
-| Incomplete Data Safety | Match declarations to actual behavior |
-| Broken functionality | Test all shortcut types before submission |
-| Permission denials crash app | All permission denials are gracefully handled |
-| Content rating mismatch | Answer questionnaire honestly |
+**Overlay Text**:
+- **Headline**: "Your memories. Right there."
 
 ---
 
-## 8. Files to Create/Modify
+### Screenshot 5: WhatsApp Access
 
-### New Files
+**Purpose**: Fast communication without automation.
 
-| File | Purpose |
-|------|---------|
-| `.github/workflows/android-release.yml` | CI/CD workflow |
-| `native/android/app/proguard-rules.pro` | ProGuard configuration |
-| `PLAY_STORE_CHECKLIST.md` | Pre-publish checklist |
-| `public/privacy-policy.html` | Updated privacy policy |
+**App State to Capture**:
+- The ContactShortcutCustomizer in message mode, OR
+- The WhatsApp message chooser dialog (native Android dialog)
+- Contact name visible
+- "Quick Messages" section showing 2-3 message templates
 
-### Modified Files
+**Capture Instructions**:
+1. Navigate to Access tab
+2. Tap "Contact" button
+3. Select "WhatsApp" mode
+4. Pick a contact
+5. In customization, add 2-3 quick message templates
+6. Capture the quick messages editor section visible
 
-| File | Changes |
-|------|---------|
-| `scripts/android/patch-android-project.mjs` | Add version code/name, signing config |
-| `GOOGLE_PLAY_PUBLISHING.md` | Update with finalized instructions |
-
----
-
-## 9. Implementation Order
-
-1. **Create ProGuard rules** - Required for minification
-2. **Update patch script** - Add version config and signing setup
-3. **Update privacy policy** - Production compliance
-4. **Create CI/CD workflow** - Automated builds
-5. **Create pre-publish checklist** - Final verification document
-6. **Update existing docs** - Consolidate all guidance
+**Overlay Text**:
+- **Headline**: "Say it faster"
+- **Subtext**: "Always in your control."
 
 ---
 
-## 10. Summary
+### Screenshot 6: Contact Call Access
 
-### What's Already Production-Ready
-- Android SDK configuration (API 31+, SDK 36)
-- Native crash reporting infrastructure
-- RLS security policies
-- OAuth authentication flow
-- Edge functions
-- All permissions properly scoped
+**Purpose**: Emotional and practical value - reach people quickly.
 
-### What Needs Implementation
-- Release signing configuration
-- ProGuard rules for minification
-- CI/CD workflow
-- Updated privacy policy
-- Store listing assets
+**App State to Capture**:
+- ContactShortcutCustomizer in dial mode (`src/components/ContactShortcutCustomizer.tsx`)
+- Contact avatar visible (or initials fallback)
+- Contact name displayed prominently
+- Phone icon visible
+- "Add to Home Screen" button at bottom
 
-### Statement
-Upon completing the changes outlined in this plan, **this app will be ready to submit to Google Play Store** as a paid application. The codebase demonstrates production-quality architecture, proper security practices, and compliance-ready infrastructure.
+**Capture Instructions**:
+1. Navigate to Access tab
+2. Tap "Contact" button
+3. Select "Call" mode
+4. Pick a contact with a photo (or use initials)
+5. Capture at the customization screen
+
+**Overlay Text**:
+- **Headline**: "Reach the people that matter"
+
+---
+
+### Screenshot 7: Scheduled Reminders
+
+**Purpose**: Time-based access and proactive notifications.
+
+**App State to Capture**:
+- ScheduledTimingPicker component (`src/components/ScheduledTimingPicker.tsx`)
+- Time wheel picker visible
+- Quick preset cards visible (Morning, Afternoon, etc.)
+- Recurrence options visible (Once, Daily, Weekly)
+
+**Capture Instructions**:
+1. Navigate to Reminders tab
+2. Tap "+" to create new reminder
+3. Select a destination (URL or contact)
+4. Proceed to timing step
+5. Capture the timing picker with time wheel and presets visible
+
+**Overlay Text**:
+- **Headline**: "Reminders that lead to action"
+
+---
+
+### Screenshot 8: Trust and Control (Profile/Settings)
+
+**Purpose**: Justify paying for the app - privacy, no ads, user control.
+
+**App State to Capture**:
+- ProfilePage component (`src/components/ProfilePage.tsx`)
+- Signed OUT state preferred (cleaner)
+- Shows "Sign in to sync" with cloud sync benefits
+- Usage Insights section visible below
+
+**Capture Instructions**:
+1. Navigate to Profile tab
+2. Ensure user is signed out
+3. Scroll to show both the sign-in prompt and usage insights
+4. Capture showing optional cloud sync messaging
+
+**Overlay Text**:
+- **Headline**: "Your device. Your data."
+- **Subtext**: "No ads. No tracking."
+
+---
+
+## Play Store Compliance Notes
+
+1. **Data Safety Declaration**:
+   - The app declares collection of optional account info (email, name) for cloud sync
+   - All data encrypted in transit via Supabase
+   - No data shared with third parties
+   - Privacy Policy at `/privacy-policy.html`
+
+2. **Screenshot Accuracy**:
+   - All screenshots must reflect real app functionality
+   - No implied features that do not exist
+   - Overlay text must not make unverifiable claims
+
+3. **Content Guidelines**:
+   - No personal contact information visible in screenshots
+   - Use placeholder/demo content for contacts and documents
+   - Blur or redact any sensitive information
+
+---
+
+## Technical Details for Capture
+
+| Setting | Value |
+|---------|-------|
+| Resolution | 1080 x 1920 minimum |
+| Format | PNG (lossless) |
+| Device frame | Optional but consistent |
+| Status bar time | Use 9:41 or similar neutral time |
+| Battery icon | Full or high |
+| Network icon | Wi-Fi connected |
+
+---
+
+## Capture Preparation Checklist
+
+Before capturing:
+- [ ] Install the production build of the app
+- [ ] Create all necessary demo shortcuts (URL, PDF, photo, contact, WhatsApp)
+- [ ] Prepare a clean home screen arrangement
+- [ ] Set a dark, minimal wallpaper
+- [ ] Sign out of the app (for Screenshot 8)
+- [ ] Enable Do Not Disturb to prevent notification interruptions
+- [ ] Clear status bar clutter
+
+---
+
+## Summary: Screenshot Order
+
+| # | Focus | Headline | Key UI |
+|---|-------|----------|--------|
+| 1 | Core Promise | "One tap to what matters" | Home screen with shortcuts |
+| 2 | URL Shortcut | "Open what you need. Instantly." | ShortcutCustomizer |
+| 3 | PDF Access | "Resume reading in one tap" | NativePdfViewerActivity |
+| 4 | Photo Slideshow | "Your memories. Right there." | SlideshowViewer |
+| 5 | WhatsApp Access | "Say it faster" | Quick Messages editor |
+| 6 | Contact Call | "Reach the people that matter" | ContactShortcutCustomizer |
+| 7 | Reminders | "Reminders that lead to action" | ScheduledTimingPicker |
+| 8 | Trust/Control | "Your device. Your data." | ProfilePage (signed out) |
+
