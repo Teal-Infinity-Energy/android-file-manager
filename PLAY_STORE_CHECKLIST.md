@@ -169,7 +169,7 @@ Complete the IARC questionnaire in Play Console → Policy → App content → C
 |-------|-------|----------------|
 | **App name** | OneTap - Quick Shortcuts | 30 characters |
 | **Short description** | Create instant home screen shortcuts for any URL, contact, or file. | 80 characters |
-| **Full description** | Detailed feature list (see GOOGLE_PLAY_PUBLISHING.md for template) | 4000 characters |
+| **Full description** | Detailed feature list — highlight shortcuts, reminders, PDF/video viewer, offline-first, no ads, no tracking | 4000 characters |
 
 - [ ] App name set
 - [ ] Short description set
@@ -313,6 +313,24 @@ After fixing the issue:
 You can appeal through Play Console → click the rejection notification → "Appeal" or "Contact support." Be factual, calm, and specific about why you believe the rejection is incorrect.
 
 **Typical review time:** 3-7 days for first submission, 1-3 days for updates.
+
+---
+
+## 8. Post-Launch Checklist
+
+### First Week After Launch
+
+- [ ] Monitor crash reports in Play Console daily
+- [ ] Respond to user reviews (especially negative ones — be calm and helpful)
+- [ ] Verify purchase flow works for new buyers
+- [ ] Check download and refund stats
+
+### Ongoing Maintenance
+
+- [ ] Ship updates every 1-2 months minimum (Google rewards active apps)
+- [ ] Respond to all user reviews
+- [ ] Update `targetSdkVersion` when Google raises the requirement (usually annually)
+- [ ] Review Data Safety form if you add new features that collect data
 
 ---
 
