@@ -9,7 +9,7 @@
 1. [The Three Layers](#1-the-three-layers)
 2. [Web Layer (React + Capacitor)](#2-web-layer-react--capacitor)
 3. [Native Android Layer (Java)](#3-native-android-layer-java)
-4. [Backend Layer (Lovable Cloud / Supabase)](#4-backend-layer-lovable-cloud--supabase)
+4. [Backend Layer (Supabase)](#4-backend-layer-supabase)
 5. [How Data Flows](#5-how-data-flows)
 6. [How OAuth Works](#6-how-oauth-works-step-by-step)
 7. [Why No Background Services](#7-why-no-background-services)
@@ -45,7 +45,7 @@ OneTap is built in three layers. Each layer has a specific job:
 │  You only touch this for Android-specific     │
 │  features that the web layer can't do.        │
 ├───────────────────────────────────────────────┤
-│            LAYER 3: Backend (Cloud)           │
+│            LAYER 3: Backend (Supabase)        │
 │                                               │
 │  What it does: cloud sync, Google sign-in,    │
 │  URL metadata fetching                        │
@@ -60,10 +60,12 @@ OneTap is built in three layers. Each layer has a specific job:
 
 ```
 React UI  ──(Capacitor bridge)──▶  Native Android Java
-React UI  ──(Supabase SDK)──────▶  Lovable Cloud Backend
+React UI  ──(Supabase SDK)──────▶  Supabase Backend
 ```
 
 Capacitor is the bridge between web and native. It lets your React code call Java functions (like "create a home screen shortcut") through a plugin system.
+
+**No platform lock-in:** The app depends only on Supabase (open-source, self-hostable) for its backend. There are no proprietary platform dependencies.
 
 ---
 
@@ -125,9 +127,9 @@ Capacitor is the bridge between web and native. It lets your React code call Jav
 
 ---
 
-## 4. Backend Layer (Lovable Cloud / Supabase)
+## 4. Backend Layer (Supabase)
 
-**What is Supabase?** An open-source backend platform that provides a PostgreSQL database, authentication, and serverless functions. In this project, it's managed through Lovable Cloud — you don't need a separate Supabase account.
+**What is Supabase?** An open-source backend platform that provides a PostgreSQL database, authentication, and serverless functions. It can be self-hosted or used as a managed service at [supabase.com](https://supabase.com).
 
 **What the backend does:**
 - ✅ Stores synced bookmarks, trash, and reminders (optional)
@@ -169,7 +171,7 @@ See [SUPABASE.md](SUPABASE.md) for the complete backend guide.
                          │
                          ▼
 ┌───────────────────────────────────────────────────┐
-│                LOVABLE CLOUD                       │
+│                  SUPABASE                          │
 │          (Backup Copy — NEVER overwrites local)    │
 │                                                    │
 │  cloud_bookmarks          → Copy of bookmarks      │
@@ -222,12 +224,12 @@ Step 3: User signs in with Google
            │
            ▼
 Step 4: Google redirects to:
-        https://[your-domain]/auth-callback?code=ABC123
+        https://onetapapp.in/auth-callback?code=ABC123
            │
            ▼
 Step 5: Android intercepts this URL
         (because AndroidManifest.xml declares it as an App Link
-         and assetlinks.json proves you own the domain)
+         and assetlinks.json on onetapapp.in proves you own the domain)
            │
            ▼
 Step 6: useDeepLink.ts receives the URL
@@ -251,12 +253,18 @@ Step 8: User is signed in. Session stored by Supabase SDK.
 | `public/.well-known/assetlinks.json` | Proves domain ownership to Android |
 | `native/android/.../AndroidManifest.xml` | Declares the app handles the callback URL |
 
+**OAuth redirect URL configuration:**
+
+The redirect URL is controlled by the `VITE_PRODUCTION_DOMAIN` environment variable. For production, set this to `onetapapp.in`. The app constructs `https://{VITE_PRODUCTION_DOMAIN}/auth-callback` as the redirect target.
+
+You must also configure this URL in your Supabase project dashboard under Authentication → URL Configuration → Redirect URLs.
+
 **What can go wrong:**
 
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | Sign-in opens browser instead of app | Wrong SHA-256 fingerprint in `assetlinks.json` | Update fingerprint to match your signing key |
-| "ES256 invalid signing" error | Callback URL not in backend's allowlist | Add the URL to Cloud → Auth Settings → URI allow list |
+| "ES256 invalid signing" error | Callback URL not in Supabase's redirect allowlist | Add the URL in Supabase dashboard → Auth → URL Configuration |
 | Sign-in works once, then stops | Idempotency guard blocking repeat URL | Clear localStorage key `pending_oauth_url` |
 
 ---
@@ -325,8 +333,8 @@ onetap-app/
 │
 ├── supabase/
 │   ├── functions/                # Serverless functions (Deno/TypeScript)
-│   ├── migrations/               # ⚠️ AUTO-GENERATED SQL migrations
-│   └── config.toml               # ⚠️ AUTO-GENERATED config
+│   ├── migrations/               # SQL migrations
+│   └── config.toml               # Supabase config
 │
 ├── scripts/android/              # Build scripts
 │   ├── clean-rebuild-android.mjs # Full rebuild automation
@@ -380,7 +388,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for the full guide.
 | **User clears app data** | All local data is lost. | If signed in + synced: re-sign-in and sync to restore cloud copies. If never synced: data is gone. |
 | **Phone restarts** | `BootReceiver` reschedules all alarms. Shortcuts survive. | Automatic — no action needed. |
 | **Bad release shipped** | Users get a broken version. | Tag a hotfix version (`v1.0.1`), test on internal track, promote to production. See [RELEASE_PROCESS.md](RELEASE_PROCESS.md). |
-| **OAuth stops working** | Users can't sign in. App still works for everything except sync. | Check `assetlinks.json` fingerprint and auth callback URL. See Section 6 above. |
+| **OAuth stops working** | Users can't sign in. App still works for everything except sync. | Check `assetlinks.json` fingerprint and Supabase Auth redirect URL config. See Section 6 above. |
 | **Lost signing keystore** | Cannot publish updates to the same Play Store listing. | **Unrecoverable.** You must create a new app listing. Always back up your keystore. |
 | **Sync guard blocks sync** | Sync silently does nothing. | Check console logs for `SyncGuardViolation` (dev) or warning (prod). Likely a timing issue. |
 

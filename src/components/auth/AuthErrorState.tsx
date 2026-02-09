@@ -61,7 +61,7 @@ export function AuthErrorState({ error, onRetry, onGoHome }: AuthErrorStateProps
         </Button>
         
         <a 
-          href={`mailto:support@lovable.dev?subject=Auth%20Error&body=Error%20message:%20${encodeURIComponent(error.message)}`}
+          href={`mailto:hello@onetapapp.in?subject=Auth%20Error&body=Error%20message:%20${encodeURIComponent(error.message)}`}
           className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1"
         >
           <Mail className="h-3 w-3" />

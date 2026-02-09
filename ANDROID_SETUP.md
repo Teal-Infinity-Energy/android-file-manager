@@ -2,17 +2,16 @@
 
 ## Prerequisites
 
-- **Node.js** v18+
+- **Node.js** v20+
 - **JDK 21** (required for Android/Gradle)
 - **Android Studio** with Android SDK
 - **Android phone** (8.0+) with USB debugging enabled
 
 ## Quick Start
 
-### 1. Export & Clone
+### 1. Clone & Install
 
 ```bash
-# Export from Lovable to GitHub, then:
 git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
 cd YOUR_REPO
 npm install
@@ -78,10 +77,7 @@ The `patch-android-project.mjs` script applies **Gradle 9/10 compatible** config
   - Resource files and layouts
 - **Updates Gradle** wrapper to 8.13 (Gradle 9/10 ready)
 - **Configures SDK versions**: minSdk=31, compileSdk=36, targetSdk=36
-- **Uses modern Gradle DSL syntax**:
-  - `minSdk =` instead of deprecated `minSdkVersion`
-  - `compileSdk =` instead of deprecated `compileSdkVersion`
-  - All property assignments use `=` operator
+- **Uses modern Gradle DSL syntax**
 - **Sets JDK 21** in gradle.properties
 - **Adds dependencies**: SwipeRefreshLayout, ExoPlayer/Media3, RecyclerView, ExifInterface
 - **Removes deprecated patterns**: jcenter(), old dependency configurations
@@ -123,16 +119,24 @@ scripts/android/
 
 ## Configure OAuth (Required for Google Sign-In)
 
-The app uses **Android App Links** for OAuth callback. This requires HTTPS URLs.
+The app uses **Android App Links** for OAuth callback. This requires HTTPS URLs on your production domain.
 
-**Backend Setup:**
-1. Open your Lovable project
-2. Go to **Cloud → Users → Auth Settings → URL Configuration**
-3. Add to "URI allow list": `https://id-preview--2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovable.app/auth-callback`
+### Step 1: Supabase Setup
 
-**Domain Verification (assetlinks.json):**
+1. Go to your [Supabase dashboard](https://supabase.com/dashboard)
+2. Navigate to **Authentication → URL Configuration**
+3. Add to "Redirect URLs": `https://onetapapp.in/auth-callback`
 
-The file `public/.well-known/assetlinks.json` must contain your app's signing certificate fingerprint:
+### Step 2: Environment Variable
+
+Ensure your `.env` file contains:
+```
+VITE_PRODUCTION_DOMAIN=onetapapp.in
+```
+
+### Step 3: Domain Verification (assetlinks.json)
+
+The file hosted at `https://onetapapp.in/.well-known/assetlinks.json` must contain your app's signing certificate fingerprint.
 
 ```bash
 # Get your debug keystore fingerprint:
@@ -142,7 +146,40 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 keytool -list -v -keystore your-release.keystore -alias your-alias | grep SHA256
 ```
 
-Update `public/.well-known/assetlinks.json` with your fingerprint(s).
+For production, use the SHA-256 fingerprint from Google Play Console → Setup → App signing → App signing key certificate.
+
+### Step 4: AndroidManifest.xml
+
+The `native/android/app/src/main/AndroidManifest.xml` already declares the App Link intent filter for `onetapapp.in`. If you use a different domain, update the `android:host` value.
+
+## OAuth Deep Link Flow (App Links)
+
+1. User taps "Sign in with Google"
+2. App opens Google OAuth in Chrome Custom Tab
+3. After authentication, Google redirects to `https://onetapapp.in/auth-callback?code=...`
+4. Android intercepts this HTTPS URL (via verified App Link in AndroidManifest.xml)
+5. App exchanges the code for a session token
+6. User is signed in
+
+**Files involved:**
+- `assetlinks.json` on your website - Domain verification for App Links
+- `native/android/app/src/main/AndroidManifest.xml` - App Links intent-filter with `autoVerify="true"`
+- `src/hooks/useDeepLink.ts` - Handles `appUrlOpen` events
+- `src/hooks/useAuth.ts` - Native OAuth flow with `skipBrowserRedirect`
+
+## Testing App Links on Physical Devices
+
+```bash
+# Check if Android verified the domain
+adb shell pm get-app-links app.onetap.shortcuts
+
+# Test the deep link manually
+adb shell am start -W -a android.intent.action.VIEW \
+  -d "https://onetapapp.in/auth-callback?code=test"
+
+# Force re-verification
+adb shell pm verify-app-links --re-verify app.onetap.shortcuts
+```
 
 ## Environment Check
 
@@ -151,34 +188,6 @@ java -version      # Should be 21.x
 echo $JAVA_HOME    # Should point to JDK 21
 echo $ANDROID_HOME # Should be set
 adb devices        # Should list your device
-```
-
-## OAuth Deep Link Flow (App Links)
-
-The app uses Android App Links for native OAuth:
-
-1. User taps "Sign in with Google"
-2. App opens Google OAuth in Chrome Custom Tab
-3. After authentication, Google redirects to `https://id-preview--2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovable.app/auth-callback?code=...`
-4. Android intercepts this HTTPS URL (via verified App Link in AndroidManifest.xml)
-5. App exchanges the code for a session token
-6. User is signed in
-
-**Files involved:**
-- `public/.well-known/assetlinks.json` - Domain verification for App Links
-- `native/android/app/src/main/AndroidManifest.xml` - App Links intent-filter with `autoVerify="true"`
-- `src/hooks/useDeepLink.ts` - Handles `appUrlOpen` events
-- `src/hooks/useAuth.ts` - Native OAuth flow with `skipBrowserRedirect`
-
-**Testing App Links:**
-
-```bash
-# Check if Android verified the domain
-adb shell pm get-app-links app.onetap.shortcuts
-
-# Test the deep link manually
-adb shell am start -W -a android.intent.action.VIEW \
-  -d "https://id-preview--2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovable.app/auth-callback?code=test"
 ```
 
 ## Troubleshooting
@@ -192,13 +201,10 @@ adb shell am start -W -a android.intent.action.VIEW \
 | Shortcuts not working | Requires Android 8.0+ |
 | `spawn ./gradlew ENOENT` | See Gradlew fix below |
 | OAuth goes to browser | Check assetlinks.json and App Links verification |
-| "ES256 invalid signing" | Backend redirect URL not configured |
+| "ES256 invalid signing" | Redirect URL not configured in Supabase Auth settings |
 | Gradle deprecation warnings | Run `--warning-mode` flag to check, patch script fixes these |
-| `shrinkResources` error | Fixed by patch script (disables resource shrinking) |
 
 ### Gradlew Not Found Fix
-
-If you get `spawn ./gradlew ENOENT` error:
 
 ```bash
 cd android
@@ -207,19 +213,7 @@ cd ..
 npx cap run android
 ```
 
-If `gradle` command not found, install it first:
-```bash
-sudo apt install gradle -y  # Ubuntu/Debian
-brew install gradle         # macOS
-```
-
 ### Java Toolchain Error (Looking for Java 21)
-
-If you see an error like:
-
-- `Cannot find a Java installation ... matching: {languageVersion=21 ...}`
-
-**Fix:** Install JDK 21 and re-run the clean rebuild:
 
 ```bash
 # Ubuntu/Debian
@@ -235,7 +229,7 @@ node scripts/android/clean-rebuild-android.mjs --run
 If Google sign-in completes but opens in the browser instead of the app:
 
 1. **Check assetlinks.json is accessible:**
-   Visit `https://id-preview--2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovable.app/.well-known/assetlinks.json` in a browser
+   Visit `https://onetapapp.in/.well-known/assetlinks.json` in a browser
 
 2. **Verify fingerprint matches:**
    ```bash
@@ -254,44 +248,10 @@ If Google sign-in completes but opens in the browser instead of the app:
    adb shell pm verify-app-links --re-verify app.onetap.shortcuts
    ```
 
-5. **Use Auth Debug panel:** In dev builds, tap the "Auth" button to see platform info and last received deep link
-
-### Clean Rebuild (Manual)
-
-If the automated script fails, run manually:
-
-```bash
-rm -rf android
-npx cap add android
-node scripts/android/patch-android-project.mjs
-npm run build
-npx cap sync android
-npx cap run android
-```
-
-### Gradle 9/10 Deprecation Warnings
-
-If you see warnings about deprecated Gradle syntax:
-
-```bash
-# Check for deprecations
-cd android && ./gradlew build --warning-mode all
-
-# The patch script fixes these automatically
-node scripts/android/patch-android-project.mjs
-```
-
-Common deprecations fixed by the patch script:
-- `minSdkVersion` → `minSdk`
-- `compileSdkVersion` → `compileSdk`
-- Property assignments without `=` operator
-- `jcenter()` repository (removed)
-- Old dependency configurations (`compile` → `implementation`)
-
 ## Release APK
 
 1. `npx cap open android`
 2. Build → Generate Signed Bundle/APK → APK
 3. Find APK in `android/app/release/`
 
-**Important:** Add your release keystore SHA256 fingerprint to `public/.well-known/assetlinks.json` before releasing.
+**Important:** Add your release keystore SHA256 fingerprint to `assetlinks.json` on your website domain before releasing.

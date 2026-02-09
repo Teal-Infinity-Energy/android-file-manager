@@ -41,7 +41,7 @@ A local-first Android app that lets users create home screen shortcuts for quick
 - **Capacitor** for native Android bridge
 - **i18next** for internationalization
 
-### Backend (Lovable Cloud/Supabase)
+### Backend (Supabase)
 - **Tables**: `cloud_bookmarks`, `cloud_trash`
 - **Edge Functions**: `fetch-url-metadata`, `delete-account`
 - **Auth**: Google OAuth with native deep link handling

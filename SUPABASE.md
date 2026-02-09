@@ -1,4 +1,4 @@
-# OneTap Shortcuts — Backend Guide (Lovable Cloud)
+# OneTap Shortcuts — Backend Guide (Supabase)
 
 > **Purpose of this document:** Remove the fear of touching the backend. If you've never used a database or backend before, this document will walk you through everything this project uses, why it exists, and how to change it safely.
 
@@ -8,13 +8,14 @@
 
 1. [What the Backend Does (and Does Not Do)](#1-what-the-backend-does-and-does-not-do)
 2. [Why There Is Only One Backend Project](#2-why-there-is-only-one-backend-project)
-3. [Database Tables Explained](#3-database-tables-explained)
-4. [Row Level Security (RLS) — Beginner Explanation](#4-row-level-security-rls--beginner-explanation)
-5. [How Google OAuth Works in This Project](#5-how-google-oauth-works-in-this-project)
-6. [Edge Functions (Serverless Code)](#6-edge-functions-serverless-code)
-7. [How to Apply Schema Changes Safely](#7-how-to-apply-schema-changes-safely)
-8. [How to Delete User Data Correctly](#8-how-to-delete-user-data-correctly)
-9. [What NOT to Change](#9-what-not-to-change)
+3. [Supabase Project Setup](#3-supabase-project-setup)
+4. [Database Tables Explained](#4-database-tables-explained)
+5. [Row Level Security (RLS) — Beginner Explanation](#5-row-level-security-rls--beginner-explanation)
+6. [How Google OAuth Works in This Project](#6-how-google-oauth-works-in-this-project)
+7. [Edge Functions (Serverless Code)](#7-edge-functions-serverless-code)
+8. [How to Apply Schema Changes Safely](#8-how-to-apply-schema-changes-safely)
+9. [How to Delete User Data Correctly](#9-how-to-delete-user-data-correctly)
+10. [What NOT to Change](#10-what-not-to-change)
 
 ---
 
@@ -54,7 +55,52 @@ Most apps have a "staging" (test) environment and a "production" (live) environm
 
 ---
 
-## 3. Database Tables Explained
+## 3. Supabase Project Setup
+
+If you're setting up this project from scratch or moving to a new Supabase instance:
+
+### Step 1: Create a Supabase project
+
+1. Go to [supabase.com](https://supabase.com) and create a free account
+2. Create a new project (choose a region close to your users)
+3. Note your project's **URL** and **anon key** from Settings → API
+
+### Step 2: Configure environment variables
+
+Create or update `.env` in the project root:
+
+```
+VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key_here
+VITE_SUPABASE_PROJECT_ID=YOUR_PROJECT_ID
+VITE_PRODUCTION_DOMAIN=onetapapp.in
+```
+
+### Step 3: Run database migrations
+
+Apply the migrations in `supabase/migrations/` to your project. You can do this via:
+- The Supabase dashboard SQL editor
+- The Supabase CLI: `supabase db push`
+
+### Step 4: Configure Google OAuth
+
+1. In Supabase dashboard → Authentication → Providers → Google
+2. Enable Google provider
+3. Add your Google OAuth client ID and secret (from Google Cloud Console)
+4. Under Authentication → URL Configuration → Redirect URLs, add:
+   - `https://onetapapp.in/auth-callback`
+   - (Any other domains you use for testing)
+
+### Step 5: Configure Edge Function secrets
+
+In Supabase dashboard → Edge Functions → Secrets, ensure these exist:
+- `SUPABASE_URL` (auto-set)
+- `SUPABASE_ANON_KEY` (auto-set)
+- `SUPABASE_SERVICE_ROLE_KEY` (auto-set)
+
+---
+
+## 4. Database Tables Explained
 
 The database has three tables. Each stores a copy of local data for cloud sync purposes.
 
@@ -118,7 +164,7 @@ This table backs up scheduled reminders.
 
 ---
 
-## 4. Row Level Security (RLS) — Beginner Explanation
+## 5. Row Level Security (RLS) — Beginner Explanation
 
 ### What is RLS?
 
@@ -154,7 +200,7 @@ ON cloud_bookmarks FOR DELETE
 USING (auth.uid() = user_id);
 ```
 
-**What `auth.uid()` means:** This is a built-in function that returns the ID of the currently logged-in user. If nobody is logged in, it returns null, and all policies fail (no data is accessible).
+**What `auth.uid()` means:** This is a built-in Supabase function that returns the ID of the currently logged-in user. If nobody is logged in, it returns null, and all policies fail (no data is accessible).
 
 ### Why This Matters
 
@@ -165,7 +211,7 @@ Never disable RLS on a table that contains user data. Doing so would expose ever
 
 ---
 
-## 5. How Google OAuth Works in This Project
+## 6. How Google OAuth Works in This Project
 
 **What is OAuth?** It's a way to let users sign in using their Google account instead of creating a username and password. Google handles the identity verification; your app just receives a token that says "this user is who they claim to be."
 
@@ -183,13 +229,31 @@ Never disable RLS on a table that contains user data. Doing so would expose ever
 
 **Sign-in is optional.** No features are locked behind sign-in. It only unlocks cloud sync.
 
+### Production OAuth Setup
+
+1. **Google Cloud Console:** Create an OAuth 2.0 client ID (Web application type)
+2. **Authorized redirect URIs:** Add `https://YOUR_SUPABASE_PROJECT_ID.supabase.co/auth/v1/callback`
+3. **Supabase dashboard:** Add your Google client ID and secret under Authentication → Providers → Google
+4. **Supabase redirect URLs:** Add `https://onetapapp.in/auth-callback` under Authentication → URL Configuration
+5. **`VITE_PRODUCTION_DOMAIN`:** Set to `onetapapp.in` in your `.env` file
+6. **`assetlinks.json`:** Host on `onetapapp.in/.well-known/assetlinks.json` with your app's SHA-256 signing fingerprint
+
 **For the full technical flow**, see [ARCHITECTURE.md](ARCHITECTURE.md) → Section 6.
 
 ---
 
-## 6. Edge Functions (Serverless Code)
+## 7. Edge Functions (Serverless Code)
 
 Edge functions are small pieces of server-side code that run on-demand. They are NOT constantly running servers — they start when called and stop when done.
+
+### Deploying Edge Functions
+
+Edge functions must be deployed to your Supabase project. Use the Supabase CLI:
+
+```bash
+supabase functions deploy fetch-url-metadata
+supabase functions deploy delete-account
+```
 
 ### `fetch-url-metadata`
 
@@ -220,7 +284,7 @@ This function uses the `service_role` key, which bypasses RLS. The service role 
 
 ---
 
-## 7. How to Apply Schema Changes Safely
+## 8. How to Apply Schema Changes Safely
 
 **When would you need to change the schema?** If you're adding a new feature that needs to store new data in the cloud. For example, adding a "notes" field to bookmarks would require adding a column to `cloud_bookmarks`.
 
@@ -232,7 +296,7 @@ This function uses the `service_role` key, which bypasses RLS. The service role 
    - ✅ **Additive** (safe): Adding a new column, adding a new table
    - ⚠️ **Destructive** (dangerous): Removing a column, changing a column type, dropping a table
 
-3. **For additive changes**, use the Lovable migration tool:
+3. **For additive changes**, write a SQL migration:
    ```sql
    -- Example: Add a "notes" column to cloud_bookmarks
    ALTER TABLE public.cloud_bookmarks
@@ -240,7 +304,7 @@ This function uses the `service_role` key, which bypasses RLS. The service role 
    ```
    This is safe because existing rows will simply have `null` in the new column.
 
-4. **For destructive changes**, check the live database first:
+4. **For destructive changes**, check the database first:
    ```sql
    -- Check if anyone has data in the column you want to remove
    SELECT COUNT(*) FROM cloud_bookmarks WHERE description IS NOT NULL;
@@ -253,17 +317,25 @@ This function uses the `service_role` key, which bypasses RLS. The service role 
    ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
 
    -- Then add the four standard policies (SELECT, INSERT, UPDATE, DELETE)
-   -- See Section 4 above for examples
+   -- See Section 5 above for examples
    ```
 
-6. **Test your change** before merging to `main`.
+6. **Apply via Supabase CLI or dashboard SQL editor:**
+   ```bash
+   # Using CLI
+   supabase db push
+   
+   # Or paste SQL directly in Supabase dashboard → SQL Editor
+   ```
+
+7. **Test your change** before merging to `main`.
 
 ⚠️ **DANGER:**
 Never run `DROP TABLE` or `ALTER TABLE ... DROP COLUMN` on production data without first confirming the data is backed up or no longer needed. These operations are irreversible.
 
 ---
 
-## 8. How to Delete User Data Correctly
+## 9. How to Delete User Data Correctly
 
 If a user requests data deletion (GDPR, CCPA, or just personal preference):
 
@@ -272,7 +344,7 @@ If a user requests data deletion (GDPR, CCPA, or just personal preference):
 2. **Manual method (if needed):**
    ```sql
    -- Find the user's ID first
-   -- (You'll need this from the auth system — check Cloud dashboard → Users)
+   -- (Check Supabase dashboard → Authentication → Users)
 
    -- Delete their bookmarks
    DELETE FROM cloud_bookmarks WHERE user_id = 'the-user-uuid';
@@ -283,21 +355,19 @@ If a user requests data deletion (GDPR, CCPA, or just personal preference):
    -- Delete their scheduled actions
    DELETE FROM cloud_scheduled_actions WHERE user_id = 'the-user-uuid';
 
-   -- Delete the auth account (requires admin access in Cloud dashboard)
+   -- Delete the auth account via Supabase dashboard → Authentication → Users → delete
    ```
 
 **Important:** Local data on the user's phone is NOT affected by cloud deletion. That data is only on their device and under their control.
 
 ---
 
-## 9. What NOT to Change
+## 10. What NOT to Change
 
 | File / Setting | Why You Must Not Change It |
 |---|---|
-| `src/integrations/supabase/client.ts` | Auto-generated. Lovable Cloud manages this. |
+| `src/integrations/supabase/client.ts` | Auto-generated. Reflects your Supabase connection. |
 | `src/integrations/supabase/types.ts` | Auto-generated from your database schema. |
-| `.env` | Auto-generated. Contains your project's connection details. |
-| `supabase/config.toml` | Auto-generated. Supabase configuration. |
 | RLS policies (removing them) | Removing RLS exposes all user data to all users. |
 | `service_role` key | This key bypasses all security. Never use it in client code. Never expose it in `.env` or frontend files. It is only used inside edge functions. |
 
