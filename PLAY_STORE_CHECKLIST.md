@@ -1,333 +1,327 @@
-# OneTap - Google Play Store Pre-Publish Checklist
+# OneTap Shortcuts — Play Store Checklist
 
-This checklist ensures everything is ready before publishing OneTap to the Google Play Store.
-
----
-
-## One-Time Setup (First Release Only)
-
-### Developer Account
-
-- [ ] Create Google Play Developer account ($25 one-time fee)
-- [ ] Complete identity verification (24-48 hours)
-- [ ] Set up developer profile (name, email, website)
-- [ ] Create merchant account for payments (Monetize → Payments profile)
-- [ ] Link bank account for payouts
-
-### App Creation
-
-- [ ] Create new app in Play Console
-  - Package name: `app.onetap.shortcuts`
-  - Default language: English (United States)
-  - App or game: App
-  - Free or paid: Paid
-
-### Signing Key
-
-- [ ] Generate release keystore:
-  ```bash
-  keytool -genkey -v -keystore onetap-release.jks \
-    -keyalg RSA -keysize 2048 -validity 10000 \
-    -alias onetap-key
-  ```
-- [ ] Store keystore file securely (NEVER lose this!)
-- [ ] Store passwords securely
-- [ ] Enroll in Google Play App Signing (recommended)
-
-### CI/CD Secrets (GitHub)
-
-- [ ] `KEYSTORE_BASE64`: Base64-encoded keystore
-  ```bash
-  base64 -w0 onetap-release.jks > keystore_base64.txt
-  ```
-- [ ] `KEYSTORE_PASSWORD`: Keystore password
-- [ ] `KEY_PASSWORD`: Key alias password
-- [ ] `PLAY_SERVICE_ACCOUNT_JSON`: Service account credentials
-  - Play Console → Setup → API access
-  - Create service account with "Release manager" role
-  - Download JSON key file
+> **Purpose of this document:** Walk you through everything Google requires to publish an Android app, with clear explanations of why each item exists and common rejection reasons to avoid. If you've never published an app before, follow this document from top to bottom.
 
 ---
 
-## App Content (Policy Compliance)
+## Table of Contents
 
-### Privacy Policy
-
-- [ ] Privacy policy is live at: `https://[your-domain]/privacy-policy.html`
-- [ ] URL is accessible (not 404)
-- [ ] Policy mentions:
-  - [ ] What data is collected (email, name via Google OAuth)
-  - [ ] Data is stored locally and optionally synced
-  - [ ] No analytics or ads
-  - [ ] How to delete data
-  - [ ] Contact email
-
-### Data Safety Form
-
-Complete in Play Console → Policy → App content → Data safety:
-
-| Question | Answer |
-|----------|--------|
-| Does your app collect or share user data? | Yes |
-| **Data Types Collected:** | |
-| → Personal info > Email address | Collected, not shared |
-| → Personal info > Name | Collected, not shared |
-| **Data Usage:** | |
-| → Is data encrypted in transit? | Yes |
-| → Can users request data deletion? | Yes |
-| → Is data collected from all users or optional? | Optional (only if signed in) |
-
-### Content Rating
-
-Complete IARC questionnaire:
-- [ ] Violence: None
-- [ ] Fear: None
-- [ ] Sexuality: None
-- [ ] Language: None
-- [ ] Controlled substances: None
-- [ ] Miscellaneous: None
-- [ ] Interactive elements: None
-- [ ] Expected rating: Everyone / PEGI 3
-
-### Target Audience
-
-- [ ] Target age group: 18+ (safest option)
-- [ ] App is NOT designed primarily for children
-- [ ] No child-appealing elements
-
-### News Apps Declaration
-
-- [ ] App is NOT a news app
-
-### App Category
-
-- [ ] Category: Tools OR Productivity
-- [ ] Tags: shortcuts, launcher, utility, productivity
+1. [One-Time Setup (First Release Only)](#1-one-time-setup-first-release-only)
+2. [App Content (Policy Compliance)](#2-app-content-policy-compliance)
+3. [Store Listing](#3-store-listing)
+4. [Pricing and Distribution](#4-pricing-and-distribution)
+5. [Per-Release Checklist](#5-per-release-checklist)
+6. [Common Rejection Reasons (and How to Avoid Them)](#6-common-rejection-reasons-and-how-to-avoid-them)
+7. [How to Respond to Rejections](#7-how-to-respond-to-rejections)
 
 ---
 
-## Store Listing
+## 1. One-Time Setup (First Release Only)
 
-### App Details
+Do these steps once. You will not need to repeat them.
 
-- [ ] **App name** (30 chars max): `OneTap - Quick Shortcuts`
-- [ ] **Short description** (80 chars max):
-  > Create instant home screen shortcuts for any URL, contact, or file.
-- [ ] **Full description** (4000 chars max): See GOOGLE_PLAY_PUBLISHING.md
+### 1.1 Create a Google Play Developer Account
 
-### Graphics
+1. Go to [play.google.com/console](https://play.google.com/console)
+2. Pay the one-time $25 registration fee
+3. Complete identity verification (takes 24-48 hours)
+4. Fill in your developer profile (name, email, website)
 
-| Asset | Size | Status |
-|-------|------|--------|
-| Hi-res icon | 512×512 PNG | [ ] Uploaded |
-| Feature graphic | 1024×500 PNG | [ ] Uploaded |
-| Phone screenshots (min 2) | 16:9 or 9:16 | [ ] Uploaded |
-| 7" tablet screenshots | Optional | [ ] Uploaded |
-| 10" tablet screenshots | Optional | [ ] Uploaded |
+- [ ] Developer account created
+- [ ] Identity verified
 
-### Screenshots Order
+### 1.2 Set Up Payments (Required for Paid Apps)
 
-1. "One tap to what matters" - Home screen with shortcuts
-2. "Create shortcuts in seconds" - URL creation flow
-3. "Built-in PDF reader" - Native PDF viewer
-4. "Picture-in-picture support" - Video player
-5. "Instant contact access" - Contact shortcuts
-6. "Never forget with reminders" - Scheduled notifications
-7. "Personalize your shortcuts" - Icon customization
-8. "Sync across devices" - Cloud sync / profile
+1. In Play Console → Monetize → Payments profile
+2. Create a merchant account
+3. Link your bank account for payouts
 
-### Contact Details
+- [ ] Merchant account created
+- [ ] Bank account linked
 
-- [ ] Developer email: [your-email]
-- [ ] Website URL: [optional]
-- [ ] Phone number: [optional]
+### 1.3 Create the App Listing
 
----
+1. In Play Console → All apps → Create app
+2. Fill in:
+   - **App name:** OneTap Shortcuts
+   - **Default language:** English (United States)
+   - **App or game:** App
+   - **Free or paid:** Paid
 
-## Pricing & Distribution
+- [ ] App created in Play Console
 
-### Pricing
-
-- [ ] Set as "Paid"
-- [ ] Default price: $2.99 USD (or your choice)
-- [ ] Review per-country pricing
-- [ ] Confirm tax settings
-
-### Countries
-
-- [ ] Select all countries OR specific markets
-- [ ] Consider excluding countries with:
-  - High piracy rates
-  - Payment processing issues
-
-### Device Targeting
-
-- [ ] Phone: Yes
-- [ ] Tablet: Yes
-- [ ] Chrome OS: Optional
-- [ ] Android TV: No
-- [ ] Wear OS: No
-
----
-
-## Release Preparation
-
-### Before Each Release
-
-- [ ] Update version in patch script or environment:
-  - `ONETAP_VERSION_CODE`: Increment by 1
-  - `ONETAP_VERSION_NAME`: Semantic version (e.g., 1.0.0)
-
-### Build Verification
+### 1.4 Generate Signing Key
 
 ```bash
-# 1. Build web app
-npm run build
-
-# 2. Sync Capacitor
-npx cap sync android
-
-# 3. Apply patches
-node scripts/android/patch-android-project.mjs
-
-# 4. Build release AAB
-cd android && ./gradlew bundleRelease
-
-# 5. Verify AAB exists
-ls -la app/build/outputs/bundle/release/
+keytool -genkey -v -keystore onetap-release.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias onetap-key
 ```
 
-- [ ] AAB file created successfully
-- [ ] No build errors or warnings
+You'll be asked for:
+- **Keystore password** — choose a strong password, write it down
+- **Your name, org, etc.** — can be anything (not shown to users)
+- **Key password** — can be the same as keystore password
 
-### Testing
+- [ ] Keystore file created (`onetap-release.jks`)
+- [ ] Passwords stored securely (password manager recommended)
 
-- [ ] Install on physical device
-- [ ] Test all shortcut types:
-  - [ ] URL shortcuts open correctly
-  - [ ] Contact call shortcuts work
-  - [ ] Contact message shortcuts work
-  - [ ] WhatsApp shortcuts work
-  - [ ] PDF shortcuts open native viewer
-  - [ ] Video shortcuts play correctly
-  - [ ] File shortcuts open files
-  - [ ] Slideshow shortcuts work
-- [ ] Test scheduled reminders
-- [ ] Test cloud sync (if signed in)
-- [ ] Test on multiple Android versions (12, 13, 14, 15)
-- [ ] Test permission handling:
-  - [ ] Deny all permissions - app doesn't crash
-  - [ ] Grant permissions - features work
-  - [ ] Revoke permissions - graceful degradation
+⚠️ **DANGER:**
+If you lose this keystore file AND you're not enrolled in Play App Signing, you can never update the app again. Back it up immediately to at least two secure locations.
 
-### Release Notes
+### 1.5 Enroll in Google Play App Signing
 
-- [ ] Write clear, concise release notes
-- [ ] Create `whatsnew/en-US.txt` for CI/CD:
-  ```
-  - [New feature 1]
-  - [Bug fix 1]
-  - [Improvement 1]
-  ```
+1. In Play Console → Setup → App signing
+2. Follow the enrollment steps
 
----
+This lets Google manage the final signing key. If you ever lose your upload keystore, you can generate a new one and continue publishing.
 
-## Submission
+- [ ] Enrolled in Play App Signing (strongly recommended)
 
-### Upload
+### 1.6 Configure CI/CD Secrets
 
-- [ ] Go to Release → Production (or Internal for first upload)
-- [ ] Create new release
-- [ ] Upload AAB file
-- [ ] Add release notes
-- [ ] Review changes
+1. Create a service account: Play Console → Setup → API access → Create service account
+2. Grant "Release manager" role
+3. Download the JSON key file
 
-### Final Checks
+Then add these to GitHub → your repo → Settings → Secrets and Variables → Actions:
 
-- [ ] All policy declarations completed
-- [ ] All required graphics uploaded
-- [ ] Privacy policy URL works
-- [ ] Pricing set correctly
-- [ ] Countries selected
-- [ ] No policy warnings in Play Console
+| Secret Name | Value |
+|-------------|-------|
+| `KEYSTORE_BASE64` | Run: `base64 -w0 onetap-release.jks` and paste the output |
+| `KEYSTORE_PASSWORD` | Your keystore password |
+| `KEY_PASSWORD` | Your key password |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Paste the entire JSON key file contents |
 
-### Submit
-
-- [ ] Click "Review release"
-- [ ] Confirm all green checkmarks
-- [ ] Click "Start rollout to Production"
+- [ ] Service account created with "Release manager" role
+- [ ] All four GitHub Secrets configured
 
 ---
 
-## Post-Submission
+## 2. App Content (Policy Compliance)
 
-### Monitoring
+Google requires you to declare specific information about your app before publishing.
 
-- [ ] Check Play Console for review status
-- [ ] Typical review time: 3-7 days (first release)
-- [ ] Watch for policy violation emails
+### 2.1 Privacy Policy
 
-### If Rejected
+Google requires a privacy policy URL for all apps. This project includes one at `public/privacy-policy.html`.
 
-Common reasons and fixes:
+**Before submitting, verify:**
+- [ ] Privacy policy is accessible at your app's URL (e.g., `https://[your-domain]/privacy-policy.html`)
+- [ ] It mentions what data is collected (email, name via Google sign-in — optional)
+- [ ] It mentions data is stored locally, optionally synced to cloud
+- [ ] It mentions no analytics, no ads, no third-party sharing
+- [ ] It includes how to delete data (in-app account deletion)
+- [ ] It includes a contact email
 
-| Rejection Reason | Fix |
-|-----------------|-----|
-| Privacy policy not accessible | Verify URL works, has HTTPS |
-| Broken functionality | Fix and resubmit |
-| Permission justification | Add detailed description in manifest |
-| Misleading description | Update store listing |
-| Missing data safety info | Complete data safety form |
+### 2.2 Data Safety Form
 
-### After Approval
+Fill this out in Play Console → Policy → App content → Data safety.
 
-- [ ] Verify app is live on Play Store
-- [ ] Test in-app purchase flow (if applicable)
-- [ ] Monitor for crashes in Play Console
-- [ ] Set up crash/ANR alerts
-- [ ] Respond to user reviews
+| Question | Your Answer | Why |
+|----------|------------|-----|
+| Does your app collect or share user data? | Yes | Email and name collected via optional Google sign-in |
+| **Personal info → Email address** | Collected, not shared | Used for cloud sync authentication |
+| **Personal info → Name** | Collected, not shared | Display name from Google account |
+| Is data encrypted in transit? | Yes | Supabase uses HTTPS for all connections |
+| Can users request data deletion? | Yes | Via in-app "Delete Account" feature |
+| Is data collected from all users? | Optional | Only if the user signs in (sign-in is optional) |
+
+- [ ] Data safety form completed
+
+### 2.3 Content Rating
+
+Complete the IARC questionnaire in Play Console → Policy → App content → Content rating.
+
+| Category | Answer |
+|----------|--------|
+| Violence | None |
+| Fear | None |
+| Sexuality | None |
+| Language | None |
+| Controlled substances | None |
+| Miscellaneous | None |
+| Interactive elements | None |
+
+**Expected rating:** Everyone / PEGI 3
+
+- [ ] Content rating questionnaire completed
+
+### 2.4 Target Audience
+
+- [ ] Target age group: **18+** (safest option — avoids children's privacy requirements)
+- [ ] App is NOT designed primarily for children
+- [ ] No child-appealing elements (cartoon characters, bright games, etc.)
+
+### 2.5 Declarations
+
+- [ ] App is NOT a news app
+- [ ] App does NOT contain ads
+- [ ] App does NOT use government IDs
 
 ---
 
-## Common Rejection Risks
+## 3. Store Listing
 
-### Critical
+### 3.1 App Information
 
-| Risk | Mitigation |
-|------|------------|
-| App crashes on launch | Test on clean device |
-| Permissions not justified | Document each permission's purpose |
-| Privacy policy URL broken | Host on reliable service |
-| Core functionality broken | Full QA before submission |
+| Field | Value | Character Limit |
+|-------|-------|----------------|
+| **App name** | OneTap - Quick Shortcuts | 30 characters |
+| **Short description** | Create instant home screen shortcuts for any URL, contact, or file. | 80 characters |
+| **Full description** | Detailed feature list (see GOOGLE_PLAY_PUBLISHING.md for template) | 4000 characters |
 
-### Moderate
+- [ ] App name set
+- [ ] Short description set
+- [ ] Full description set
 
-| Risk | Mitigation |
-|------|------------|
-| Low quality screenshots | Use device frames, good resolution |
-| Vague description | Be specific about features |
-| Wrong content rating | Answer IARC honestly |
-| Data safety mismatch | Audit actual data collection |
+### 3.2 Graphics Assets
 
-### Minor
+| Asset | Size | Required? | Notes |
+|-------|------|----------|-------|
+| **App icon** | 512×512 PNG | Yes | High-resolution, no transparency, no rounded corners (Google applies its own) |
+| **Feature graphic** | 1024×500 PNG | Yes | Displayed at the top of your Play Store listing |
+| **Phone screenshots** | Min 2 | Yes | 16:9 or 9:16 aspect ratio, show actual app screens |
+| **7" tablet screenshots** | At least 1 | Recommended | If your app supports tablets |
+| **10" tablet screenshots** | At least 1 | Recommended | If your app supports tablets |
 
-| Risk | Mitigation |
-|------|------------|
-| Typos in listing | Proofread carefully |
-| Missing tablet screenshots | Add if you support tablets |
-| Outdated contact info | Verify email works |
+**Recommended screenshot order:**
+1. Home screen with shortcuts visible
+2. Creating a URL shortcut
+3. Built-in PDF reader
+4. Video player with picture-in-picture
+5. Contact shortcuts
+6. Scheduled reminders
+7. Icon customization
+8. Cloud sync / profile screen
+
+- [ ] App icon uploaded
+- [ ] Feature graphic uploaded
+- [ ] Phone screenshots uploaded (minimum 2)
+
+### 3.3 Contact Details
+
+- [ ] Developer email provided
+- [ ] Website URL (optional but recommended)
 
 ---
 
-## Version History
+## 4. Pricing and Distribution
 
-| Version | Date | Notes |
-|---------|------|-------|
-| 1.0.0 | TBD | Initial release |
+### 4.1 Pricing
+
+- [ ] App set as **Paid**
+- [ ] Default price set (recommended: $1.99 – $4.99 USD)
+- [ ] Per-country pricing reviewed (Google auto-converts, but review for reasonableness)
+
+**Good to know:** Google takes 15% of the first $1M in annual revenue, then 30% after that.
+
+### 4.2 Countries
+
+- [ ] Countries selected (all countries or specific markets)
+
+### 4.3 Device Targeting
+
+| Device Type | Supported? |
+|------------|-----------|
+| Phone | ✅ Yes |
+| Tablet | ✅ Yes |
+| Chrome OS | Optional |
+| Android TV | ❌ No |
+| Wear OS | ❌ No |
+
+- [ ] Device types configured
+
+---
+
+## 5. Per-Release Checklist
+
+Use this for every release after the first one.
+
+- [ ] All changes merged to `main` via reviewed PR
+- [ ] Tested on physical device
+- [ ] All shortcut types work
+- [ ] Reminders work
+- [ ] Sync works (if signed in)
+- [ ] Offline mode works
+- [ ] `whatsnew/en-US.txt` updated with user-facing changes
+- [ ] Version tag created and pushed (e.g., `git tag v1.0.1 && git push origin v1.0.1`)
+- [ ] CI build succeeded
+- [ ] Tested on internal track
+- [ ] Promoted to production (when ready)
+- [ ] Monitored Play Console for crashes (first 48 hours)
+
+---
+
+## 6. Common Rejection Reasons (and How to Avoid Them)
+
+### Critical (Will Definitely Cause Rejection)
+
+| Rejection Reason | How to Prevent |
+|-----------------|---------------|
+| App crashes on launch | Test on a clean device (factory reset or new emulator) |
+| Privacy policy URL is broken (404) | Verify the URL works in a browser before submitting |
+| Core functionality is broken | Run through the full testing checklist |
+| Data safety form doesn't match reality | Audit what data your app actually collects |
+| Missing permission justification | Document why each permission is needed in the manifest |
+
+### Moderate (May Cause Rejection)
+
+| Rejection Reason | How to Prevent |
+|-----------------|---------------|
+| Low quality screenshots | Use device frames, high resolution, actual app content |
+| Vague or misleading description | Be specific about what the app does |
+| Wrong content rating | Answer the IARC questionnaire honestly |
+| App requires permissions not justified by functionality | Only request permissions you actually need |
+
+### Minor (Unlikely to Cause Rejection, But Can)
+
+| Rejection Reason | How to Prevent |
+|-----------------|---------------|
+| Typos in listing | Proofread everything |
+| Outdated contact info | Make sure your developer email works |
+| Missing tablet screenshots | Add them if your app supports tablets |
+
+---
+
+## 7. How to Respond to Rejections
+
+Google Play rejections are not personal. They happen frequently, even to experienced developers. Here's how to handle them calmly.
+
+### Step 1: Read the rejection email carefully
+
+Google will tell you the specific policy your app violated. Read it twice. The reason is usually more specific than you expect.
+
+### Step 2: Fix the issue
+
+| Rejection Type | What to Do |
+|---------------|-----------|
+| **Policy violation** | Change the app behavior or listing to comply |
+| **Broken functionality** | Fix the bug, test thoroughly, resubmit |
+| **Missing declaration** | Complete the required form in Play Console |
+| **Misleading listing** | Update your description and screenshots to accurately reflect the app |
+
+### Step 3: Resubmit
+
+After fixing the issue:
+1. Upload a new AAB (if you changed code)
+2. Update the listing (if you changed text/screenshots)
+3. Submit for review again
+
+### Step 4: If you disagree with the rejection
+
+You can appeal through Play Console → click the rejection notification → "Appeal" or "Contact support." Be factual, calm, and specific about why you believe the rejection is incorrect.
+
+**Typical review time:** 3-7 days for first submission, 1-3 days for updates.
 
 ---
 
 ## Emergency Contacts
 
-- Google Play Console Support: [Play Console Help](https://support.google.com/googleplay/android-developer/)
-- Policy Clarification: [Policy Center](https://play.google.com/console/about/policy/)
+- **Play Console Help:** [support.google.com/googleplay/android-developer](https://support.google.com/googleplay/android-developer/)
+- **Policy Questions:** [Play Policy Center](https://play.google.com/console/about/policy/)
+- **App Signing Help:** [Play App Signing documentation](https://developer.android.com/studio/publish/app-signing)
+
+---
+
+*Last updated: February 2026*

@@ -1,140 +1,324 @@
-# OneTap Shortcuts - Release Process
+# OneTap Shortcuts — Release Process
 
-## Overview
-
-Every release follows this principle: **CI builds, human decides.**
+> **Purpose of this document:** Teach you how to ship updates safely and repeatedly, even if you've never released an Android app before. The core principle: **CI builds, human decides.**
 
 ---
 
-## Pre-Release Checklist
+## Table of Contents
+
+1. [How Releases Work (Overview)](#1-how-releases-work-overview)
+2. [Branching Strategy](#2-branching-strategy)
+3. [Feature Branch Workflow](#3-feature-branch-workflow)
+4. [Pre-Release Checklist](#4-pre-release-checklist)
+5. [Step-by-Step Release](#5-step-by-step-release)
+6. [Play Store Track Strategy](#6-play-store-track-strategy)
+7. [Emergency Fixes (Hotfixes)](#7-emergency-fixes-hotfixes)
+8. [If Something Goes Wrong (Decision Tree)](#8-if-something-goes-wrong-decision-tree)
+9. [Release Notes](#9-release-notes)
+10. [What NOT to Do](#10-what-not-to-do)
+11. [Version History](#11-version-history)
+
+---
+
+## 1. How Releases Work (Overview)
+
+```
+feature branch → main → git tag → CI builds → internal track → test → production
+                  │                    │              │                    │
+                  │                    │              │                    │
+              human merges        automatic       human tests        human promotes
+```
+
+**The key idea:** Automation handles the boring, repeatable parts (building, signing, uploading). Humans handle the irreversible decisions (merging to main, promoting to production).
+
+---
+
+## 2. Branching Strategy
+
+```
+main ─────────────────────────────────────────────▶ (always releasable)
+  │                                    ▲
+  │                                    │
+  └── feature/add-notes ──────────────┘ (merge via PR)
+  │                                    ▲
+  └── feature/fix-pdf-viewer ─────────┘ (merge via PR)
+```
+
+### Rules
+
+| Rule | Why |
+|------|-----|
+| `main` is always production-ready | So you can ship a hotfix anytime without untangling unfinished work |
+| All work happens in `feature/*` branches | Keeps `main` clean |
+| Merge via pull request with review | Catches mistakes before they reach production |
+| Never commit directly to `main` | Prevents accidental broken releases |
+
+---
+
+## 3. Feature Branch Workflow
+
+### Starting a new feature
+
+```bash
+# 1. Make sure main is up to date
+git checkout main
+git pull origin main
+
+# 2. Create a feature branch
+git checkout -b feature/your-feature-name
+
+# 3. Make your changes, commit often
+git add .
+git commit -m "feat: describe what you changed"
+
+# 4. Push your branch
+git push origin feature/your-feature-name
+```
+
+### Merging your feature
+
+```bash
+# 1. Create a Pull Request on GitHub
+#    (Go to your repo → Pull Requests → New → select your branch)
+
+# 2. Review the changes yourself (or have someone review)
+#    - Does the app build? (npm run build)
+#    - Does it work on device? (npx cap run android)
+#    - Did you test the specific feature you changed?
+
+# 3. Merge the PR on GitHub
+
+# 4. After merging, update your local main
+git checkout main
+git pull origin main
+```
+
+---
+
+## 4. Pre-Release Checklist
+
+Go through this list before every release. Do not skip items.
 
 ### Code
 
-- [ ] All changes merged to `main` via PR review
-- [ ] `main` branch builds successfully locally
-- [ ] No console errors or warnings in dev build
+- [ ] All changes merged to `main` via reviewed PR
+- [ ] `main` builds successfully: `npm run build` completes without errors
+- [ ] No console errors or warnings in the browser dev build
 - [ ] Native files in `native/android/` are up to date
 
 ### Testing
 
-- [ ] Install on physical device via `npx cap run android`
-- [ ] Test all shortcut types (URL, contact, message, WhatsApp, PDF, video, file, slideshow)
-- [ ] Test scheduled reminders (create, fire, recurrence)
-- [ ] Test cloud sync (manual + verify daily auto doesn't over-trigger)
-- [ ] Test offline behavior (airplane mode)
-- [ ] Test on Android 12, 13, 14, 15 if possible
-- [ ] Test permission denial + grant flows
+- [ ] Installed on physical Android device via `npx cap run android`
+- [ ] Tested all shortcut types:
+  - [ ] URL shortcuts open correctly
+  - [ ] Contact call shortcuts work
+  - [ ] Contact message shortcuts work
+  - [ ] WhatsApp shortcuts work
+  - [ ] PDF shortcuts open native viewer
+  - [ ] Video shortcuts play correctly
+  - [ ] File shortcuts open files
+  - [ ] Slideshow shortcuts work
+- [ ] Tested scheduled reminders (create, wait for it to fire, check recurrence)
+- [ ] Tested cloud sync (sign in, sync, verify data appears)
+- [ ] Tested offline behavior (airplane mode — app should work normally)
+- [ ] Tested permission denial (deny permissions — app should not crash)
 
-### Version
+### Version Decision
 
-- [ ] Decide version number (semver):
-  - **Patch** (1.0.x): Bug fixes, no new features
-  - **Minor** (1.x.0): New features, backward compatible
-  - **Major** (x.0.0): Breaking changes (rare)
-- [ ] Version code will auto-calculate: `major * 10000 + minor * 100 + patch`
+Decide the version number using semantic versioning:
+
+| Change Type | Version Bump | Example |
+|------------|-------------|---------|
+| Bug fix, no new features | Patch: `1.0.x` | `v1.0.0` → `v1.0.1` |
+| New feature, backward compatible | Minor: `1.x.0` | `v1.0.1` → `v1.1.0` |
+| Breaking change (very rare) | Major: `x.0.0` | `v1.1.0` → `v2.0.0` |
+
+### Release Notes
+
+- [ ] Updated `whatsnew/en-US.txt` with user-facing changes
+  ```
+  • Added notes feature for bookmarks
+  • Fixed PDF viewer crash on large files
+  • Improved shortcut creation speed
+  ```
 
 ---
 
-## Release Steps
+## 5. Step-by-Step Release
 
-### 1. Tag the Release
+### Step 1: Tag the release
 
 ```bash
 git checkout main
 git pull origin main
-git tag v1.0.0        # Replace with actual version
+git tag v1.0.0        # Replace with your actual version
 git push origin v1.0.0
 ```
 
-This triggers CI which:
-- Builds the AAB
-- Uploads to Google Play **internal** track
-- Creates a GitHub Release
+**What happens next (automatic):**
+- GitHub Actions starts the build workflow
+- A signed AAB is created
+- The AAB is uploaded to Google Play's **internal** test track
+- A GitHub Release is created
 
-### 2. Test on Internal Track
+### Step 2: Wait for CI
 
-- Install from Play Console internal testing
-- Run through core flows on a clean device
-- Verify the AAB is correctly signed
+Go to your GitHub repository → Actions tab. You should see the "Android Release Build" workflow running. Wait for it to complete (usually 5-10 minutes).
 
-### 3. Promote to Production
+**If it fails:** Check the error logs. Common issues:
+- Secrets not configured → see [DEPLOYMENT.md](DEPLOYMENT.md) → Section 6
+- Java compilation error → check your native code changes
+- Version code conflict → your tag version must be higher than the last upload
 
-**Option A: Via CI** (recommended)
-```
-GitHub → Actions → Android Release Build → Run workflow
-  Track: production
-  Skip upload: false
-```
+### Step 3: Test on internal track
+
+1. Open Google Play Console
+2. Go to your app → Testing → Internal testing
+3. Copy the test link and open it on your phone
+4. Install the app from the internal track
+5. Test the key features listed in the pre-release checklist
+
+### Step 4: Promote to production
+
+**Option A: Via CI (recommended)**
+1. Go to GitHub → Actions → Android Release Build
+2. Click "Run workflow"
+3. Set track to `production`
+4. Click "Run workflow"
 
 **Option B: Via Play Console**
-- Go to Release → Production → Create new release
-- "Add from library" → select the tested AAB
-- Add release notes
-- Review and roll out
+1. Open Play Console → Release → Production
+2. Click "Create new release"
+3. Click "Add from library" → select the tested AAB
+4. Add release notes
+5. Click "Review release" → "Start rollout to Production"
 
-### 4. Post-Release
+### Step 5: Post-release
 
-- [ ] Verify app appears on Play Store
-- [ ] Monitor Play Console for crashes/ANRs (first 24-48 hours)
+- [ ] Verify the app appears on Play Store (may take 1-24 hours)
+- [ ] Monitor Play Console for crashes/ANRs for the first 48 hours
 - [ ] Respond to any user reviews
 
 ---
 
-## Hotfix Process
+## 6. Play Store Track Strategy
 
-For urgent production fixes:
+| Track | Who Sees It | When to Use |
+|-------|------------|-------------|
+| Internal | Only your test accounts | Every release (always test here first) |
+| Alpha | Invited testers | When you want feedback from a small group |
+| Beta | Anyone who opts in | When you want wider testing |
+| Production | Everyone | When you're confident the release is stable |
+
+**Tag pushes always go to internal.** Promotion to any other track requires manual action.
+
+---
+
+## 7. Emergency Fixes (Hotfixes)
+
+If you discover a critical bug in production:
 
 ```bash
+# 1. Fix the bug directly on main (or a quick branch)
 git checkout main
+git pull origin main
 # Make the fix
-git add . && git commit -m "fix: description"
+git add .
+git commit -m "fix: describe the critical fix"
+git push origin main
+
+# 2. Tag a patch version
 git tag v1.0.1
-git push origin main v1.0.1
+git push origin v1.0.1
+
+# 3. Wait for CI to build and upload to internal
+# 4. Test on internal track
+# 5. Promote to production immediately
 ```
 
-CI builds → test on internal → promote to production.
+**Speed matters for hotfixes,** but never skip testing on the internal track. A broken hotfix is worse than the original bug.
 
 ---
 
-## Release Notes
-
-Create `whatsnew/en-US.txt` before tagging:
+## 8. If Something Goes Wrong (Decision Tree)
 
 ```
-• [Feature or fix description]
-• [Another change]
+Something went wrong with a release
+        │
+        ├── Is the app crashing for all users?
+        │       │
+        │       ├── YES → Use Play Console "Halt rollout"
+        │       │         Fix the issue, tag a new patch, test, promote
+        │       │
+        │       └── NO → Is it a cosmetic issue?
+        │               │
+        │               ├── YES → Fix it, ship in the next regular release
+        │               │
+        │               └── NO → Is it affecting core functionality?
+        │                       │
+        │                       ├── YES → Hotfix (see Section 7)
+        │                       │
+        │                       └── NO → Fix it, ship in the next release
+        │
+        ├── Did the CI build fail?
+        │       │
+        │       ├── Check GitHub Actions logs for the error
+        │       ├── Common: missing secrets, Java errors, version conflicts
+        │       └── Fallback: build locally (see DEPLOYMENT.md → Section 12)
+        │
+        └── Did Play Store reject the app?
+                │
+                ├── Read the rejection reason carefully
+                ├── See PLAY_STORE_CHECKLIST.md for common reasons
+                └── Fix the issue and resubmit
 ```
 
-Keep it user-facing and concise. Technical details go in the Git commit history.
+### Important: Do NOT use Play Console's "rollback" feature
+
+Play Console offers a "rollback" button, but it is unreliable. Instead, always "fix forward" — create a new patch version with the fix, test it, and promote it.
 
 ---
 
-## What NOT to Do
+## 9. Release Notes
 
-- ❌ Auto-promote to production (always manual)
-- ❌ Skip internal track testing
-- ❌ Release on Fridays
-- ❌ Change pricing during a release
-- ❌ Bundle multiple risky changes in one release
+Release notes live in `whatsnew/en-US.txt`. Update this file before tagging a release.
+
+**Good release notes:**
+```
+• Added notes field to bookmarks
+• Fixed PDF viewer crash on files larger than 50MB
+• Improved contact shortcut creation speed
+```
+
+**Bad release notes:**
+```
+• Bug fixes and performance improvements
+```
+
+Keep notes user-facing and specific. Technical details belong in git commit history, not release notes.
 
 ---
 
-## Rollback
+## 10. What NOT to Do
 
-If a release causes issues:
-
-1. **Assess severity** — is it a crash or cosmetic?
-2. **Fix forward** — tag a new patch version
-3. **Play Console halt** — use "Halt rollout" if critical
-4. Do NOT rely on Play Console's "rollback" — it's unreliable
+| ❌ Don't | Why |
+|----------|-----|
+| Auto-promote to production | You lose the ability to catch issues before real users see them |
+| Skip internal track testing | The one time you skip it will be the one time it's broken |
+| Release on Fridays | If something breaks, you'll be fixing it over the weekend |
+| Bundle many risky changes in one release | If something breaks, you won't know which change caused it |
+| Delete old git tags | Tags are your release history — keep them |
+| Change pricing during a release | Price changes and code changes should be separate events |
 
 ---
 
-## Version History
+## 11. Version History
 
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0.0 | TBD | Initial release |
+
+Update this table with each release.
 
 ---
 

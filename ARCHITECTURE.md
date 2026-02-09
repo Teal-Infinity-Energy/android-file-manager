@@ -1,169 +1,388 @@
-# OneTap Shortcuts - Architecture
+# OneTap Shortcuts — Architecture
 
-## Overview
-
-OneTap is a paid Android app that creates home screen shortcuts for URLs, contacts, files, and scheduled reminders. It follows a **local-first** architecture where the device is always the source of truth.
+> **Purpose of this document:** Help you build a mental model of how everything fits together, so you can make changes confidently without breaking things you don't understand yet.
 
 ---
 
-## Technology Stack
+## Table of Contents
 
-| Layer | Technology |
-|-------|-----------|
-| **UI** | React 18 + TypeScript |
-| **Build** | Vite (ESNext target) |
-| **Styling** | Tailwind CSS + shadcn/ui |
-| **Native Bridge** | Capacitor 8 |
-| **Native Platform** | Android (Java, minSdk 31 / Android 12+) |
-| **Backend** | Lovable Cloud (Supabase) — optional, for sync only |
-| **Auth** | Google OAuth via Android App Links |
-| **i18n** | i18next (English-only at launch, multi-language prepared) |
+1. [The Three Layers](#1-the-three-layers)
+2. [Web Layer (React + Capacitor)](#2-web-layer-react--capacitor)
+3. [Native Android Layer (Java)](#3-native-android-layer-java)
+4. [Backend Layer (Lovable Cloud / Supabase)](#4-backend-layer-lovable-cloud--supabase)
+5. [How Data Flows](#5-how-data-flows)
+6. [How OAuth Works](#6-how-oauth-works-step-by-step)
+7. [Why No Background Services](#7-why-no-background-services)
+8. [Why No Analytics](#8-why-no-analytics)
+9. [Navigation Structure](#9-navigation-structure)
+10. [Project Structure](#10-project-structure)
+11. [Build Pipeline Overview](#11-build-pipeline-overview)
+12. [Failure Scenarios and Recovery](#12-failure-scenarios-and-recovery)
 
 ---
 
-## Project Structure
+## 1. The Three Layers
+
+OneTap is built in three layers. Each layer has a specific job:
+
+```
+┌───────────────────────────────────────────────┐
+│            LAYER 1: Web (React)               │
+│                                               │
+│  What you see: buttons, forms, lists, tabs    │
+│  Where it lives: src/                         │
+│  Language: TypeScript + React                 │
+│                                               │
+│  This is where 90% of your changes happen.    │
+├───────────────────────────────────────────────┤
+│            LAYER 2: Native (Android)          │
+│                                               │
+│  What it does: home screen shortcuts,         │
+│  notifications, PDF viewer, video player      │
+│  Where it lives: native/android/              │
+│  Language: Java                               │
+│                                               │
+│  You only touch this for Android-specific     │
+│  features that the web layer can't do.        │
+├───────────────────────────────────────────────┤
+│            LAYER 3: Backend (Cloud)           │
+│                                               │
+│  What it does: cloud sync, Google sign-in,    │
+│  URL metadata fetching                        │
+│  Where it lives: supabase/                    │
+│  Language: SQL (schema) + TypeScript (funcs)  │
+│                                               │
+│  This is OPTIONAL. The app works without it.  │
+└───────────────────────────────────────────────┘
+```
+
+**How they connect:**
+
+```
+React UI  ──(Capacitor bridge)──▶  Native Android Java
+React UI  ──(Supabase SDK)──────▶  Lovable Cloud Backend
+```
+
+Capacitor is the bridge between web and native. It lets your React code call Java functions (like "create a home screen shortcut") through a plugin system.
+
+---
+
+## 2. Web Layer (React + Capacitor)
+
+**What is it?** A standard React single-page application, bundled by Vite, styled with Tailwind CSS and shadcn/ui components.
+
+**What is Capacitor?** Capacitor wraps your React app inside a native Android WebView. Think of it as a container that lets your web app behave like a native app. It also provides a "bridge" so your React code can call native device APIs.
+
+**Key folders:**
+
+| Folder | Purpose |
+|--------|---------|
+| `src/components/` | UI components (buttons, forms, sheets, lists) |
+| `src/components/ui/` | Low-level shadcn/ui primitives (don't edit these often) |
+| `src/hooks/` | React hooks for state, auth, sync, etc. |
+| `src/lib/` | Pure business logic — no React dependencies |
+| `src/pages/` | Top-level page components (one per route) |
+| `src/plugins/` | TypeScript interfaces for Capacitor native plugins |
+| `src/types/` | TypeScript type definitions |
+| `src/contexts/` | React context providers |
+| `src/i18n/` | Translation files and i18next configuration |
+
+---
+
+## 3. Native Android Layer (Java)
+
+**What is it?** Custom Java classes that handle things the web layer cannot do — primarily creating home screen shortcuts and firing scheduled notifications.
+
+⚠️ **Critical rule:** Always edit files in `native/android/`. Never edit files in `android/` directly. The build script copies from `native/android/` → `android/` every time you build.
+
+**Key classes and what they do:**
+
+| Java Class | What It Does |
+|------------|-------------|
+| `MainActivity.java` | App entry point. Registers Capacitor plugins. |
+| `ShortcutPlugin.java` | Creates home screen shortcuts using Android's `ShortcutManager` API |
+| `NotificationHelper.java` | Displays scheduled notifications |
+| `ScheduledActionReceiver.java` | Receives alarm broadcasts and triggers notifications |
+| `BootReceiver.java` | Reschedules all alarms after the phone restarts |
+| `NativePdfViewerActivity.java` | Full-featured PDF viewer with pinch-zoom |
+| `NativeVideoPlayerActivity.java` | Video player with picture-in-picture support |
+| `QuickCreateWidget.java` | Home screen widget for quick shortcut creation |
+| `CrashLogger.java` | Simple crash logging (no external SDK needed) |
+
+**Proxy Activities:** Each shortcut type has a "proxy activity" — a lightweight Java class that receives the shortcut tap and performs the action:
+
+| Proxy | Action |
+|-------|--------|
+| `LinkProxyActivity` | Opens a URL in the browser |
+| `ContactProxyActivity` | Initiates a phone call |
+| `MessageProxyActivity` | Opens the messaging app |
+| `WhatsAppProxyActivity` | Opens WhatsApp to a specific contact |
+| `PDFProxyActivity` | Opens the native PDF viewer |
+| `VideoProxyActivity` | Opens the native video player |
+| `FileProxyActivity` | Opens a file with the system file handler |
+| `SlideshowProxyActivity` | Opens a photo slideshow |
+| `ShortcutEditProxyActivity` | Opens the edit screen for an existing shortcut |
+
+---
+
+## 4. Backend Layer (Lovable Cloud / Supabase)
+
+**What is Supabase?** An open-source backend platform that provides a PostgreSQL database, authentication, and serverless functions. In this project, it's managed through Lovable Cloud — you don't need a separate Supabase account.
+
+**What the backend does:**
+- ✅ Stores synced bookmarks, trash, and reminders (optional)
+- ✅ Handles Google OAuth sign-in
+- ✅ Fetches URL metadata (title, favicon) to bypass browser CORS restrictions
+
+**What the backend does NOT do:**
+- ❌ Does not store shortcuts (those are native Android shortcuts)
+- ❌ Does not run background jobs or cron tasks
+- ❌ Does not send push notifications
+- ❌ Does not track analytics
+
+See [SUPABASE.md](SUPABASE.md) for the complete backend guide.
+
+---
+
+## 5. How Data Flows
+
+### Data Ownership
+
+```
+┌───────────────────────────────────────────────────┐
+│                 LOCAL DEVICE                       │
+│          (Source of Truth — ALWAYS)                │
+│                                                    │
+│  localStorage:                                     │
+│    saved_links        → Your bookmarks             │
+│    saved_links_trash  → Your deleted bookmarks     │
+│    scheduled_actions  → Your reminders             │
+│    onetap_settings    → Your preferences           │
+│    sync_status        → When you last synced       │
+│                                                    │
+│  Android System:                                   │
+│    ShortcutManager    → Your home screen shortcuts  │
+│    AlarmManager       → Your scheduled reminders    │
+└────────────────────────┬──────────────────────────┘
+                         │
+              (optional, additive-only)
+                         │
+                         ▼
+┌───────────────────────────────────────────────────┐
+│                LOVABLE CLOUD                       │
+│          (Backup Copy — NEVER overwrites local)    │
+│                                                    │
+│  cloud_bookmarks          → Copy of bookmarks      │
+│  cloud_trash              → Copy of deleted items   │
+│  cloud_scheduled_actions  → Copy of reminders       │
+└───────────────────────────────────────────────────┘
+```
+
+**The golden rule:** Local data always wins. If there's a conflict between what's on the device and what's in the cloud, the device version is kept. Cloud sync only *adds* items that don't already exist locally — it never updates or deletes local data.
+
+### Sync Flow
+
+```
+User taps "Sync Now"  ──or──  App opens (daily auto)
+         │
+         ▼
+  syncGuard.ts validates the request
+         │
+    ┌────┴────┐
+    │ Blocked │──▶ No-op (silently ignored)
+    └────┬────┘
+         │ Allowed
+         ▼
+  Upload: Send local items to cloud
+  (upsert by entity_id — same item overwrites in cloud)
+         │
+         ▼
+  Download: Fetch cloud items
+  (skip any item whose entity_id already exists locally)
+         │
+         ▼
+  Record sync timestamp
+```
+
+---
+
+## 6. How OAuth Works (Step by Step)
+
+Google sign-in uses "Android App Links" — a system where Android intercepts specific HTTPS URLs and opens them in your app instead of the browser.
+
+```
+Step 1: User taps "Sign in with Google"
+           │
+           ▼
+Step 2: App opens Google's OAuth page in a Chrome Custom Tab
+        (a browser window that floats on top of the app)
+           │
+           ▼
+Step 3: User signs in with Google
+           │
+           ▼
+Step 4: Google redirects to:
+        https://[your-domain]/auth-callback?code=ABC123
+           │
+           ▼
+Step 5: Android intercepts this URL
+        (because AndroidManifest.xml declares it as an App Link
+         and assetlinks.json proves you own the domain)
+           │
+           ▼
+Step 6: useDeepLink.ts receives the URL
+           │
+           ▼
+Step 7: oauthCompletion.ts exchanges the code for a session
+        (with idempotency — processes the same URL only once)
+           │
+           ▼
+Step 8: User is signed in. Session stored by Supabase SDK.
+```
+
+**Files involved:**
+
+| File | Role |
+|------|------|
+| `src/hooks/useAuth.ts` | Starts the OAuth flow, manages auth state |
+| `src/hooks/useDeepLink.ts` | Listens for deep links from Android |
+| `src/lib/oauthCompletion.ts` | Shared logic to complete OAuth (used by both native and web) |
+| `src/pages/AuthCallback.tsx` | Web-only fallback callback route |
+| `public/.well-known/assetlinks.json` | Proves domain ownership to Android |
+| `native/android/.../AndroidManifest.xml` | Declares the app handles the callback URL |
+
+**What can go wrong:**
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| Sign-in opens browser instead of app | Wrong SHA-256 fingerprint in `assetlinks.json` | Update fingerprint to match your signing key |
+| "ES256 invalid signing" error | Callback URL not in backend's allowlist | Add the URL to Cloud → Auth Settings → URI allow list |
+| Sign-in works once, then stops | Idempotency guard blocking repeat URL | Clear localStorage key `pending_oauth_url` |
+
+---
+
+## 7. Why No Background Services
+
+**Philosophy:** The app is a guest on the user's device. It should not consume battery, CPU, or network in the background.
+
+**How reminders work without background services:** OneTap uses Android's built-in `AlarmManager` to schedule notifications. The alarm is set once when you create a reminder, and Android handles the rest. `BootReceiver` reschedules alarms if the phone restarts.
+
+**How sync works without background services:** Sync only happens when the user explicitly requests it ("Sync Now") or once per day when the app is opened. There is no background timer, no polling, and no push-triggered sync.
+
+---
+
+## 8. Why No Analytics
+
+**Philosophy:** A paid app earns money from delivering value, not from surveillance. The app collects zero analytics, zero usage metrics, and zero crash telemetry to external services.
+
+Crash logging is local-only (`CrashLogger.java`) — breadcrumbs are stored on the device and can be viewed by the developer during debugging, but are never sent anywhere.
+
+---
+
+## 9. Navigation Structure
+
+The app has four bottom tabs:
+
+```
+┌──────────┬──────────┬──────────┬──────────┐
+│  Access  │ Reminders│ Bookmarks│ Profile  │
+│   (Zap)  │  (Bell)  │(Bookmark)│  (User)  │
+└──────────┴──────────┴──────────┴──────────┘
+```
+
+| Tab | Component | Purpose |
+|-----|-----------|---------|
+| Access | `AccessFlow.tsx` | Create new shortcuts |
+| Reminders | `NotificationsPage.tsx` | View and create scheduled reminders |
+| Bookmarks | `BookmarkLibrary.tsx` | Browse and organize saved links |
+| Profile | `ProfilePage.tsx` | Settings, cloud sync, account |
+
+---
+
+## 10. Project Structure
 
 ```
 onetap-app/
-├── src/                          # React application
+├── src/                          # React application (EDIT HERE)
 │   ├── components/               # UI components
 │   │   ├── ui/                   # shadcn/ui primitives
 │   │   └── auth/                 # Auth-related components
 │   ├── hooks/                    # Custom React hooks
-│   ├── lib/                      # Business logic (no React dependencies)
+│   ├── lib/                      # Business logic (no React imports)
 │   ├── pages/                    # Route-level components
-│   ├── plugins/                  # Capacitor plugin interfaces
+│   ├── plugins/                  # Capacitor plugin TypeScript interfaces
 │   ├── types/                    # TypeScript type definitions
 │   ├── contexts/                 # React contexts
-│   ├── i18n/                     # Internationalization config
-│   └── integrations/supabase/    # Auto-generated Supabase client
-├── native/android/               # Source native files (EDIT THESE)
+│   ├── i18n/                     # Translations
+│   └── integrations/supabase/    # ⚠️ AUTO-GENERATED — do not edit
+│
+├── native/android/               # Native Java source files (EDIT HERE)
 │   ├── app/src/main/java/        # Custom Java classes
-│   ├── app/src/main/res/         # Resources, layouts, drawables
+│   ├── app/src/main/res/         # Android resources, layouts, drawables
 │   └── app/src/main/AndroidManifest.xml
-├── android/                      # Generated Capacitor project (DO NOT EDIT)
+│
+├── android/                      # ⚠️ GENERATED by Capacitor — do NOT edit
+│
 ├── supabase/
-│   ├── functions/                # Edge functions (Deno)
-│   ├── migrations/               # SQL migration files
-│   └── config.toml               # Auto-generated config
-├── scripts/android/              # Build automation scripts
+│   ├── functions/                # Serverless functions (Deno/TypeScript)
+│   ├── migrations/               # ⚠️ AUTO-GENERATED SQL migrations
+│   └── config.toml               # ⚠️ AUTO-GENERATED config
+│
+├── scripts/android/              # Build scripts
+│   ├── clean-rebuild-android.mjs # Full rebuild automation
+│   └── patch-android-project.mjs # Applies native patches
+│
 ├── public/                       # Static assets
-│   ├── .well-known/              # assetlinks.json for App Links
-│   └── privacy-policy.html       # Privacy policy
-└── .github/workflows/            # CI/CD
+│   ├── .well-known/              # assetlinks.json for OAuth
+│   └── privacy-policy.html       # Google Play requirement
+│
+├── .github/workflows/            # CI/CD pipeline
+│   └── android-release.yml       # Build + publish workflow
+│
+└── Documentation files (*.md)
 ```
 
 ---
 
-## Data Architecture
-
-### Local Storage (Source of Truth)
-
-All data lives in `localStorage` on the device. Cloud is additive-only.
-
-| Key | Type | Purpose |
-|-----|------|---------|
-| `saved_links` | `SavedLink[]` | Bookmarks |
-| `saved_links_trash` | `TrashedLink[]` | Soft-deleted bookmarks |
-| `scheduled_actions` | `ScheduledAction[]` | Reminders |
-| `onetap_settings` | `AppSettings` | User preferences |
-| `sync_status` | `SyncStatus` | Sync timing state |
-
-### Cloud Schema (Optional, Additive-Only)
-
-Three tables with RLS — users can only access their own data:
-
-| Table | Purpose |
-|-------|---------|
-| `cloud_bookmarks` | Synced bookmarks (keyed by `entity_id`) |
-| `cloud_trash` | Synced deleted bookmarks |
-| `cloud_scheduled_actions` | Synced reminders |
-
-See `SUPABASE.md` for full schema details.
-
----
-
-## Native Android Layer
-
-All native code lives in `native/android/` and is copied to `android/` by the patch script.
-
-### Key Java Classes
-
-| Class | Purpose |
-|-------|---------|
-| `MainActivity.java` | Entry point, registers Capacitor plugins |
-| `ShortcutPlugin.java` | Home screen shortcut creation via `ShortcutManager` |
-| `NotificationHelper.java` | Scheduled notification display |
-| `ScheduledActionReceiver.java` | `BroadcastReceiver` for alarm triggers |
-| `BootReceiver.java` | Reschedules alarms after device reboot |
-| `NativePdfViewerActivity.java` | Full-featured PDF viewer with pinch-zoom |
-| `NativeVideoPlayerActivity.java` | Video player with PiP support |
-| `QuickCreateWidget.java` | Home screen widget for quick shortcut creation |
-| `CrashLogger.java` | Breadcrumb-based crash logging (no external SDK) |
-
-### Proxy Activities
-
-Each shortcut type has a proxy activity that handles the intent:
-
-- `LinkProxyActivity` — Opens URLs
-- `ContactProxyActivity` — Initiates calls
-- `MessageProxyActivity` — Opens messaging
-- `WhatsAppProxyActivity` — Opens WhatsApp
-- `PDFProxyActivity` — Opens PDF viewer
-- `VideoProxyActivity` — Opens video player
-- `FileProxyActivity` — Opens files
-- `SlideshowProxyActivity` — Opens slideshow
-- `ShortcutEditProxyActivity` — Edits existing shortcuts
-
----
-
-## Sync Architecture
-
-See `PRODUCT_IDEOLOGY.md` for philosophy. Key technical points:
-
-1. **All sync goes through `syncGuard.ts`** — runtime enforcement of timing rules
-2. **Two triggers only**: Manual ("Sync Now") and daily auto (once per 24h on foreground)
-3. **Upload**: Upsert by `entity_id` — cloud never overwrites local
-4. **Download**: Skip items whose `entity_id` already exists locally
-5. **No background sync, no polling, no reactive triggers**
-
----
-
-## Auth Flow (Native Android)
-
-1. User taps "Sign in with Google"
-2. App opens Chrome Custom Tab with OAuth URL
-3. Google redirects to `https://[preview-domain]/auth-callback?code=...`
-4. Android intercepts via App Links (`autoVerify` in AndroidManifest)
-5. `oauthCompletion.ts` exchanges code for session
-6. Idempotency guard prevents double-processing
-
-**Files**: `useAuth.ts`, `useDeepLink.ts`, `oauthCompletion.ts`, `AuthCallback.tsx`
-
----
-
-## Navigation
-
-Four bottom tabs:
-
-| Tab | Icon | Component | Purpose |
-|-----|------|-----------|---------|
-| Access | Zap | `AccessFlow` | Create shortcuts |
-| Reminders | Bell | `NotificationsPage` | Scheduled actions |
-| Bookmarks | Bookmark | `BookmarkLibrary` | Saved links library |
-| Profile | User | `ProfilePage` | Settings + sync |
-
----
-
-## Build Pipeline
-
-See `DEPLOYMENT.md` for full details. Summary:
+## 11. Build Pipeline Overview
 
 ```
-npm run build → npx cap sync android → patch-android-project.mjs → ./gradlew bundleRelease
+Your code changes
+       │
+       ▼
+npm run build          ← Vite bundles React app into dist/
+       │
+       ▼
+npx cap sync android   ← Copies dist/ into the Android project
+       │
+       ▼
+patch-android-project  ← Copies native/ files, configures Gradle
+       │
+       ▼
+./gradlew bundleRelease  ← Produces a signed .aab file
+       │
+       ▼
+Upload to Play Store   ← CI does this automatically (internal track)
+       │
+       ▼
+Manual promotion       ← YOU decide when it goes to production
 ```
 
-CI/CD automates builds; human intent required for releases.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full guide.
+
+---
+
+## 12. Failure Scenarios and Recovery
+
+| Scenario | What Happens | How to Recover |
+|----------|-------------|----------------|
+| **Cloud goes down** | App works perfectly. Sync button shows an error. | Wait for cloud to come back. No data is lost. |
+| **User clears app data** | All local data is lost. | If signed in + synced: re-sign-in and sync to restore cloud copies. If never synced: data is gone. |
+| **Phone restarts** | `BootReceiver` reschedules all alarms. Shortcuts survive. | Automatic — no action needed. |
+| **Bad release shipped** | Users get a broken version. | Tag a hotfix version (`v1.0.1`), test on internal track, promote to production. See [RELEASE_PROCESS.md](RELEASE_PROCESS.md). |
+| **OAuth stops working** | Users can't sign in. App still works for everything except sync. | Check `assetlinks.json` fingerprint and auth callback URL. See Section 6 above. |
+| **Lost signing keystore** | Cannot publish updates to the same Play Store listing. | **Unrecoverable.** You must create a new app listing. Always back up your keystore. |
+| **Sync guard blocks sync** | Sync silently does nothing. | Check console logs for `SyncGuardViolation` (dev) or warning (prod). Likely a timing issue. |
 
 ---
 
