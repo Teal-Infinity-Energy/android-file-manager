@@ -4,6 +4,8 @@
 
 OneTap is a paid Android app that creates home screen shortcuts for instant access to URLs, contacts, files, PDFs, videos, and scheduled reminders. It is local-first — all data lives on the user's device, and cloud sync is entirely optional. There are no ads, no subscriptions, and no tracking.
 
+> **This project does not depend on Lovable Cloud.** Lovable is used only as a code editing assistant. The production stack is: **Android app + Supabase backend + Vercel website**. There is no platform lock-in.
+
 ---
 
 ## What Problem Does This Solve?
@@ -30,13 +32,20 @@ Android users frequently access the same URLs, contacts, and files. OneTap lets 
 └───────────────────────────────────┼──────────────────┘
                                     │
                           ┌─────────▼─────────┐
-                          │  Lovable Cloud     │
-                          │  (Supabase)        │
+                          │    Supabase        │
                           │                    │
                           │  • Cloud Sync      │
                           │  • Google Sign-In  │
                           │  • URL Metadata    │
                           └────────────────────┘
+
+┌───────────────────────────────────────────────────────┐
+│              Vercel (onetapapp.in)                      │
+│                                                        │
+│  • Marketing website                                   │
+│  • Privacy policy hosting                              │
+│  • assetlinks.json for OAuth deep links                │
+└───────────────────────────────────────────────────────┘
 ```
 
 **Key insight:** The cloud is optional. The app works perfectly without internet, without sign-in, and without the cloud. If the cloud disappeared tomorrow, users would lose nothing.
@@ -62,6 +71,7 @@ Android users frequently access the same URLs, contacts, and files. OneTap lets 
 - No staging environment (single backend for test and production)
 - No analytics or tracking code
 - No ad SDKs
+- No Lovable Cloud dependencies
 
 ---
 
@@ -72,10 +82,10 @@ These files are critical to production. Changing them incorrectly can break the 
 | File / Area | Why It's Dangerous |
 |---|---|
 | `android/` folder | **Generated** — gets overwritten by build scripts. Edit `native/android/` instead. |
-| `src/integrations/supabase/client.ts` | **Auto-generated** — Lovable Cloud manages this file. |
+| `src/integrations/supabase/client.ts` | **Auto-generated** — managed by the Supabase integration. |
 | `src/integrations/supabase/types.ts` | **Auto-generated** — reflects your database schema automatically. |
-| `.env` | **Auto-generated** — contains your Supabase connection details. |
-| `supabase/config.toml` | **Auto-generated** — Supabase configuration. |
+| `.env` | Contains your Supabase connection details. Handle with care. |
+| `supabase/config.toml` | Supabase configuration. |
 | `public/.well-known/assetlinks.json` | Controls OAuth deep links. Wrong fingerprint = sign-in breaks. |
 | Release keystore (`.jks` file) | **If you lose this, you cannot update the app on Play Store. Ever.** |
 | GitHub Secrets | Contain signing keys and Play Store credentials. Wrong values = broken CI. |
@@ -107,11 +117,15 @@ These are safe to change during normal development:
 3. When ready to release, you tag a version: git tag v1.2.3
 4. GitHub Actions automatically builds a signed app bundle
 5. The bundle is uploaded to Google Play's internal test track
-6. You manually test it
+6. You manually test it on a physical Android device
 7. You manually promote it to production
 ```
 
 **The key principle:** CI builds automatically, but releasing to real users always requires a human decision.
+
+### Testing Philosophy
+
+All app testing happens on **real Android devices only**. There are no web previews, no emulator-only testing workflows, and no cloud preview environments. Debug builds are tested via USB, and release builds are tested via Google Play's internal track.
 
 ---
 
@@ -142,10 +156,7 @@ cd onetap-app
 # 2. Install dependencies
 npm install
 
-# 3. Run in browser (for UI development)
-npm run dev
-
-# 4. Run on Android device (requires JDK 21 + Android Studio)
+# 3. Run on Android device (requires JDK 21 + Android Studio)
 node scripts/android/clean-rebuild-android.mjs --run
 ```
 
@@ -162,9 +173,10 @@ See [ANDROID_SETUP.md](ANDROID_SETUP.md) for detailed setup instructions.
 | Styling | Tailwind CSS + shadcn/ui | Consistent design system |
 | Native Bridge | Capacitor 8 | Wraps web app in native Android shell |
 | Native Code | Java (Android) | Home screen shortcuts, notifications, PDF/video viewers |
-| Backend | Lovable Cloud (Supabase) | Optional cloud sync and auth |
-| Auth | Google OAuth | Simple, trusted sign-in |
+| Backend | Supabase | Cloud sync and auth (self-hosted or managed) |
+| Auth | Google OAuth via Supabase | Simple, trusted sign-in |
 | CI/CD | GitHub Actions | Automated builds, manual releases |
+| Website | Vercel | Marketing site and domain verification |
 
 ---
 
@@ -175,6 +187,7 @@ See [ANDROID_SETUP.md](ANDROID_SETUP.md) for detailed setup instructions.
 3. **Resource-respectful:** No background services, no polling, no analytics, no tracking.
 4. **Paid upfront:** One-time purchase. No ads, no subscriptions, no in-app purchases.
 5. **Human intent required:** CI builds code, but humans decide when to release.
+6. **No platform lock-in:** Lovable is a code editor, not infrastructure.
 
 See [PRODUCT_IDEOLOGY.md](PRODUCT_IDEOLOGY.md) for the full philosophy.
 
@@ -186,6 +199,7 @@ See [PRODUCT_IDEOLOGY.md](PRODUCT_IDEOLOGY.md) for the full philosophy.
 - All development happens in `feature/*` branches
 - Tag-based releases trigger CI builds (e.g., `v1.0.0`)
 - Human review required before merging and releasing
+- All testing on physical Android devices
 
 ---
 

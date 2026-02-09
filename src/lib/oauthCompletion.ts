@@ -43,16 +43,14 @@ export function getOAuthRedirectUrl(): string {
     return `${window.location.origin}/auth-callback`;
   }
   
-  // For native, determine based on environment
-  // In production builds, this should be the production domain
-  // In development/preview, use the preview domain
+  // For native, use the production domain from env
   const productionDomain = import.meta.env.VITE_PRODUCTION_DOMAIN;
-  const previewDomain = import.meta.env.VITE_SUPABASE_PROJECT_ID 
-    ? `id-preview--${import.meta.env.VITE_SUPABASE_PROJECT_ID.replace('qyokhlaexuywzuyasqxo', '2fa7e10e-ca71-4319-a546-974fcb8a4a6b')}.lovable.app`
-    : null;
   
-  // Use production domain if set, otherwise fall back to preview
-  const domain = productionDomain || previewDomain || 'localhost:5173';
+  if (!productionDomain) {
+    console.warn('[OAuth] VITE_PRODUCTION_DOMAIN is not set. OAuth redirects will fail on native.');
+  }
+  
+  const domain = productionDomain || 'onetapapp.in';
   
   return `https://${domain}/auth-callback`;
 }

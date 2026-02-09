@@ -23,10 +23,9 @@
 ## 1. How Releases Work (Overview)
 
 ```
-feature branch → main → git tag → CI builds → internal track → test → production
-                  │                    │              │                    │
-                  │                    │              │                    │
-              human merges        automatic       human tests        human promotes
+feature branch → main → git tag → CI builds → internal track → test on device → production
+                  │                    │              │                              │
+              human merges        automatic       human tests                  human promotes
 ```
 
 **The key idea:** Automation handles the boring, repeatable parts (building, signing, uploading). Humans handle the irreversible decisions (merging to main, promoting to production).
@@ -79,11 +78,10 @@ git push origin feature/your-feature-name
 
 ```bash
 # 1. Create a Pull Request on GitHub
-#    (Go to your repo → Pull Requests → New → select your branch)
 
-# 2. Review the changes yourself (or have someone review)
+# 2. Review the changes:
 #    - Does the app build? (npm run build)
-#    - Does it work on device? (npx cap run android)
+#    - Does it work on a physical device? (npx cap run android)
 #    - Did you test the specific feature you changed?
 
 # 3. Merge the PR on GitHub
@@ -103,10 +101,10 @@ Go through this list before every release. Do not skip items.
 
 - [ ] All changes merged to `main` via reviewed PR
 - [ ] `main` builds successfully: `npm run build` completes without errors
-- [ ] No console errors or warnings in the browser dev build
+- [ ] No console errors or warnings in the build
 - [ ] Native files in `native/android/` are up to date
 
-### Testing
+### Testing (on Physical Android Device)
 
 - [ ] Installed on physical Android device via `npx cap run android`
 - [ ] Tested all shortcut types:
@@ -122,6 +120,7 @@ Go through this list before every release. Do not skip items.
 - [ ] Tested cloud sync (sign in, sync, verify data appears)
 - [ ] Tested offline behavior (airplane mode — app should work normally)
 - [ ] Tested permission denial (deny permissions — app should not crash)
+- [ ] Tested OAuth sign-in flow on device (App Links intercept correctly)
 
 ### Version Decision
 
@@ -136,11 +135,6 @@ Decide the version number using semantic versioning:
 ### Release Notes
 
 - [ ] Updated `whatsnew/en-US.txt` with user-facing changes
-  ```
-  • Added notes feature for bookmarks
-  • Fixed PDF viewer crash on large files
-  • Improved shortcut creation speed
-  ```
 
 ---
 
@@ -163,18 +157,13 @@ git push origin v1.0.0
 
 ### Step 2: Wait for CI
 
-Go to your GitHub repository → Actions tab. You should see the "Android Release Build" workflow running. Wait for it to complete (usually 5-10 minutes).
+Go to your GitHub repository → Actions tab. Wait for the "Android Release Build" workflow to complete (usually 5-10 minutes).
 
-**If it fails:** Check the error logs. Common issues:
-- Secrets not configured → see [DEPLOYMENT.md](DEPLOYMENT.md) → Section 6
-- Java compilation error → check your native code changes
-- Version code conflict → your tag version must be higher than the last upload
-
-### Step 3: Test on internal track
+### Step 3: Test on internal track (physical device only)
 
 1. Open Google Play Console
 2. Go to your app → Testing → Internal testing
-3. Copy the test link and open it on your phone
+3. Copy the test link and open it on your **physical Android phone**
 4. Install the app from the internal track
 5. Test the key features listed in the pre-release checklist
 
@@ -197,7 +186,6 @@ Go to your GitHub repository → Actions tab. You should see the "Android Releas
 
 - [ ] Verify the app appears on Play Store (may take 1-24 hours)
 - [ ] Monitor Play Console for crashes/ANRs for the first 48 hours
-- [ ] Respond to any user reviews
 
 ---
 
@@ -232,11 +220,11 @@ git tag v1.0.1
 git push origin v1.0.1
 
 # 3. Wait for CI to build and upload to internal
-# 4. Test on internal track
+# 4. Test on physical device via internal track
 # 5. Promote to production immediately
 ```
 
-**Speed matters for hotfixes,** but never skip testing on the internal track. A broken hotfix is worse than the original bug.
+**Speed matters for hotfixes,** but never skip testing on a physical device. A broken hotfix is worse than the original bug.
 
 ---
 
@@ -264,7 +252,7 @@ Something went wrong with a release
         │       │
         │       ├── Check GitHub Actions logs for the error
         │       ├── Common: missing secrets, Java errors, version conflicts
-        │       └── Fallback: build locally (see DEPLOYMENT.md → Section 12)
+        │       └── Fallback: build locally (see DEPLOYMENT.md)
         │
         └── Did Play Store reject the app?
                 │
@@ -295,7 +283,7 @@ Release notes live in `whatsnew/en-US.txt`. Update this file before tagging a re
 • Bug fixes and performance improvements
 ```
 
-Keep notes user-facing and specific. Technical details belong in git commit history, not release notes.
+Keep notes user-facing and specific.
 
 ---
 
@@ -308,7 +296,7 @@ Keep notes user-facing and specific. Technical details belong in git commit hist
 | Release on Fridays | If something breaks, you'll be fixing it over the weekend |
 | Bundle many risky changes in one release | If something breaks, you won't know which change caused it |
 | Delete old git tags | Tags are your release history — keep them |
-| Change pricing during a release | Price changes and code changes should be separate events |
+| Test only in emulators | Always verify on a physical device |
 
 ---
 

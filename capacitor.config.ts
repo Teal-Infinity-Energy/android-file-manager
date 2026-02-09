@@ -4,9 +4,9 @@ const config: CapacitorConfig = {
   appId: 'app.onetap.shortcuts',
   appName: 'OneTap',
   webDir: 'dist',
-  // For live reload during development, uncomment below:
+  // For live reload during development, uncomment and set your local IP:
   // server: {
-  //   url: 'https://2fa7e10e-ca71-4319-a546-974fcb8a4a6b.lovableproject.com?forceHideBadge=true',
+  //   url: 'http://YOUR_LOCAL_IP:8080',
   //   cleartext: true
   // },
   android: {

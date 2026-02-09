@@ -16,8 +16,10 @@
 8. [How Version Codes Work](#8-how-version-codes-work)
 9. [How to Test Release Builds Safely](#9-how-to-test-release-builds-safely)
 10. [Build Outputs](#10-build-outputs)
-11. [Edge Functions](#11-edge-functions)
-12. [Common Failures and Fixes](#12-common-failures-and-fixes)
+11. [Edge Functions Deployment](#11-edge-functions-deployment)
+12. [Website Deployment (Vercel)](#12-website-deployment-vercel)
+13. [Supabase Environment Setup](#13-supabase-environment-setup)
+14. [Common Failures and Fixes](#14-common-failures-and-fixes)
 
 ---
 
@@ -47,18 +49,19 @@ Your React code (src/)
 
 **What is an AAB?** An Android App Bundle. It's the format Google Play requires. Google takes your AAB and generates optimized APKs for each device type.
 
+**Important:** The app is never tested or deployed via web preview environments. All testing happens on physical Android devices.
+
 ---
 
 ## 2. Environments
 
 | Environment | Purpose | How It Updates |
 |-------------|---------|---------------|
-| Lovable Preview | Web development and testing | Auto-deploys when you change code in Lovable |
-| Android Debug | Testing on your phone | Built locally with `npx cap run android` |
+| Android Debug | Testing on your phone via USB | Built locally with `npx cap run android` |
 | Android Release | Production-quality build | Built locally or by CI |
 | Google Play | Distribution to real users | Manual promotion between tracks |
 
-**There is ONE backend project.** No staging/production split. See [SUPABASE.md](SUPABASE.md) for why.
+**There is ONE Supabase backend project.** No staging/production split. See [SUPABASE.md](SUPABASE.md) for why.
 
 ---
 
@@ -92,23 +95,18 @@ This single command does everything: cleans, builds, patches, syncs, and deploys
 
 ```bash
 # Step 1: Build the web app
-# This runs Vite, which bundles your React code into static HTML/CSS/JS files
 npm run build
 # Expected: Creates a dist/ folder with your bundled app
 
 # Step 2: Sync Capacitor
-# This copies the dist/ folder into the Android project
 npx cap sync android
 # Expected: Updates android/app/src/main/assets/public/
 
 # Step 3: Apply native patches
-# This copies your Java files from native/android/ to android/
-# and configures Gradle settings
 node scripts/android/patch-android-project.mjs
 # Expected: Prints messages about each file copied and setting applied
 
 # Step 4: Run on your phone
-# This compiles the Android project and installs it on your connected device
 npx cap run android
 # Expected: App launches on your phone
 ```
@@ -149,9 +147,6 @@ This is your main build script. It automates the full process:
 This script transforms the generic Capacitor Android project into OneTap. It:
 
 - **Copies native files** from `native/android/` → `android/`
-  - All Java classes (MainActivity, ShortcutPlugin, proxy activities, etc.)
-  - AndroidManifest.xml
-  - Resource files (layouts, drawables, XML configs)
 - **Updates Gradle** wrapper to version 8.13
 - **Configures SDK versions:** minSdk=31, compileSdk=36, targetSdk=36
 - **Adds dependencies:** ExoPlayer/Media3, SwipeRefreshLayout, RecyclerView
@@ -203,7 +198,7 @@ Tag push (v1.0.0)  ──or──  Manual workflow dispatch
 ### What Humans Do (Manual)
 
 - **Decide when to release:** Tag a version when you're ready
-- **Test on internal track:** Install from Play Console and verify
+- **Test on internal track:** Install from Play Console on a physical device and verify
 - **Promote to production:** Manually trigger the workflow with `track: production`, or promote in Play Console
 
 ### Required GitHub Secrets
@@ -235,7 +230,7 @@ Every Android app must be "signed" with a cryptographic key before it can be ins
 | **Upload key** | Used to sign the AAB you upload to Google Play | Your keystore file (`onetap-release.jks`) |
 | **App signing key** | Used by Google Play to sign the final APK sent to users | Managed by Google (if enrolled in Play App Signing) |
 
-**Recommended:** Enroll in Google Play App Signing. This means even if you lose your upload key, Google still has the app signing key and you can reset your upload key. Without enrollment, losing your keystore means you can never update the app.
+**Recommended:** Enroll in Google Play App Signing. This means even if you lose your upload key, Google still has the app signing key and you can reset your upload key.
 
 ### Creating a keystore (one-time)
 
@@ -244,11 +239,6 @@ keytool -genkey -v -keystore onetap-release.jks \
   -keyalg RSA -keysize 2048 -validity 10000 \
   -alias onetap-key
 ```
-
-You will be prompted for:
-- A keystore password (remember this — you need it for every build)
-- Your name, organization, etc. (can be anything)
-- A key password (can be the same as keystore password)
 
 ⚠️ **DANGER:**
 **Back up this file immediately.** Store it in a secure location outside of your repository (e.g., a password manager, encrypted cloud storage). If you lose it AND you didn't enroll in Play App Signing, you cannot update the app. Ever.
@@ -265,15 +255,6 @@ Every Android app has two version identifiers:
 | `versionCode` | `10203` | Machine-readable. Must increase with every release. |
 
 **The formula:** `major × 10000 + minor × 100 + patch`
-
-| Tag | versionName | versionCode |
-|-----|-------------|-------------|
-| v1.0.0 | 1.0.0 | 10000 |
-| v1.0.1 | 1.0.1 | 10001 |
-| v1.2.3 | 1.2.3 | 10203 |
-| v2.0.0 | 2.0.0 | 20000 |
-
-**Rule:** The `versionCode` must always be higher than the previous release. Google Play will reject your upload if it's equal or lower.
 
 ---
 
@@ -292,7 +273,7 @@ Every Android app has two version identifiers:
 
 1. **Tag a version:** `git tag v1.0.0 && git push origin v1.0.0`
 2. **Wait for CI:** Check GitHub Actions — the build should succeed and upload to the internal track
-3. **Install from internal track:** Open Play Console → Internal testing → copy the test link → install on your phone
+3. **Install from internal track:** Open Play Console → Internal testing → copy the test link → install on your **physical Android device**
 4. **Test everything:** All shortcut types, reminders, sync, offline mode
 5. **If it works:** Promote to production (see [RELEASE_PROCESS.md](RELEASE_PROCESS.md))
 6. **If it's broken:** Fix the issue, tag a new patch version (`v1.0.1`), repeat
@@ -310,9 +291,24 @@ Every Android app has two version identifiers:
 
 ---
 
-## 11. Edge Functions
+## 11. Edge Functions Deployment
 
-Edge functions deploy automatically when you push code changes to your Lovable project. You do not need to deploy them manually.
+Edge functions must be deployed manually using the Supabase CLI:
+
+```bash
+# Install Supabase CLI if you haven't
+npm install -g supabase
+
+# Login to your Supabase account
+supabase login
+
+# Link to your project
+supabase link --project-ref YOUR_PROJECT_ID
+
+# Deploy all functions
+supabase functions deploy fetch-url-metadata
+supabase functions deploy delete-account
+```
 
 | Function | Purpose |
 |----------|---------|
@@ -321,7 +317,47 @@ Edge functions deploy automatically when you push code changes to your Lovable p
 
 ---
 
-## 12. Common Failures and Fixes
+## 12. Website Deployment (Vercel)
+
+The marketing website is hosted on Vercel at `onetapapp.in`. This is a separate repository (`onetapapp.in`).
+
+**Critical files hosted on the website domain:**
+
+| File | Purpose | Why It Matters |
+|------|---------|---------------|
+| `/.well-known/assetlinks.json` | Android App Link verification | Without this, OAuth redirects open in browser instead of the app |
+| `/privacy-policy.html` | Google Play policy compliance | Required for Play Store listing |
+| `/auth-callback` | OAuth redirect landing | Intercepted by Android App Links before the page loads |
+
+**When deploying to Vercel, ensure:**
+1. The `assetlinks.json` file is served with correct MIME type (`application/json`)
+2. The SHA-256 fingerprint in `assetlinks.json` matches your Play Store app signing certificate
+3. The domain has a valid SSL certificate (required for App Links)
+
+---
+
+## 13. Supabase Environment Setup
+
+### Required environment variables (`.env`)
+
+```
+VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key
+VITE_SUPABASE_PROJECT_ID=YOUR_PROJECT_ID
+VITE_PRODUCTION_DOMAIN=onetapapp.in
+```
+
+### Supabase Dashboard Configuration
+
+1. **Authentication → Providers → Google:** Enable and configure with your OAuth credentials
+2. **Authentication → URL Configuration → Redirect URLs:** Add `https://onetapapp.in/auth-callback`
+3. **Edge Functions → Secrets:** Verify `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` exist
+
+See [SUPABASE.md](SUPABASE.md) for full backend setup.
+
+---
+
+## 14. Common Failures and Fixes
 
 | Problem | What You See | How to Fix |
 |---------|-------------|-----------|
