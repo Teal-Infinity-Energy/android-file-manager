@@ -212,6 +212,13 @@ jobs:
             echo "track=internal" >> $GITHUB_OUTPUT
           fi
       
+      - name: Create whatsnew directory (if missing)
+        run: |
+          mkdir -p whatsnew
+          if [ ! -f "whatsnew/en-US.txt" ]; then
+            echo "Release v${{ needs.build.outputs.version_name }}" > whatsnew/en-US.txt
+          fi
+      
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
@@ -222,7 +229,6 @@ jobs:
           status: completed
           releaseName: "v${{ needs.build.outputs.version_name }}"
           whatsNewDirectory: ./whatsnew
-        continue-on-error: true
       
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
